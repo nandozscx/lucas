@@ -1,15 +1,15 @@
 
 "use client";
 
-import React, { useState, useMemo, useEffect } from 'react';
-import type { Delivery, VendorTotal } from '@/types';
+import React, { useState, useEffect } from 'react';
+import type { Delivery } from '@/types'; // VendorTotal might be unneeded if not used
 import DashboardHeader from '@/components/dashboard-header';
-import SupplyEntryForm from '@/components/supply-entry-form';
-import SupplyDataView from '@/components/supply-data-view';
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Card } from "@/components/ui/card";
+import { ClipboardPenLine, Users, Download, History } from 'lucide-react';
 
-// Simple client-side ID generator
+// Simple client-side ID generator (kept in case "Registro" needs it later)
 const generateId = () => {
   return Date.now().toString(36) + Math.random().toString(36).substring(2, 9);
 };
@@ -26,15 +26,15 @@ export default function DashboardPage() {
     if (storedDeliveries) {
       try {
         const parsedDeliveries = JSON.parse(storedDeliveries);
-        // Basic validation for stored data
         if (Array.isArray(parsedDeliveries) && parsedDeliveries.every(d => 'id' in d && 'providerName' in d && 'date' in d && 'quantity' in d)) {
             setDeliveries(parsedDeliveries);
         } else {
-            localStorage.removeItem('dailySupplyTrackerDeliveries'); // Clear corrupted data
+            console.warn("Invalid data structure in localStorage, clearing.");
+            localStorage.removeItem('dailySupplyTrackerDeliveries');
         }
       } catch (error) {
         console.error("Failed to parse deliveries from localStorage", error);
-        localStorage.removeItem('dailySupplyTrackerDeliveries'); // Clear corrupted data
+        localStorage.removeItem('dailySupplyTrackerDeliveries');
       }
     }
   }, []);
@@ -46,89 +46,105 @@ export default function DashboardPage() {
     }
   }, [deliveries, isClient]);
 
-  const handleAddDelivery = (newDeliveryData: Omit<Delivery, 'id'>) => {
-    const newDelivery: Delivery = {
-      ...newDeliveryData,
-      id: generateId(),
-    };
-    setDeliveries(prevDeliveries => [...prevDeliveries, newDelivery]);
-    toast({
-      title: "Success!",
-      description: `Delivery from ${newDelivery.providerName} added.`,
-      className: "bg-primary text-primary-foreground",
-    });
+  // Moved exportToCSV function from DashboardHeader
+  const exportToCSV = () => {
+    if (deliveries.length === 0) {
+      toast({
+        title: "No Data",
+        description: "There is no data to export.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const headers = "Provider,Date,Quantity\n";
+    const csvRows = deliveries.map(d =>
+      `"${d.providerName.replace(/"/g, '""')}","${d.date}",${d.quantity}`
+    );
+    const csvContent = headers + csvRows.join("\n");
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+
+    if (link.download !== undefined) {
+      const url = URL.createObjectURL(blob);
+      link.setAttribute("href", url);
+      link.setAttribute("download", "supply_deliveries.csv");
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      toast({
+        title: "Export Successful",
+        description: "Deliveries exported to CSV.",
+      });
+    } else {
+       toast({
+        title: "Export Failed",
+        description: "Your browser does not support direct downloads.",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleDeleteDelivery = (id: string) => {
-    setDeliveries(prevDeliveries => prevDeliveries.filter(d => d.id !== id));
+  const handleCardClick = (cardTitle: string) => {
+    // Placeholder for navigation or other actions
     toast({
-      title: "Delivery Deleted",
-      description: "The delivery record has been removed.",
-      variant: "destructive",
+      title: `${cardTitle} Clicked`,
+      description: `You clicked the ${cardTitle} card. Navigation not yet implemented.`,
     });
+    console.log(`${cardTitle} card action triggered.`);
   };
 
-  const dailyTotals = useMemo(() => {
-    if (!isClient) return {};
-    return deliveries.reduce((acc, delivery) => {
-      acc[delivery.date] = (acc[delivery.date] || 0) + delivery.quantity;
-      return acc;
-    }, {} as Record<string, number>);
-  }, [deliveries, isClient]);
-
-  const vendorTotals = useMemo<VendorTotal[]>(() => {
-    if (!isClient) return [];
-    const totalsMap: Record<string, { originalName: string; totalQuantity: number }> = {};
-    deliveries.forEach(delivery => {
-      const normalizedName = delivery.providerName.trim().toLowerCase();
-      if (totalsMap[normalizedName]) {
-        totalsMap[normalizedName].totalQuantity += delivery.quantity;
-      } else {
-        totalsMap[normalizedName] = {
-          originalName: delivery.providerName.trim(),
-          totalQuantity: delivery.quantity,
-        };
-      }
-    });
-    return Object.values(totalsMap).sort((a, b) => a.originalName.localeCompare(b.originalName));
-  }, [deliveries, isClient]);
 
   if (!isClient) {
-    // Skeleton loader to match the layout during SSR/hydration
     return (
       <div className="min-h-screen flex flex-col p-4 md:p-8 space-y-6 bg-background">
         <Skeleton className="h-20 w-full rounded-lg" /> {/* Header Placeholder */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-1">
-            <Skeleton className="h-[450px] w-full rounded-lg" /> {/* Form Placeholder */}
-          </div>
-          <div className="lg:col-span-2">
-            <Skeleton className="h-[600px] w-full rounded-lg" /> {/* Data View Placeholder */}
-          </div>
-        </div>
+        <main className="flex-grow grid grid-cols-1 sm:grid-cols-2 gap-6 md:gap-8 p-4 md:p-8">
+            <Skeleton className="h-48 w-full rounded-lg aspect-square" />
+            <Skeleton className="h-48 w-full rounded-lg aspect-square" />
+            <Skeleton className="h-48 w-full rounded-lg aspect-square" />
+            <Skeleton className="h-48 w-full rounded-lg aspect-square" />
+        </main>
+        <footer className="text-center text-sm text-muted-foreground py-4 mt-auto">
+            <Skeleton className="h-6 w-1/2 mx-auto rounded-md" />
+        </footer>
       </div>
     );
   }
 
+  const cardItems = [
+    { title: "Registro", icon: ClipboardPenLine, action: () => handleCardClick("Registro") },
+    { title: "Proveedores", icon: Users, action: () => handleCardClick("Proveedores") },
+    { title: "Exportar", icon: Download, action: exportToCSV },
+    { title: "Historial", icon: History, action: () => handleCardClick("Historial") },
+  ];
+
   return (
     <div className="min-h-screen flex flex-col p-4 md:p-8 space-y-6 bg-background">
-      <DashboardHeader deliveries={deliveries} />
-      <main className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-grow">
-        <section aria-labelledby="add-delivery-heading" className="lg:col-span-1">
-           <h2 id="add-delivery-heading" className="sr-only">Add New Delivery Form</h2>
-          <SupplyEntryForm onAddDelivery={handleAddDelivery} />
-        </section>
-        <section aria-labelledby="supply-records-heading" className="lg:col-span-2">
-          <h2 id="supply-records-heading" className="sr-only">Supply Records and Totals</h2>
-          <SupplyDataView
-            deliveries={deliveries}
-            dailyTotals={dailyTotals}
-            vendorTotals={vendorTotals}
-            onDeleteDelivery={handleDeleteDelivery}
-          />
-        </section>
+      <DashboardHeader onExportCSV={exportToCSV} />
+      <main className="flex-grow grid grid-cols-1 sm:grid-cols-2 gap-6 md:gap-8 p-4 md:p-8 items-center">
+        {cardItems.map((item) => {
+          const IconComponent = item.icon;
+          return (
+            <Card
+              key={item.title}
+              role="button"
+              tabIndex={0}
+              onClick={item.action}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); item.action(); } }}
+              className="flex flex-col items-center justify-center p-6 hover:shadow-xl transition-all duration-200 ease-in-out cursor-pointer aspect-square rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 shadow-md"
+              aria-label={item.title}
+            >
+              <IconComponent className="h-16 w-16 text-primary mb-4" strokeWidth={1.5} />
+              <p className="text-xl font-semibold text-center text-foreground">{item.title}</p>
+            </Card>
+          );
+        })}
       </main>
-      <footer className="text-center text-sm text-muted-foreground py-4">
+      <footer className="text-center text-sm text-muted-foreground py-4 mt-auto">
         <p>&copy; {new Date().getFullYear()} Daily Supply Tracker. All rights reserved.</p>
       </footer>
     </div>
