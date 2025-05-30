@@ -22,7 +22,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
+  // AlertDialogTrigger, // No longer needed here
 } from "@/components/ui/alert-dialog";
 import {
   Table,
@@ -106,11 +106,9 @@ export default function ProvidersPage() {
     handleCloseDialog();
   }, [editingProvider, toast, handleCloseDialog]);
 
-  const handleDeleteProvider = (providerId: string) => {
-    const provider = providers.find(p => p.id === providerId);
-    if (provider) {
-      setProviderToDelete(provider); // This will trigger the AlertDialog
-    }
+  // This function now just sets the state to open the AlertDialog
+  const handleDeleteProviderClick = (provider: Provider) => {
+    setProviderToDelete(provider);
   };
   
   const confirmDelete = () => {
@@ -189,11 +187,10 @@ export default function ProvidersPage() {
                       <Button variant="ghost" size="icon" onClick={() => handleOpenEditDialog(provider)} aria-label={`Edit ${provider.name}`}>
                         <Edit2 className="h-4 w-4 text-blue-600 hover:text-blue-500" />
                       </Button>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="icon" onClick={() => setProviderToDelete(provider)} aria-label={`Delete ${provider.name}`}>
-                          <Trash2 className="h-4 w-4 text-destructive hover:text-destructive/80" />
-                        </Button>
-                      </AlertDialogTrigger>
+                      {/* Removed AlertDialogTrigger wrapper */}
+                      <Button variant="ghost" size="icon" onClick={() => handleDeleteProviderClick(provider)} aria-label={`Delete ${provider.name}`}>
+                        <Trash2 className="h-4 w-4 text-destructive hover:text-destructive/80" />
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -246,3 +243,4 @@ export default function ProvidersPage() {
     </div>
   );
 }
+
