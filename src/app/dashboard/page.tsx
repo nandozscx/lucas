@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import type { Delivery } from '@/types';
 import DashboardHeader from '@/components/dashboard-header';
 import { useToast } from "@/hooks/use-toast";
@@ -13,6 +14,7 @@ export default function DashboardPage() {
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const { toast } = useToast();
   const [isClient, setIsClient] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     setIsClient(true);
@@ -23,7 +25,7 @@ export default function DashboardPage() {
         if (Array.isArray(parsedDeliveries) && parsedDeliveries.every(d => 'id' in d && 'providerName' in d && 'date' in d && 'quantity' in d)) {
             setDeliveries(parsedDeliveries);
         } else {
-            console.warn("Invalid data structure in localStorage, clearing.");
+            console.warn("Invalid data structure in localStorage for deliveries, clearing.");
             localStorage.removeItem('dailySupplyTrackerDeliveries');
         }
       } catch (error) {
@@ -81,11 +83,15 @@ export default function DashboardPage() {
   };
 
   const handleCardClick = (cardTitle: string) => {
-    toast({
-      title: `${cardTitle} Clicked`,
-      description: `You clicked the ${cardTitle} card. Navigation not yet implemented.`,
-    });
-    console.log(`${cardTitle} card action triggered.`);
+    if (cardTitle === "Proveedores") {
+      router.push('/dashboard/providers');
+    } else {
+      toast({
+        title: `${cardTitle} Clicked`,
+        description: `You clicked the ${cardTitle} card. Navigation not yet implemented.`,
+      });
+      console.log(`${cardTitle} card action triggered.`);
+    }
   };
 
 

@@ -10,3 +10,10 @@ export interface VendorTotal {
   originalName: string;
   totalQuantity: number;
 }
+
+export interface Provider {
+  id: string;
+  name: string;
+  address: string;
+  phone: string;
+}
