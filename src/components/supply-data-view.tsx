@@ -40,7 +40,7 @@ const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals
   const EmptyState: React.FC<{ message: string }> = ({ message }) => (
     <div className="flex flex-col items-center justify-center text-center text-muted-foreground py-10 border border-dashed rounded-md">
       <Info className="h-12 w-12 mb-3 opacity-50" />
-      <p className="text-lg font-medium">No Data Available</p>
+      <p className="text-lg font-medium">No Hay Datos Disponibles</p>
       <p className="text-sm">{message}</p>
     </div>
   );
@@ -48,34 +48,34 @@ const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals
   return (
     <Card className="shadow-lg rounded-lg">
       <CardHeader>
-        <CardTitle className="text-xl text-primary">Supply Records</CardTitle>
+        <CardTitle className="text-xl text-primary">Registros de Entregas</CardTitle>
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="allDeliveries" className="w-full">
           <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3 mb-6">
             <TabsTrigger value="allDeliveries" className="flex items-center gap-2 text-sm sm:text-base">
-              <ListOrdered className="h-4 w-4 sm:h-5 sm:w-5"/> All Deliveries
+              <ListOrdered className="h-4 w-4 sm:h-5 sm:w-5"/> Todas las Entregas
             </TabsTrigger>
             <TabsTrigger value="dailyTotals" className="flex items-center gap-2 text-sm sm:text-base">
-              <CalendarDays className="h-4 w-4 sm:h-5 sm:w-5"/> Daily Totals
+              <CalendarDays className="h-4 w-4 sm:h-5 sm:w-5"/> Totales Diarios
             </TabsTrigger>
             <TabsTrigger value="vendorTotals" className="flex items-center gap-2 text-sm sm:text-base">
-              <Users className="h-4 w-4 sm:h-5 sm:w-5"/> Vendor Totals
+              <Users className="h-4 w-4 sm:h-5 sm:w-5"/> Totales por Proveedor
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="allDeliveries">
             {sortedDeliveries.length === 0 ? (
-              <EmptyState message="No deliveries have been recorded yet. Add one using the form." />
+              <EmptyState message="Aún no se han registrado entregas. Añade una usando el formulario." />
             ) : (
               <ScrollArea className="h-[400px] sm:h-[500px] rounded-md border">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="font-semibold">Provider</TableHead>
-                      <TableHead className="font-semibold">Date</TableHead>
-                      <TableHead className="text-right font-semibold">Quantity</TableHead>
-                      <TableHead className="text-right font-semibold">Actions</TableHead>
+                      <TableHead className="font-semibold">Proveedor</TableHead>
+                      <TableHead className="font-semibold">Fecha</TableHead>
+                      <TableHead className="text-right font-semibold">Cantidad</TableHead>
+                      <TableHead className="text-right font-semibold">Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -85,7 +85,7 @@ const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals
                         <TableCell>{format(parseISO(delivery.date), "PP")}</TableCell>
                         <TableCell className="text-right">{delivery.quantity.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})}</TableCell>
                         <TableCell className="text-right">
-                          <Button variant="ghost" size="icon" onClick={() => onDeleteDelivery(delivery.id)} aria-label={`Delete delivery from ${delivery.providerName} on ${format(parseISO(delivery.date), "PP")}`}>
+                          <Button variant="ghost" size="icon" onClick={() => onDeleteDelivery(delivery.id)} aria-label={`Eliminar entrega de ${delivery.providerName} el ${format(parseISO(delivery.date), "PP")}`}>
                             <Trash2 className="h-4 w-4 text-destructive hover:text-destructive/80" />
                           </Button>
                         </TableCell>
@@ -93,21 +93,21 @@ const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals
                     ))}
                   </TableBody>
                 </Table>
-                 {sortedDeliveries.length > 5 && <TableCaption>Scroll for more entries.</TableCaption>}
+                 {sortedDeliveries.length > 5 && <TableCaption>Desplázate para ver más entradas.</TableCaption>}
               </ScrollArea>
             )}
           </TabsContent>
 
           <TabsContent value="dailyTotals">
              {sortedDailyTotals.length === 0 ? (
-              <EmptyState message="Daily totals will appear here once deliveries are added." />
+              <EmptyState message="Los totales diarios aparecerán aquí una vez que se añadan entregas." />
             ) : (
               <ScrollArea className="h-[400px] sm:h-[500px] rounded-md border">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="font-semibold">Date</TableHead>
-                      <TableHead className="text-right font-semibold">Total Quantity</TableHead>
+                      <TableHead className="font-semibold">Fecha</TableHead>
+                      <TableHead className="text-right font-semibold">Cantidad Total</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -119,21 +119,21 @@ const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals
                     ))}
                   </TableBody>
                 </Table>
-                {sortedDailyTotals.length > 5 && <TableCaption>Scroll for more entries.</TableCaption>}
+                {sortedDailyTotals.length > 5 && <TableCaption>Desplázate para ver más entradas.</TableCaption>}
               </ScrollArea>
             )}
           </TabsContent>
 
           <TabsContent value="vendorTotals">
             {vendorTotals.length === 0 ? (
-              <EmptyState message="Vendor totals will be calculated and displayed here." />
+              <EmptyState message="Los totales por proveedor se calcularán y mostrarán aquí." />
             ) : (
               <ScrollArea className="h-[400px] sm:h-[500px] rounded-md border">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="font-semibold">Provider</TableHead>
-                      <TableHead className="text-right font-semibold">Total Quantity</TableHead>
+                      <TableHead className="font-semibold">Proveedor</TableHead>
+                      <TableHead className="text-right font-semibold">Cantidad Total</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -145,7 +145,7 @@ const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals
                     ))}
                   </TableBody>
                 </Table>
-                {vendorTotals.length > 5 && <TableCaption>Scroll for more entries.</TableCaption>}
+                {vendorTotals.length > 5 && <TableCaption>Desplázate para ver más entradas.</TableCaption>}
               </ScrollArea>
             )}
           </TabsContent>
@@ -156,3 +156,4 @@ const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals
 };
 
 export default SupplyDataView;
+

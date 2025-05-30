@@ -3,12 +3,12 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import type { Delivery, Delivery as DeliveryType, VendorTotal } from '@/types'; // Delivery alias for clarity if needed elsewhere
+import type { Delivery, Delivery as DeliveryType, VendorTotal, Provider } from '@/types'; // Delivery alias for clarity if needed elsewhere
 import SupplyEntryForm from '@/components/supply-entry-form';
 import SupplyDataView from '@/components/supply-data-view';
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, ClipboardList } from 'lucide-react';
+import { ArrowLeft, ClipboardList, AlertTriangle } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,11 +19,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from '@/components/ui/button';
 
 const DELIVERIES_STORAGE_KEY = 'dailySupplyTrackerDeliveries';
+const PROVIDERS_STORAGE_KEY = 'dailySupplyTrackerProviders';
 
 export default function RegistryPage() {
   const [deliveries, setDeliveries] = useState<DeliveryType[]>([]);
+  const [providers, setProviders] = useState<Provider[]>([]);
   const [dailyTotals, setDailyTotals] = useState<Record<string, number>>({});
   const [vendorTotals, setVendorTotals] = useState<VendorTotal[]>([]);
   const [isClient, setIsClient] = useState(false);
@@ -34,6 +38,7 @@ export default function RegistryPage() {
   useEffect(() => {
     setIsClient(true);
     if (typeof window !== 'undefined') {
+      // Load Deliveries
       const storedDeliveries = localStorage.getItem(DELIVERIES_STORAGE_KEY);
       if (storedDeliveries) {
         try {
@@ -49,6 +54,25 @@ export default function RegistryPage() {
           localStorage.removeItem(DELIVERIES_STORAGE_KEY);
         }
       }
+
+      // Load Providers
+      const storedProviders = localStorage.getItem(PROVIDERS_STORAGE_KEY);
+      if (storedProviders) {
+        try {
+          const parsedProviders = JSON.parse(storedProviders);
+           if (Array.isArray(parsedProviders) && parsedProviders.every(p => 'id' in p && 'name' in p && 'address' in p && 'phone' in p)) {
+            setProviders(parsedProviders);
+          } else {
+            console.warn("Invalid data structure in localStorage for providers, clearing providers list.");
+            localStorage.removeItem(PROVIDERS_STORAGE_KEY);
+            setProviders([]); // Set to empty array if data is invalid
+          }
+        } catch (error) {
+          console.error("Failed to parse providers from localStorage", error);
+          localStorage.removeItem(PROVIDERS_STORAGE_KEY);
+          setProviders([]); // Set to empty array on error
+        }
+      }
     }
   }, []);
 
@@ -56,14 +80,12 @@ export default function RegistryPage() {
     if (isClient) {
       localStorage.setItem(DELIVERIES_STORAGE_KEY, JSON.stringify(deliveries));
 
-      // Calculate daily totals
       const newDailyTotals: Record<string, number> = {};
       deliveries.forEach(delivery => {
         newDailyTotals[delivery.date] = (newDailyTotals[delivery.date] || 0) + delivery.quantity;
       });
       setDailyTotals(newDailyTotals);
 
-      // Calculate vendor totals
       const newVendorTotalsMap: Record<string, number> = {};
       deliveries.forEach(delivery => {
         newVendorTotalsMap[delivery.providerName] = (newVendorTotalsMap[delivery.providerName] || 0) + delivery.quantity;
@@ -82,8 +104,8 @@ export default function RegistryPage() {
     };
     setDeliveries(prev => [newDelivery, ...prev]);
     toast({
-      title: "Delivery Added",
-      description: `Delivery from ${newDelivery.providerName} on ${newDelivery.date} for ${newDelivery.quantity} units has been recorded.`,
+      title: "Entrega Registrada",
+      description: `Entrega de ${newDelivery.providerName} el ${newDelivery.date} por ${newDelivery.quantity} unidades ha sido registrada.`,
     });
   }, [toast]);
 
@@ -98,8 +120,8 @@ export default function RegistryPage() {
     if (deliveryToDelete) {
       setDeliveries(prev => prev.filter(d => d.id !== deliveryToDelete.id));
       toast({
-        title: "Delivery Deleted",
-        description: `Delivery from ${deliveryToDelete.providerName} has been deleted.`,
+        title: "Entrega Eliminada",
+        description: `La entrega de ${deliveryToDelete.providerName} ha sido eliminada.`,
         variant: "destructive",
       });
       setDeliveryToDelete(null);
@@ -133,17 +155,33 @@ export default function RegistryPage() {
       <header className="flex flex-col sm:flex-row items-center justify-between mb-6 md:mb-10 p-4 bg-card shadow-md rounded-lg gap-4">
         <Link href="/dashboard" className="flex items-center text-primary hover:underline text-sm mb-4 sm:mb-0 self-start sm:self-center">
           <ArrowLeft className="mr-1 h-4 w-4" />
-          Back to Dashboard
+          Volver al Panel
         </Link>
-        <h1 className="text-2xl md:text-3xl font-bold text-primary flex items-center order-first sm:order-none mx-auto sm:mx-0">
-          <ClipboardList className="mr-3 h-8 w-8" /> Register Supply Deliveries
-        </h1>
+        <div className="text-center order-first sm:order-none mx-auto sm:mx-0">
+          <h1 className="text-2xl md:text-3xl font-bold text-primary flex items-center justify-center">
+            <ClipboardList className="mr-3 h-8 w-8" /> Registro de Entregas
+          </h1>
+          <p className="text-sm text-muted-foreground">Registro Semanal</p>
+        </div>
         <div className="w-0 sm:w-auto"></div> {/* Spacer for alignment */}
       </header>
 
       <main className="flex-grow grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
         <div className="md:col-span-1 space-y-6">
-          <SupplyEntryForm onAddDelivery={handleAddDelivery} />
+          {providers.length === 0 ? (
+             <Alert variant="destructive" className="shadow-md">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>No hay proveedores registrados</AlertTitle>
+              <AlertDescription>
+                Por favor, añade proveedores en la sección "Proveedores" antes de registrar entregas.
+                <Button asChild variant="link" className="p-0 h-auto ml-1 text-destructive hover:underline">
+                  <Link href="/dashboard/providers">Ir a Proveedores</Link>
+                </Button>
+              </AlertDescription>
+            </Alert>
+          ) : (
+            <SupplyEntryForm onAddDelivery={handleAddDelivery} providers={providers} />
+          )}
         </div>
         <div className="md:col-span-2 space-y-6">
           <SupplyDataView
@@ -158,22 +196,22 @@ export default function RegistryPage() {
       <AlertDialog open={!!deliveryToDelete} onOpenChange={(open) => { if (!open) setDeliveryToDelete(null);}}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure you want to delete this delivery?</AlertDialogTitle>
+            <AlertDialogTitle>¿Seguro que quieres eliminar esta entrega?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the delivery record from "{deliveryToDelete?.providerName}" on {deliveryToDelete?.date}.
+              Esta acción no se puede deshacer. Se eliminará permanentemente el registro de entrega de "{deliveryToDelete?.providerName}" del {deliveryToDelete?.date}.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setDeliveryToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel onClick={() => setDeliveryToDelete(null)}>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDeleteDelivery} className="bg-destructive hover:bg-destructive/90">
-              Delete
+              Eliminar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
       <footer className="text-center text-sm text-muted-foreground py-4 mt-auto">
-        <p>&copy; {new Date().getFullYear()} Daily Supply Tracker. All rights reserved.</p>
+        <p>&copy; {new Date().getFullYear()} Daily Supply Tracker. Todos los derechos reservados.</p>
       </footer>
     </div>
   );

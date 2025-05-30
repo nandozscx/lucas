@@ -3,8 +3,8 @@ import type { Metadata } from 'next';
 import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
-  title: 'Register Deliveries - Daily Supply Tracker',
-  description: 'Log new supply deliveries from vendors.',
+  title: 'Registro Semanal de Entregas - Daily Supply Tracker',
+  description: 'Registra nuevas entregas de productos de proveedores.',
 };
 
 export default function RegistryLayout({

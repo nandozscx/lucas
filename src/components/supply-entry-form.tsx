@@ -11,6 +11,13 @@ import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Form,
   FormControl,
   FormField,
@@ -21,21 +28,22 @@ import {
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { CalendarIcon, PackagePlus, Building, Boxes } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { Delivery } from "@/types";
+import type { Delivery, Provider } from "@/types";
 
 const deliveryFormSchema = z.object({
-  providerName: z.string().min(1, "Provider name is required.").max(100, "Provider name must be 100 characters or less."),
-  date: z.date({ required_error: "Delivery date is required." }),
-  quantity: z.coerce.number().positive({ message: "Quantity must be a positive number." }),
+  providerName: z.string().min(1, "El nombre del proveedor es obligatorio."),
+  date: z.date({ required_error: "La fecha de entrega es obligatoria." }),
+  quantity: z.coerce.number().positive({ message: "La cantidad debe ser un número positivo." }),
 });
 
 type DeliveryFormData = z.infer<typeof deliveryFormSchema>;
 
 interface SupplyEntryFormProps {
   onAddDelivery: (delivery: Omit<Delivery, 'id'>) => void;
+  providers: Provider[];
 }
 
-const SupplyEntryForm: React.FC<SupplyEntryFormProps> = ({ onAddDelivery }) => {
+const SupplyEntryForm: React.FC<SupplyEntryFormProps> = ({ onAddDelivery, providers }) => {
   const form = useForm<DeliveryFormData>({
     resolver: zodResolver(deliveryFormSchema),
     defaultValues: {
@@ -47,19 +55,18 @@ const SupplyEntryForm: React.FC<SupplyEntryFormProps> = ({ onAddDelivery }) => {
 
   const onSubmit = (data: DeliveryFormData) => {
     onAddDelivery({
-      providerName: data.providerName.trim(),
+      providerName: data.providerName, // providerName is now directly from select
       date: format(data.date, "yyyy-MM-dd"),
       quantity: data.quantity,
     });
-    form.reset();
-    form.setValue("date", new Date()); // Explicitly reset date to today after successful submission
+    form.reset({ providerName: "", quantity: undefined, date: new Date() });
   };
 
   return (
     <Card className="shadow-lg rounded-lg">
       <CardHeader>
         <CardTitle className="flex items-center text-xl text-primary">
-          <PackagePlus className="mr-2 h-6 w-6" /> Add New Delivery
+          <PackagePlus className="mr-2 h-6 w-6" /> Registrar Nueva Entrega
         </CardTitle>
       </CardHeader>
       <Form {...form}>
@@ -72,11 +79,22 @@ const SupplyEntryForm: React.FC<SupplyEntryFormProps> = ({ onAddDelivery }) => {
                 <FormItem>
                   <FormLabel className="flex items-center font-semibold">
                     <Building className="mr-2 h-4 w-4 text-muted-foreground" />
-                    Provider Name
+                    Proveedor
                   </FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g. Global Foods Ltd." {...field} />
-                  </FormControl>
+                  <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccione un proveedor" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {providers.map((provider) => (
+                        <SelectItem key={provider.id} value={provider.name}>
+                          {provider.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
@@ -88,7 +106,7 @@ const SupplyEntryForm: React.FC<SupplyEntryFormProps> = ({ onAddDelivery }) => {
                 <FormItem className="flex flex-col">
                   <FormLabel className="flex items-center font-semibold">
                      <CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground" />
-                     Delivery Date
+                     Fecha de Entrega
                   </FormLabel>
                   <Popover>
                     <PopoverTrigger asChild>
@@ -103,7 +121,7 @@ const SupplyEntryForm: React.FC<SupplyEntryFormProps> = ({ onAddDelivery }) => {
                           {field.value ? (
                             format(field.value, "PPP") // e.g. Aug 23, 2023
                           ) : (
-                            <span>Pick a date</span>
+                            <span>Seleccione una fecha</span>
                           )}
                           <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                         </Button>
@@ -132,7 +150,7 @@ const SupplyEntryForm: React.FC<SupplyEntryFormProps> = ({ onAddDelivery }) => {
                 <FormItem>
                   <FormLabel className="flex items-center font-semibold">
                     <Boxes className="mr-2 h-4 w-4 text-muted-foreground" />
-                    Quantity
+                    Cantidad
                   </FormLabel>
                   <FormControl>
                     <Input type="number" placeholder="e.g. 150.5" {...field} step="0.01" />
@@ -144,7 +162,7 @@ const SupplyEntryForm: React.FC<SupplyEntryFormProps> = ({ onAddDelivery }) => {
           </CardContent>
           <CardFooter>
             <Button type="submit" className="w-full bg-primary hover:bg-primary/90">
-              <PackagePlus className="mr-2 h-5 w-5" /> Add Delivery
+              <PackagePlus className="mr-2 h-5 w-5" /> Registrar Entrega
             </Button>
           </CardFooter>
         </form>
@@ -154,3 +172,4 @@ const SupplyEntryForm: React.FC<SupplyEntryFormProps> = ({ onAddDelivery }) => {
 };
 
 export default SupplyEntryForm;
+
