@@ -153,7 +153,13 @@ const SupplyEntryForm: React.FC<SupplyEntryFormProps> = ({ onAddDelivery, provid
                     Cantidad
                   </FormLabel>
                   <FormControl>
-                    <Input type="number" placeholder="e.g. 150.5" {...field} step="0.01" />
+                    <Input
+                      type="number"
+                      placeholder="e.g. 150.5"
+                      {...field}
+                      value={field.value === undefined ? '' : field.value} // Ensure value is not undefined
+                      step="0.01"
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -172,4 +178,3 @@ const SupplyEntryForm: React.FC<SupplyEntryFormProps> = ({ onAddDelivery, provid
 };
 
 export default SupplyEntryForm;
-
