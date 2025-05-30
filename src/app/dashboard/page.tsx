@@ -35,14 +35,21 @@ export default function DashboardPage() {
     }
   }, []);
 
+  // This useEffect is primarily for the export function if deliveries were managed here.
+  // It's kept in case other functionalities on this page might need it in the future.
   useEffect(() => {
     if (isClient) {
-      localStorage.setItem('dailySupplyTrackerDeliveries', JSON.stringify(deliveries));
+      // If we were managing deliveries here, we'd save them:
+      // localStorage.setItem('dailySupplyTrackerDeliveries', JSON.stringify(deliveries));
     }
-  }, [deliveries, isClient]);
+  }, [deliveries, isClient]); // `deliveries` state is loaded but not modified on this page.
 
   const exportToCSV = () => {
-    if (deliveries.length === 0) {
+    // Load deliveries from localStorage specifically for export
+    const storedDeliveriesData = localStorage.getItem('dailySupplyTrackerDeliveries');
+    const currentDeliveries = storedDeliveriesData ? JSON.parse(storedDeliveriesData) : [];
+
+    if (currentDeliveries.length === 0) {
       toast({
         title: "No Data",
         description: "There is no data to export.",
@@ -52,7 +59,7 @@ export default function DashboardPage() {
     }
 
     const headers = "Provider,Date,Quantity\n";
-    const csvRows = deliveries.map(d =>
+    const csvRows = currentDeliveries.map((d: Delivery) =>
       `"${d.providerName.replace(/"/g, '""')}","${d.date}",${d.quantity}`
     );
     const csvContent = headers + csvRows.join("\n");
@@ -85,6 +92,8 @@ export default function DashboardPage() {
   const handleCardClick = (cardTitle: string) => {
     if (cardTitle === "Proveedores") {
       router.push('/dashboard/providers');
+    } else if (cardTitle === "Registro") {
+      router.push('/dashboard/registry');
     } else {
       toast({
         title: `${cardTitle} Clicked`,

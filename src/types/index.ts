@@ -7,7 +7,7 @@ export interface Delivery {
 }
 
 export interface VendorTotal {
-  originalName: string;
+  originalName: string; // To keep the exact name used in entries
   totalQuantity: number;
 }
 
