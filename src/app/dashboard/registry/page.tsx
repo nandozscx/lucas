@@ -3,8 +3,8 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import type { Delivery, Delivery as DeliveryType, VendorTotal, Provider } from '@/types'; // Delivery alias for clarity if needed elsewhere
-import SupplyEntryForm from '@/components/supply-entry-form';
+import type { Delivery, Delivery as DeliveryType, VendorTotal, Provider } from '@/types';
+import SupplyEntryForm, { type DailyRegistryFormData } from '@/components/supply-entry-form';
 import SupplyDataView from '@/components/supply-data-view';
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from '@/components/ui/button';
+import { format } from 'date-fns';
 
 const DELIVERIES_STORAGE_KEY = 'dailySupplyTrackerDeliveries';
 const PROVIDERS_STORAGE_KEY = 'dailySupplyTrackerProviders';
@@ -65,12 +66,12 @@ export default function RegistryPage() {
           } else {
             console.warn("Invalid data structure in localStorage for providers, clearing providers list.");
             localStorage.removeItem(PROVIDERS_STORAGE_KEY);
-            setProviders([]); // Set to empty array if data is invalid
+            setProviders([]); 
           }
         } catch (error) {
           console.error("Failed to parse providers from localStorage", error);
           localStorage.removeItem(PROVIDERS_STORAGE_KEY);
-          setProviders([]); // Set to empty array on error
+          setProviders([]); 
         }
       }
     }
@@ -97,18 +98,42 @@ export default function RegistryPage() {
     }
   }, [deliveries, isClient]);
 
-  const handleAddDelivery = useCallback((newDeliveryData: Omit<DeliveryType, 'id'>) => {
-    const newDelivery: DeliveryType = {
-      ...newDeliveryData,
-      id: crypto.randomUUID(),
-    };
-    setDeliveries(prev => [newDelivery, ...prev]);
-    toast({
-      title: "Entrega Registrada",
-      description: `Entrega de ${newDelivery.providerName} el ${newDelivery.date} por ${newDelivery.quantity} unidades ha sido registrada.`,
-    });
-  }, [toast]);
+  const handleAddDeliveries = useCallback((data: DailyRegistryFormData) => {
+    const dateStr = format(data.date, "yyyy-MM-dd");
+    let deliveriesAddedCount = 0;
+    const newDeliveries: DeliveryType[] = [];
 
+    data.entries.forEach(entry => {
+      if (entry.quantity !== undefined && entry.quantity !== null && entry.quantity > 0) {
+        const newDelivery: DeliveryType = {
+          id: crypto.randomUUID(),
+          providerName: entry.providerName,
+          date: dateStr,
+          quantity: entry.quantity,
+        };
+        newDeliveries.push(newDelivery);
+        deliveriesAddedCount++;
+      }
+    });
+
+    if (newDeliveries.length > 0) {
+      setDeliveries(prev => [...newDeliveries, ...prev]);
+    }
+
+    if (deliveriesAddedCount > 0) {
+      toast({
+        title: "Entregas Registradas",
+        description: `${deliveriesAddedCount} entrega(s) para el ${format(data.date, "PPP", { locale: require('date-fns/locale/es') })} han sido registradas.`,
+      });
+    } else {
+      toast({
+        title: "Sin Entregas para Registrar",
+        description: "No se ingresaron cantidades para la fecha seleccionada.",
+        variant: "default",
+      });
+    }
+  }, [toast]);
+  
   const handleDeleteDelivery = useCallback((id: string) => {
      const delivery = deliveries.find(d => d.id === id);
      if (delivery) {
@@ -180,7 +205,7 @@ export default function RegistryPage() {
               </AlertDescription>
             </Alert>
           ) : (
-            <SupplyEntryForm onAddDelivery={handleAddDelivery} providers={providers} />
+            <SupplyEntryForm onSubmitDeliveries={handleAddDeliveries} providers={providers} />
           )}
         </div>
         <div className="md:col-span-2 space-y-6">
@@ -189,6 +214,7 @@ export default function RegistryPage() {
             dailyTotals={dailyTotals}
             vendorTotals={vendorTotals}
             onDeleteDelivery={handleDeleteDelivery}
+            providers={providers} // Pass providers for the weekly table
           />
         </div>
       </main>

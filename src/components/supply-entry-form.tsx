@@ -1,22 +1,16 @@
 
 "use client";
 
-import React from "react";
-import { useForm } from "react-hook-form";
+import React, { useEffect } from "react";
+import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
+import { es } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Form,
   FormControl,
@@ -28,77 +22,83 @@ import {
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { CalendarIcon, PackagePlus, Building, Boxes } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { Delivery, Provider } from "@/types";
+import type { Provider } from "@/types"; // Delivery type no longer needed here directly
 
-const deliveryFormSchema = z.object({
-  providerName: z.string().min(1, "El nombre del proveedor es obligatorio."),
-  date: z.date({ required_error: "La fecha de entrega es obligatoria." }),
-  quantity: z.coerce.number().positive({ message: "La cantidad debe ser un número positivo." }),
+const dailyEntrySchema = z.object({
+  providerId: z.string(),
+  providerName: z.string(),
+  quantity: z.coerce
+    .number({ invalid_type_error: "Debe ser un número" })
+    .positive({ message: "Debe ser positivo" })
+    .optional()
+    .or(z.literal(undefined))
+    .or(z.literal('')), // Allow empty string for react-hook-form reset and initial state
 });
 
-type DeliveryFormData = z.infer<typeof deliveryFormSchema>;
+const dailyRegistrySchema = z.object({
+  date: z.date({ required_error: "La fecha de entrega es obligatoria." }),
+  entries: z.array(dailyEntrySchema),
+});
+
+export type DailyRegistryFormData = z.infer<typeof dailyRegistrySchema>;
 
 interface SupplyEntryFormProps {
-  onAddDelivery: (delivery: Omit<Delivery, 'id'>) => void;
+  onSubmitDeliveries: (data: DailyRegistryFormData) => void;
   providers: Provider[];
 }
 
-const SupplyEntryForm: React.FC<SupplyEntryFormProps> = ({ onAddDelivery, providers }) => {
-  const form = useForm<DeliveryFormData>({
-    resolver: zodResolver(deliveryFormSchema),
+const SupplyEntryForm: React.FC<SupplyEntryFormProps> = ({ onSubmitDeliveries, providers }) => {
+  const form = useForm<DailyRegistryFormData>({
+    resolver: zodResolver(dailyRegistrySchema),
     defaultValues: {
-      providerName: "",
-      date: new Date(), // Default to today
-      quantity: undefined, // Use undefined for number input to allow placeholder
+      date: new Date(),
+      entries: providers.map(p => ({ providerId: p.id, providerName: p.name, quantity: undefined }))
     },
   });
 
-  const onSubmit = (data: DeliveryFormData) => {
-    onAddDelivery({
-      providerName: data.providerName, // providerName is now directly from select
-      date: format(data.date, "yyyy-MM-dd"),
-      quantity: data.quantity,
+  const { fields } = useFieldArray({
+    control: form.control,
+    name: "entries",
+  });
+
+  const selectedDate = form.watch("date");
+
+  // Update defaultValues if providers prop changes
+  useEffect(() => {
+    form.reset({
+      date: form.getValues("date") || new Date(), // Keep current date or default to new
+      entries: providers.map(p => ({ providerId: p.id, providerName: p.name, quantity: undefined }))
     });
-    form.reset({ providerName: "", quantity: undefined, date: new Date() });
+  }, [providers, form]);
+
+  const handleSubmit = (data: DailyRegistryFormData) => {
+    onSubmitDeliveries(data);
+    // Reset quantities but keep the selected date for convenience
+    form.reset({
+      date: data.date, 
+      entries: providers.map(p => ({ providerId: p.id, providerName: p.name, quantity: undefined }))
+    });
+  };
+  
+  const getDayName = (date: Date): string => {
+    return format(date, "EEEE", { locale: es });
+  };
+
+  const getDateNumber = (date: Date): string => {
+    return format(date, "d", { locale: es });
   };
 
   return (
     <Card className="shadow-lg rounded-lg">
       <CardHeader>
         <CardTitle className="flex items-center text-xl text-primary">
-          <PackagePlus className="mr-2 h-6 w-6" /> Registrar Nueva Entrega
+          <PackagePlus className="mr-2 h-6 w-6" /> 
+          <span>Registro para el {getDayName(selectedDate)} {getDateNumber(selectedDate)}</span>
         </CardTitle>
       </CardHeader>
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)}>
+        <form onSubmit={form.handleSubmit(handleSubmit)}>
           <CardContent className="space-y-6">
-            <FormField
-              control={form.control}
-              name="providerName"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="flex items-center font-semibold">
-                    <Building className="mr-2 h-4 w-4 text-muted-foreground" />
-                    Proveedor
-                  </FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccione un proveedor" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {providers.map((provider) => (
-                        <SelectItem key={provider.id} value={provider.name}>
-                          {provider.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
             <FormField
               control={form.control}
               name="date"
@@ -119,7 +119,7 @@ const SupplyEntryForm: React.FC<SupplyEntryFormProps> = ({ onAddDelivery, provid
                           )}
                         >
                           {field.value ? (
-                            format(field.value, "PPP") // e.g. Aug 23, 2023
+                            format(field.value, "PPP", { locale: es }) 
                           ) : (
                             <span>Seleccione una fecha</span>
                           )}
@@ -136,6 +136,7 @@ const SupplyEntryForm: React.FC<SupplyEntryFormProps> = ({ onAddDelivery, provid
                           date > new Date() || date < new Date("2000-01-01")
                         }
                         initialFocus
+                        locale={es}
                       />
                     </PopoverContent>
                   </Popover>
@@ -143,32 +144,44 @@ const SupplyEntryForm: React.FC<SupplyEntryFormProps> = ({ onAddDelivery, provid
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name="quantity"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="flex items-center font-semibold">
-                    <Boxes className="mr-2 h-4 w-4 text-muted-foreground" />
-                    Cantidad
-                  </FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      placeholder="e.g. 150.5"
-                      {...field}
-                      value={field.value === undefined ? '' : field.value} // Ensure value is not undefined
-                      step="0.01"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+
+            <div className="space-y-4">
+              <FormLabel className="flex items-center font-semibold">
+                <Boxes className="mr-2 h-4 w-4 text-muted-foreground" />
+                Cantidades por Proveedor
+              </FormLabel>
+              {fields.map((item, index) => (
+                <FormField
+                  key={item.id}
+                  control={form.control}
+                  name={`entries.${index}.quantity`}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel htmlFor={`entries.${index}.quantity`} className="text-sm font-medium text-muted-foreground flex items-center">
+                        <Building className="mr-2 h-3 w-3 text-muted-foreground opacity-70" /> 
+                        {form.getValues(`entries.${index}.providerName`)}
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          id={`entries.${index}.quantity`}
+                          type="number"
+                          placeholder="Cantidad (ej. 150.5)"
+                          step="0.01"
+                          {...field}
+                          value={field.value === undefined || field.value === null ? '' : field.value}
+                          onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              ))}
+            </div>
           </CardContent>
           <CardFooter>
             <Button type="submit" className="w-full bg-primary hover:bg-primary/90">
-              <PackagePlus className="mr-2 h-5 w-5" /> Registrar Entrega
+              <PackagePlus className="mr-2 h-5 w-5" /> Registrar Entregas del Día
             </Button>
           </CardFooter>
         </form>
