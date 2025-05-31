@@ -3,25 +3,17 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import type { Delivery, Delivery as DeliveryType, VendorTotal, Provider } from '@/types';
+import type { Delivery as DeliveryType, VendorTotal, Provider } from '@/types';
 import SupplyEntryForm, { type DailyRegistryFormData } from '@/components/supply-entry-form';
 import SupplyDataView from '@/components/supply-data-view';
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, ClipboardList, AlertTriangle } from 'lucide-react';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+// AlertDialog ya no es necesario aquí
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
+import { es } from 'date-fns/locale'; // Importar locale es
 
 const DELIVERIES_STORAGE_KEY = 'dailySupplyTrackerDeliveries';
 const PROVIDERS_STORAGE_KEY = 'dailySupplyTrackerProviders';
@@ -33,7 +25,7 @@ export default function RegistryPage() {
   const [vendorTotals, setVendorTotals] = useState<VendorTotal[]>([]);
   const [isClient, setIsClient] = useState(false);
   const { toast } = useToast();
-  const [deliveryToDelete, setDeliveryToDelete] = useState<DeliveryType | null>(null);
+  // deliveryToDelete y AlertDialog ya no son necesarios
 
 
   useEffect(() => {
@@ -123,7 +115,7 @@ export default function RegistryPage() {
     if (deliveriesAddedCount > 0) {
       toast({
         title: "Entregas Registradas",
-        description: `${deliveriesAddedCount} entrega(s) para el ${format(data.date, "PPP", { locale: require('date-fns/locale/es') })} han sido registradas.`,
+        description: `${deliveriesAddedCount} entrega(s) para el ${format(data.date, "PPP", { locale: es })} han sido registradas.`,
       });
     } else {
       toast({
@@ -134,24 +126,7 @@ export default function RegistryPage() {
     }
   }, [toast]);
   
-  const handleDeleteDelivery = useCallback((id: string) => {
-     const delivery = deliveries.find(d => d.id === id);
-     if (delivery) {
-        setDeliveryToDelete(delivery);
-     }
-  }, [deliveries]);
-
-  const confirmDeleteDelivery = () => {
-    if (deliveryToDelete) {
-      setDeliveries(prev => prev.filter(d => d.id !== deliveryToDelete.id));
-      toast({
-        title: "Entrega Eliminada",
-        description: `La entrega de ${deliveryToDelete.providerName} ha sido eliminada.`,
-        variant: "destructive",
-      });
-      setDeliveryToDelete(null);
-    }
-  };
+  // handleDeleteDelivery y confirmDeleteDelivery ya no son necesarios
 
   if (!isClient) {
     return (
@@ -213,28 +188,13 @@ export default function RegistryPage() {
             deliveries={deliveries}
             dailyTotals={dailyTotals}
             vendorTotals={vendorTotals}
-            onDeleteDelivery={handleDeleteDelivery}
-            providers={providers} // Pass providers for the weekly table
+            // onDeleteDelivery ya no se pasa
+            providers={providers} 
           />
         </div>
       </main>
       
-      <AlertDialog open={!!deliveryToDelete} onOpenChange={(open) => { if (!open) setDeliveryToDelete(null);}}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Seguro que quieres eliminar esta entrega?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta acción no se puede deshacer. Se eliminará permanentemente el registro de entrega de "{deliveryToDelete?.providerName}" del {deliveryToDelete?.date}.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setDeliveryToDelete(null)}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDeleteDelivery} className="bg-destructive hover:bg-destructive/90">
-              Eliminar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* AlertDialog para confirmación de borrado eliminado */}
 
       <footer className="text-center text-sm text-muted-foreground py-4 mt-auto">
         <p>&copy; {new Date().getFullYear()} Daily Supply Tracker. Todos los derechos reservados.</p>
@@ -242,3 +202,4 @@ export default function RegistryPage() {
     </div>
   );
 }
+

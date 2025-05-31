@@ -14,32 +14,21 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Trash2, ListChecks, Users, CalendarDays, Info, CalendarRange } from 'lucide-react';
-import { format, parseISO, getDay, startOfWeek, endOfWeek, isWithinInterval, addWeeks, subWeeks } from 'date-fns';
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area"; // ScrollBar importado
+import { Users, CalendarDays, Info, CalendarRange } from 'lucide-react';
+import { format, parseISO, getDay, startOfWeek, endOfWeek, isWithinInterval } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 interface SupplyDataViewProps {
   deliveries: Delivery[];
   dailyTotals: Record<string, number>;
   vendorTotals: VendorTotal[];
-  onDeleteDelivery: (id: string) => void;
   providers: Provider[];
 }
 
-const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals, vendorTotals, onDeleteDelivery, providers }) => {
+const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals, vendorTotals, providers }) => {
   
-  const [currentWeekStart, setCurrentWeekStart] = React.useState(() => startOfWeek(new Date(), { weekStartsOn: 0, locale: es }));
-
-  const handlePreviousWeek = () => {
-    setCurrentWeekStart(prev => subWeeks(prev, 1));
-  };
-
-  const handleNextWeek = () => {
-    setCurrentWeekStart(prev => addWeeks(prev, 1));
-  };
-  
+  const currentWeekStart = startOfWeek(new Date(), { weekStartsOn: 0, locale: es });
   const currentWeekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 0, locale: es });
 
   const deliveriesForCurrentWeek = deliveries.filter(d => {
@@ -64,13 +53,6 @@ const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals
 
   const daysOfWeekHeaders = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
   
-  // Original sorted deliveries for "Historial Detallado" tab
-  const sortedDeliveries = [...deliveries].sort((a, b) => {
-    const dateComparison = parseISO(b.date).getTime() - parseISO(a.date).getTime();
-    if (dateComparison !== 0) return dateComparison;
-    return a.providerName.localeCompare(b.providerName);
-  });
-
   const sortedDailyTotals = Object.entries(dailyTotals).sort(([dateA], [dateB]) => 
     parseISO(dateB).getTime() - parseISO(dateA).getTime()
   );
@@ -90,12 +72,9 @@ const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="weeklySummary" className="w-full">
-          <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2 md:grid-cols-4 mb-6">
+          <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2 md:grid-cols-3 mb-6"> {/* Ajustado a 3 columnas */}
             <TabsTrigger value="weeklySummary" className="flex items-center gap-2 text-sm sm:text-base">
               <CalendarRange className="h-4 w-4 sm:h-5 sm:w-5"/> Resumen Semanal
-            </TabsTrigger>
-            <TabsTrigger value="allDeliveries" className="flex items-center gap-2 text-sm sm:text-base">
-              <ListChecks className="h-4 w-4 sm:h-5 sm:w-5"/> Historial Detallado
             </TabsTrigger>
             <TabsTrigger value="dailyTotals" className="flex items-center gap-2 text-sm sm:text-base">
               <CalendarDays className="h-4 w-4 sm:h-5 sm:w-5"/> Totales Diarios
@@ -106,21 +85,19 @@ const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals
           </TabsList>
 
           <TabsContent value="weeklySummary">
-            <div className="flex justify-between items-center mb-4">
-              <Button onClick={handlePreviousWeek} variant="outline">Semana Anterior</Button>
+            <div className="mb-4">
               <div className="text-center">
                 <p className="font-semibold text-primary">
                   Semana del {format(currentWeekStart, "dd 'de' MMMM", { locale: es })} al {format(currentWeekEnd, "dd 'de' MMMM 'de' yyyy", { locale: es })}
                 </p>
               </div>
-              <Button onClick={handleNextWeek} variant="outline">Semana Siguiente</Button>
             </div>
             {providers.length === 0 ? (
               <EmptyState message="No hay proveedores registrados para mostrar el resumen semanal." />
             ) : weeklyTableData.every(row => row.quantities.every(q => q === undefined)) && deliveriesForCurrentWeek.length === 0 ? (
                <EmptyState message="No hay entregas registradas para esta semana." />
             ) : (
-              <ScrollArea className="h-[400px] sm:h-[500px] rounded-md border">
+              <ScrollArea className="h-[400px] sm:h-[500px] rounded-md border whitespace-nowrap"> {/* whitespace-nowrap para ScrollArea */}
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -144,43 +121,12 @@ const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals
                   </TableBody>
                 </Table>
                 {weeklyTableData.length > 5 && <TableCaption>Desplázate para ver más proveedores o días.</TableCaption>}
+                <ScrollBar orientation="horizontal" /> {/* ScrollBar horizontal añadida */}
               </ScrollArea>
             )}
           </TabsContent>
 
-          <TabsContent value="allDeliveries">
-            {sortedDeliveries.length === 0 ? (
-              <EmptyState message="Aún no se han registrado entregas. Añade una usando el formulario." />
-            ) : (
-              <ScrollArea className="h-[400px] sm:h-[500px] rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="font-semibold">Proveedor</TableHead>
-                      <TableHead className="font-semibold">Fecha</TableHead>
-                      <TableHead className="text-right font-semibold">Cantidad</TableHead>
-                      <TableHead className="text-right font-semibold">Acciones</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {sortedDeliveries.map((delivery) => (
-                      <TableRow key={delivery.id}>
-                        <TableCell className="font-medium">{delivery.providerName}</TableCell>
-                        <TableCell>{format(parseISO(delivery.date), "PP", { locale: es })}</TableCell>
-                        <TableCell className="text-right">{delivery.quantity.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})}</TableCell>
-                        <TableCell className="text-right">
-                          <Button variant="ghost" size="icon" onClick={() => onDeleteDelivery(delivery.id)} aria-label={`Eliminar entrega de ${delivery.providerName} el ${format(parseISO(delivery.date), "PP", { locale: es })}`}>
-                            <Trash2 className="h-4 w-4 text-destructive hover:text-destructive/80" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                   {sortedDeliveries.length > 5 && <TableCaption>Desplázate para ver más entradas.</TableCaption>}
-                </Table>
-              </ScrollArea>
-            )}
-          </TabsContent>
+          {/* Contenido de TabsContent para "allDeliveries" (Historial Detallado) eliminado */}
 
           <TabsContent value="dailyTotals">
              {sortedDailyTotals.length === 0 ? (
