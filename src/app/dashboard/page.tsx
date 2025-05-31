@@ -11,54 +11,33 @@ import { Card } from "@/components/ui/card";
 import { ClipboardPenLine, Users, Download, History } from 'lucide-react';
 
 export default function DashboardPage() {
-  const [deliveries, setDeliveries] = useState<Delivery[]>([]);
+  // deliveries state is not directly used on this page for display anymore,
+  // but kept if any other dashboard-level summary might need it.
+  // const [deliveries, setDeliveries] = useState<Delivery[]>([]); 
   const { toast } = useToast();
   const [isClient, setIsClient] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
     setIsClient(true);
-    const storedDeliveries = localStorage.getItem('dailySupplyTrackerDeliveries');
-    if (storedDeliveries) {
-      try {
-        const parsedDeliveries = JSON.parse(storedDeliveries);
-        if (Array.isArray(parsedDeliveries) && parsedDeliveries.every(d => 'id' in d && 'providerName' in d && 'date' in d && 'quantity' in d)) {
-            setDeliveries(parsedDeliveries);
-        } else {
-            console.warn("Invalid data structure in localStorage for deliveries, clearing.");
-            localStorage.removeItem('dailySupplyTrackerDeliveries');
-        }
-      } catch (error) {
-        console.error("Failed to parse deliveries from localStorage", error);
-        localStorage.removeItem('dailySupplyTrackerDeliveries');
-      }
-    }
+    // Deliveries are loaded directly within exportToCSV now or by respective pages.
   }, []);
 
-  // This useEffect is primarily for the export function if deliveries were managed here.
-  // It's kept in case other functionalities on this page might need it in the future.
-  useEffect(() => {
-    if (isClient) {
-      // If we were managing deliveries here, we'd save them:
-      // localStorage.setItem('dailySupplyTrackerDeliveries', JSON.stringify(deliveries));
-    }
-  }, [deliveries, isClient]); // `deliveries` state is loaded but not modified on this page.
 
   const exportToCSV = () => {
-    // Load deliveries from localStorage specifically for export
     const storedDeliveriesData = localStorage.getItem('dailySupplyTrackerDeliveries');
-    const currentDeliveries = storedDeliveriesData ? JSON.parse(storedDeliveriesData) : [];
+    const currentDeliveries: Delivery[] = storedDeliveriesData ? JSON.parse(storedDeliveriesData) : [];
 
     if (currentDeliveries.length === 0) {
       toast({
-        title: "No Data",
-        description: "There is no data to export.",
+        title: "Sin Datos",
+        description: "No hay datos para exportar.",
         variant: "destructive",
       });
       return;
     }
 
-    const headers = "Provider,Date,Quantity\n";
+    const headers = "Proveedor,Fecha,Cantidad\n"; // Columnas en español
     const csvRows = currentDeliveries.map((d: Delivery) =>
       `"${d.providerName.replace(/"/g, '""')}","${d.date}",${d.quantity}`
     );
@@ -70,20 +49,20 @@ export default function DashboardPage() {
     if (link.download !== undefined) {
       const url = URL.createObjectURL(blob);
       link.setAttribute("href", url);
-      link.setAttribute("download", "supply_deliveries.csv");
+      link.setAttribute("download", "entregas_suministros.csv"); // Nombre de archivo en español
       link.style.visibility = 'hidden';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
       toast({
-        title: "Export Successful",
-        description: "Deliveries exported to CSV.",
+        title: "Exportación Exitosa",
+        description: "Las entregas se han exportado a CSV.",
       });
     } else {
        toast({
-        title: "Export Failed",
-        description: "Your browser does not support direct downloads.",
+        title: "Exportación Fallida",
+        description: "Tu navegador no soporta descargas directas.",
         variant: "destructive",
       });
     }
@@ -94,12 +73,14 @@ export default function DashboardPage() {
       router.push('/dashboard/providers');
     } else if (cardTitle === "Registro") {
       router.push('/dashboard/registry');
-    } else {
-      toast({
-        title: `${cardTitle} Clicked`,
-        description: `You clicked the ${cardTitle} card. Navigation not yet implemented.`,
+    } else if (cardTitle === "Historial") {
+       toast({
+        title: `"${cardTitle}" presionado`,
+        description: `Navegación para "${cardTitle}" aún no implementada.`,
       });
-      console.log(`${cardTitle} card action triggered.`);
+      console.log(`Acción para la tarjeta "${cardTitle}" activada.`);
+    } else {
+      // For "Exportar", the action is directly called.
     }
   };
 
@@ -151,7 +132,7 @@ export default function DashboardPage() {
         })}
       </main>
       <footer className="text-center text-sm text-muted-foreground py-4 mt-auto">
-        <p>&copy; {new Date().getFullYear()} Daily Supply Tracker. All rights reserved.</p>
+        <p>&copy; {new Date().getFullYear()} Daily Supply Tracker. Todos los derechos reservados.</p>
       </footer>
     </div>
   );

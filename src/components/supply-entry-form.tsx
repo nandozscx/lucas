@@ -22,17 +22,17 @@ import {
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { CalendarIcon, PackagePlus, Building, Boxes } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { Provider } from "@/types"; // Delivery type no longer needed here directly
+import type { Provider } from "@/types";
 
 const dailyEntrySchema = z.object({
-  providerId: z.string(),
+  providerId: z.string(), // Keep providerId for potential future linking
   providerName: z.string(),
   quantity: z.coerce
-    .number({ invalid_type_error: "Debe ser un número" })
-    .positive({ message: "Debe ser positivo" })
+    .number({ invalid_type_error: "Debe ser un número." })
+    .positive({ message: "La cantidad debe ser un número positivo." })
     .optional()
     .or(z.literal(undefined))
-    .or(z.literal('')), // Allow empty string for react-hook-form reset and initial state
+    .or(z.literal('')),
 });
 
 const dailyRegistrySchema = z.object({
@@ -63,28 +63,28 @@ const SupplyEntryForm: React.FC<SupplyEntryFormProps> = ({ onSubmitDeliveries, p
 
   const selectedDate = form.watch("date");
 
-  // Update defaultValues if providers prop changes
   useEffect(() => {
     form.reset({
-      date: form.getValues("date") || new Date(), // Keep current date or default to new
+      date: form.getValues("date") || new Date(),
       entries: providers.map(p => ({ providerId: p.id, providerName: p.name, quantity: undefined }))
     });
   }, [providers, form]);
 
   const handleSubmit = (data: DailyRegistryFormData) => {
     onSubmitDeliveries(data);
-    // Reset quantities but keep the selected date for convenience
     form.reset({
       date: data.date, 
       entries: providers.map(p => ({ providerId: p.id, providerName: p.name, quantity: undefined }))
     });
   };
   
-  const getDayName = (date: Date): string => {
+  const getDayName = (date: Date | undefined): string => {
+    if (!date) return "";
     return format(date, "EEEE", { locale: es });
   };
 
-  const getDateNumber = (date: Date): string => {
+  const getDateNumber = (date: Date | undefined): string => {
+    if (!date) return "";
     return format(date, "d", { locale: es });
   };
 
@@ -152,7 +152,7 @@ const SupplyEntryForm: React.FC<SupplyEntryFormProps> = ({ onSubmitDeliveries, p
               </FormLabel>
               {fields.map((item, index) => (
                 <FormField
-                  key={item.id}
+                  key={item.id} // react-hook-form field array key
                   control={form.control}
                   name={`entries.${index}.quantity`}
                   render={({ field }) => (
@@ -166,9 +166,9 @@ const SupplyEntryForm: React.FC<SupplyEntryFormProps> = ({ onSubmitDeliveries, p
                           id={`entries.${index}.quantity`}
                           type="number"
                           placeholder="Cantidad (ej. 150.5)"
-                          step="0.01"
+                          step="0.01" // Allows decimals
                           {...field}
-                          value={field.value === undefined || field.value === null ? '' : field.value}
+                          value={field.value === undefined || field.value === null ? '' : field.value} // Handle undefined for controlled input
                           onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))}
                         />
                       </FormControl>

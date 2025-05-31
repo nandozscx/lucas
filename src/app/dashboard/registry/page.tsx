@@ -9,11 +9,10 @@ import SupplyDataView from '@/components/supply-data-view';
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, ClipboardList, AlertTriangle } from 'lucide-react';
-// AlertDialog ya no es necesario aquí
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
-import { es } from 'date-fns/locale'; // Importar locale es
+import { es } from 'date-fns/locale';
 
 const DELIVERIES_STORAGE_KEY = 'dailySupplyTrackerDeliveries';
 const PROVIDERS_STORAGE_KEY = 'dailySupplyTrackerProviders';
@@ -25,13 +24,10 @@ export default function RegistryPage() {
   const [vendorTotals, setVendorTotals] = useState<VendorTotal[]>([]);
   const [isClient, setIsClient] = useState(false);
   const { toast } = useToast();
-  // deliveryToDelete y AlertDialog ya no son necesarios
-
 
   useEffect(() => {
     setIsClient(true);
     if (typeof window !== 'undefined') {
-      // Load Deliveries
       const storedDeliveries = localStorage.getItem(DELIVERIES_STORAGE_KEY);
       if (storedDeliveries) {
         try {
@@ -39,29 +35,28 @@ export default function RegistryPage() {
           if (Array.isArray(parsedDeliveries) && parsedDeliveries.every(d => 'id' in d && 'providerName' in d && 'date' in d && 'quantity' in d)) {
             setDeliveries(parsedDeliveries);
           } else {
-            console.warn("Invalid data structure in localStorage for deliveries, clearing.");
+            console.warn("Estructura de datos inválida en localStorage para entregas, limpiando.");
             localStorage.removeItem(DELIVERIES_STORAGE_KEY);
           }
         } catch (error) {
-          console.error("Failed to parse deliveries from localStorage", error);
+          console.error("Falló al parsear entregas desde localStorage", error);
           localStorage.removeItem(DELIVERIES_STORAGE_KEY);
         }
       }
 
-      // Load Providers
       const storedProviders = localStorage.getItem(PROVIDERS_STORAGE_KEY);
       if (storedProviders) {
         try {
           const parsedProviders = JSON.parse(storedProviders);
-           if (Array.isArray(parsedProviders) && parsedProviders.every(p => 'id' in p && 'name' in p && 'address' in p && 'phone' in p)) {
+           if (Array.isArray(parsedProviders) && parsedProviders.every(p => 'id' in p && 'name' in p && 'address' in p && 'phone' in p && 'price' in p && typeof p.price === 'number')) {
             setProviders(parsedProviders);
           } else {
-            console.warn("Invalid data structure in localStorage for providers, clearing providers list.");
+            console.warn("Estructura de datos inválida en localStorage para proveedores, limpiando lista de proveedores.");
             localStorage.removeItem(PROVIDERS_STORAGE_KEY);
             setProviders([]); 
           }
         } catch (error) {
-          console.error("Failed to parse providers from localStorage", error);
+          console.error("Falló al parsear proveedores desde localStorage", error);
           localStorage.removeItem(PROVIDERS_STORAGE_KEY);
           setProviders([]); 
         }
@@ -79,12 +74,19 @@ export default function RegistryPage() {
       });
       setDailyTotals(newDailyTotals);
 
-      const newVendorTotalsMap: Record<string, number> = {};
+      const newVendorTotalsMap: Record<string, { totalQuantity: number }> = {};
       deliveries.forEach(delivery => {
-        newVendorTotalsMap[delivery.providerName] = (newVendorTotalsMap[delivery.providerName] || 0) + delivery.quantity;
+        if (!newVendorTotalsMap[delivery.providerName]) {
+          newVendorTotalsMap[delivery.providerName] = { totalQuantity: 0 };
+        }
+        newVendorTotalsMap[delivery.providerName].totalQuantity += delivery.quantity;
       });
+      
       const newVendorTotalsArray = Object.entries(newVendorTotalsMap)
-        .map(([name, total]) => ({ originalName: name, totalQuantity: total }))
+        .map(([name, data]) => ({
+          originalName: name,
+          totalQuantity: data.totalQuantity,
+        }))
         .sort((a, b) => a.originalName.localeCompare(b.originalName));
       setVendorTotals(newVendorTotalsArray);
     }
@@ -99,7 +101,7 @@ export default function RegistryPage() {
       if (entry.quantity !== undefined && entry.quantity !== null && entry.quantity > 0) {
         const newDelivery: DeliveryType = {
           id: crypto.randomUUID(),
-          providerName: entry.providerName,
+          providerName: entry.providerName, // Storing name for simplicity, could be ID
           date: dateStr,
           quantity: entry.quantity,
         };
@@ -121,12 +123,11 @@ export default function RegistryPage() {
       toast({
         title: "Sin Entregas para Registrar",
         description: "No se ingresaron cantidades para la fecha seleccionada.",
-        variant: "default",
+        variant: "default", // Using default variant for informational non-critical message
       });
     }
   }, [toast]);
   
-  // handleDeleteDelivery y confirmDeleteDelivery ya no son necesarios
 
   if (!isClient) {
     return (
@@ -137,10 +138,10 @@ export default function RegistryPage() {
         </header>
         <main className="flex-grow grid md:grid-cols-3 gap-6 md:gap-8">
           <div className="md:col-span-1 space-y-6">
-            <Skeleton className="h-96 w-full rounded-lg" /> {/* Form Placeholder */}
+            <Skeleton className="h-96 w-full rounded-lg" />
           </div>
           <div className="md:col-span-2 space-y-6">
-            <Skeleton className="h-[600px] w-full rounded-lg" /> {/* Data View Placeholder */}
+            <Skeleton className="h-[600px] w-full rounded-lg" />
           </div>
         </main>
         <footer className="text-center text-sm text-muted-foreground py-4 mt-auto">
@@ -163,7 +164,7 @@ export default function RegistryPage() {
           </h1>
           <p className="text-sm text-muted-foreground">Registro Semanal</p>
         </div>
-        <div className="w-0 sm:w-auto"></div> {/* Spacer for alignment */}
+        <div className="w-0 sm:w-auto"></div> 
       </header>
 
       <main className="flex-grow grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
@@ -188,18 +189,14 @@ export default function RegistryPage() {
             deliveries={deliveries}
             dailyTotals={dailyTotals}
             vendorTotals={vendorTotals}
-            // onDeleteDelivery ya no se pasa
             providers={providers} 
           />
         </div>
       </main>
       
-      {/* AlertDialog para confirmación de borrado eliminado */}
-
       <footer className="text-center text-sm text-muted-foreground py-4 mt-auto">
         <p>&copy; {new Date().getFullYear()} Daily Supply Tracker. Todos los derechos reservados.</p>
       </footer>
     </div>
   );
 }
-

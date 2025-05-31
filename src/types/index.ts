@@ -1,7 +1,7 @@
 
 export interface Delivery {
   id: string;
-  providerName: string;
+  providerName: string; // Consider changing to providerId if linking directly
   date: string; // YYYY-MM-DD format
   quantity: number;
 }
@@ -16,4 +16,5 @@ export interface Provider {
   name: string;
   address: string;
   phone: string;
+  price: number; // Precio unitario al que se le compra al proveedor
 }

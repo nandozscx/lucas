@@ -10,8 +10,8 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-  DialogFooter,
-  DialogClose,
+  // DialogFooter, // No longer needed here as form has its own footer
+  // DialogClose, // No longer needed here
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -22,7 +22,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  // AlertDialogTrigger, // No longer needed here
 } from "@/components/ui/alert-dialog";
 import {
   Table,
@@ -38,7 +37,7 @@ import ProviderForm, { type ProviderFormData } from '@/components/provider-form'
 import type { Provider } from '@/types';
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PlusCircle, Edit2, Trash2, Users, ArrowLeft, Info } from 'lucide-react';
+import { PlusCircle, Edit2, Trash2, Users, ArrowLeft, Info, DollarSign } from 'lucide-react';
 
 const PROVIDERS_STORAGE_KEY = 'dailySupplyTrackerProviders';
 
@@ -57,14 +56,14 @@ export default function ProvidersPage() {
       if (storedProviders) {
         try {
           const parsedProviders = JSON.parse(storedProviders);
-           if (Array.isArray(parsedProviders) && parsedProviders.every(p => 'id' in p && 'name' in p && 'address' in p && 'phone' in p)) {
+           if (Array.isArray(parsedProviders) && parsedProviders.every(p => 'id' in p && 'name' in p && 'address' in p && 'phone' in p && 'price' in p && typeof p.price === 'number')) {
             setProviders(parsedProviders);
           } else {
-            console.warn("Invalid data structure in localStorage for providers, clearing.");
+            console.warn("Estructura de datos inválida en localStorage para proveedores, limpiando.");
             localStorage.removeItem(PROVIDERS_STORAGE_KEY);
           }
         } catch (error) {
-          console.error("Failed to parse providers from localStorage", error);
+          console.error("Falló al parsear proveedores desde localStorage", error);
           localStorage.removeItem(PROVIDERS_STORAGE_KEY);
         }
       }
@@ -89,24 +88,21 @@ export default function ProvidersPage() {
 
   const handleCloseDialog = useCallback(() => {
     setIsDialogOpen(false);
-    setEditingProvider(null); // Clear editing state when dialog closes
+    setEditingProvider(null);
   }, []);
 
   const handleFormSubmit = useCallback((data: ProviderFormData) => {
     if (editingProvider) {
-      // Edit existing provider
       setProviders(prev => prev.map(p => p.id === editingProvider.id ? { ...p, ...data } : p));
-      toast({ title: "Provider Updated", description: `Provider "${data.name}" has been updated successfully.` });
+      toast({ title: "Proveedor Actualizado", description: `El proveedor "${data.name}" ha sido actualizado exitosamente.` });
     } else {
-      // Add new provider
       const newProvider: Provider = { ...data, id: crypto.randomUUID() };
       setProviders(prev => [newProvider, ...prev]);
-      toast({ title: "Provider Added", description: `Provider "${data.name}" has been added successfully.` });
+      toast({ title: "Proveedor Agregado", description: `El proveedor "${data.name}" ha sido agregado exitosamente.` });
     }
     handleCloseDialog();
   }, [editingProvider, toast, handleCloseDialog]);
 
-  // This function now just sets the state to open the AlertDialog
   const handleDeleteProviderClick = (provider: Provider) => {
     setProviderToDelete(provider);
   };
@@ -114,18 +110,18 @@ export default function ProvidersPage() {
   const confirmDelete = () => {
     if (providerToDelete) {
       setProviders(prev => prev.filter(p => p.id !== providerToDelete.id));
-      toast({ title: "Provider Deleted", description: `Provider "${providerToDelete.name}" has been deleted.`, variant: "destructive" });
-      setProviderToDelete(null); // Close AlertDialog
+      toast({ title: "Proveedor Eliminado", description: `El proveedor "${providerToDelete.name}" ha sido eliminado.`, variant: "destructive" });
+      setProviderToDelete(null);
     }
   };
 
   const EmptyState: React.FC<{ message: string; onAddClick: () => void }> = ({ message, onAddClick }) => (
     <div className="flex flex-col items-center justify-center text-center text-muted-foreground py-10 border border-dashed rounded-md">
       <Info className="h-12 w-12 mb-3 opacity-50" />
-      <p className="text-lg font-medium">No Providers Found</p>
+      <p className="text-lg font-medium">No Hay Proveedores</p>
       <p className="text-sm mb-4">{message}</p>
       <Button onClick={onAddClick} variant="outline">
-        <PlusCircle className="mr-2 h-4 w-4" /> Add First Provider
+        <PlusCircle className="mr-2 h-4 w-4" /> Agregar Primer Proveedor
       </Button>
     </div>
   );
@@ -153,28 +149,29 @@ export default function ProvidersPage() {
       <header className="flex flex-col sm:flex-row items-center justify-between mb-6 md:mb-10 p-4 bg-card shadow-md rounded-lg gap-4">
          <Link href="/dashboard" className="flex items-center text-primary hover:underline text-sm mb-4 sm:mb-0 self-start sm:self-center">
             <ArrowLeft className="mr-1 h-4 w-4" />
-            Back to Dashboard
+            Volver al Panel
           </Link>
         <h1 className="text-2xl md:text-3xl font-bold text-primary flex items-center order-first sm:order-none mx-auto sm:mx-0">
-          <Users className="mr-3 h-8 w-8" /> Manage Providers
+          <Users className="mr-3 h-8 w-8" /> Gestionar Proveedores
         </h1>
         <Button onClick={handleOpenAddDialog} className="bg-primary hover:bg-primary/90">
-          <PlusCircle className="mr-2 h-5 w-5" /> Add New Provider
+          <PlusCircle className="mr-2 h-5 w-5" /> Agregar Nuevo Proveedor
         </Button>
       </header>
 
       <main className="flex-grow">
         {providers.length === 0 ? (
-           <EmptyState message="Click the button above to add your first provider." onAddClick={handleOpenAddDialog}/>
+           <EmptyState message="Haz clic en el botón de arriba para agregar tu primer proveedor." onAddClick={handleOpenAddDialog}/>
         ) : (
           <ScrollArea className="h-[calc(100vh-280px)] sm:h-[calc(100vh-250px)] rounded-md border shadow-md">
             <Table>
               <TableHeader className="sticky top-0 bg-card z-10">
                 <TableRow>
-                  <TableHead className="font-semibold w-[25%]">Name</TableHead>
-                  <TableHead className="font-semibold w-[35%]">Address</TableHead>
-                  <TableHead className="font-semibold w-[20%]">Phone</TableHead>
-                  <TableHead className="text-right font-semibold w-[20%]">Actions</TableHead>
+                  <TableHead className="font-semibold w-[25%]">Nombre</TableHead>
+                  <TableHead className="font-semibold w-[30%]">Dirección</TableHead>
+                  <TableHead className="font-semibold w-[15%]">Teléfono</TableHead>
+                  <TableHead className="font-semibold w-[15%] text-right">Precio Unit.</TableHead>
+                  <TableHead className="text-right font-semibold w-[15%]">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -183,19 +180,21 @@ export default function ProvidersPage() {
                     <TableCell className="font-medium py-3">{provider.name}</TableCell>
                     <TableCell className="py-3 whitespace-pre-wrap">{provider.address}</TableCell>
                     <TableCell className="py-3">{provider.phone}</TableCell>
+                    <TableCell className="py-3 text-right">
+                      {provider.price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                    </TableCell>
                     <TableCell className="text-right py-3">
-                      <Button variant="ghost" size="icon" onClick={() => handleOpenEditDialog(provider)} aria-label={`Edit ${provider.name}`}>
+                      <Button variant="ghost" size="icon" onClick={() => handleOpenEditDialog(provider)} aria-label={`Editar ${provider.name}`}>
                         <Edit2 className="h-4 w-4 text-blue-600 hover:text-blue-500" />
                       </Button>
-                      {/* Removed AlertDialogTrigger wrapper */}
-                      <Button variant="ghost" size="icon" onClick={() => handleDeleteProviderClick(provider)} aria-label={`Delete ${provider.name}`}>
+                      <Button variant="ghost" size="icon" onClick={() => handleDeleteProviderClick(provider)} aria-label={`Eliminar ${provider.name}`}>
                         <Trash2 className="h-4 w-4 text-destructive hover:text-destructive/80" />
                       </Button>
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
-              {providers.length > 8 && <TableCaption>Scroll for more providers.</TableCaption>}
+              {providers.length > 8 && <TableCaption>Desplázate para ver más proveedores.</TableCaption>}
             </Table>
           </ScrollArea>
         )}
@@ -206,16 +205,16 @@ export default function ProvidersPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center text-xl">
               {editingProvider ? <Edit2 className="mr-2 h-5 w-5" /> : <PlusCircle className="mr-2 h-5 w-5" />}
-              {editingProvider ? 'Edit Provider' : 'Add New Provider'}
+              {editingProvider ? 'Editar Proveedor' : 'Agregar Nuevo Proveedor'}
             </DialogTitle>
             <DialogDescription>
-              {editingProvider ? 'Update the details for this provider.' : 'Fill in the form below to add a new provider.'}
+              {editingProvider ? 'Actualiza los detalles de este proveedor.' : 'Completa el formulario para agregar un nuevo proveedor.'}
             </DialogDescription>
           </DialogHeader>
           <ProviderForm
             onSubmit={handleFormSubmit}
             onCancel={handleCloseDialog}
-            initialData={editingProvider ? { name: editingProvider.name, address: editingProvider.address, phone: editingProvider.phone } : undefined}
+            initialData={editingProvider ? { name: editingProvider.name, address: editingProvider.address, phone: editingProvider.phone, price: editingProvider.price } : undefined}
             isEditing={!!editingProvider}
           />
         </DialogContent>
@@ -224,23 +223,22 @@ export default function ProvidersPage() {
       <AlertDialog open={!!providerToDelete} onOpenChange={(open) => { if (!open) setProviderToDelete(null);}}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the provider "{providerToDelete?.name}".
+              Esta acción no se puede deshacer. Esto eliminará permanentemente al proveedor "{providerToDelete?.name}".
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setProviderToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel onClick={() => setProviderToDelete(null)}>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">
-              Delete
+              Eliminar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
        <footer className="text-center text-sm text-muted-foreground py-4 mt-auto">
-            <p>&copy; {new Date().getFullYear()} Daily Supply Tracker. All rights reserved.</p>
+            <p>&copy; {new Date().getFullYear()} Daily Supply Tracker. Todos los derechos reservados.</p>
         </footer>
     </div>
   );
 }
-
