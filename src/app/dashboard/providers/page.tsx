@@ -10,8 +10,6 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-  // DialogFooter, // No longer needed here as form has its own footer
-  // DialogClose, // No longer needed here
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -167,23 +165,23 @@ export default function ProvidersPage() {
             <Table>
               <TableHeader className="sticky top-0 bg-card z-10">
                 <TableRow>
-                  <TableHead className="font-semibold w-[25%]">Nombre</TableHead>
+                  <TableHead className="font-semibold w-[25%] pl-4">Nombre</TableHead>
                   <TableHead className="font-semibold w-[30%]">Dirección</TableHead>
                   <TableHead className="font-semibold w-[15%]">Teléfono</TableHead>
                   <TableHead className="font-semibold w-[15%] text-right">Precio Unit.</TableHead>
-                  <TableHead className="text-right font-semibold w-[15%]">Acciones</TableHead>
+                  <TableHead className="text-right font-semibold w-[15%] pr-4">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {providers.map((provider) => (
                   <TableRow key={provider.id}>
-                    <TableCell className="font-medium py-3">{provider.name}</TableCell>
+                    <TableCell className="font-medium py-3 pl-4">{provider.name}</TableCell>
                     <TableCell className="py-3 whitespace-pre-wrap">{provider.address}</TableCell>
                     <TableCell className="py-3">{provider.phone}</TableCell>
                     <TableCell className="py-3 text-right">
                       {provider.price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                     </TableCell>
-                    <TableCell className="text-right py-3">
+                    <TableCell className="text-right py-3 pr-4">
                       <Button variant="ghost" size="icon" onClick={() => handleOpenEditDialog(provider)} aria-label={`Editar ${provider.name}`}>
                         <Edit2 className="h-4 w-4 text-blue-600 hover:text-blue-500" />
                       </Button>
