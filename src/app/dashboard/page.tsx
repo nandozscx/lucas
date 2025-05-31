@@ -8,21 +8,22 @@ import DashboardHeader from '@/components/dashboard-header';
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card } from "@/components/ui/card";
-import { ClipboardPenLine, Users, Download, History } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { ClipboardPenLine, Users, Download, HistoryIcon } from 'lucide-react'; // Renamed History to HistoryIcon to avoid conflict
 
 export default function DashboardPage() {
-  // deliveries state is not directly used on this page for display anymore,
-  // but kept if any other dashboard-level summary might need it.
-  // const [deliveries, setDeliveries] = useState<Delivery[]>([]); 
   const { toast } = useToast();
   const [isClient, setIsClient] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
     setIsClient(true);
-    // Deliveries are loaded directly within exportToCSV now or by respective pages.
   }, []);
-
 
   const exportToCSV = () => {
     const storedDeliveriesData = localStorage.getItem('dailySupplyTrackerDeliveries');
@@ -31,13 +32,13 @@ export default function DashboardPage() {
     if (currentDeliveries.length === 0) {
       toast({
         title: "Sin Datos",
-        description: "No hay datos para exportar.",
+        description: "No hay datos para exportar a CSV.",
         variant: "destructive",
       });
       return;
     }
 
-    const headers = "Proveedor,Fecha,Cantidad\n"; // Columnas en español
+    const headers = "Proveedor,Fecha,Cantidad\n";
     const csvRows = currentDeliveries.map((d: Delivery) =>
       `"${d.providerName.replace(/"/g, '""')}","${d.date}",${d.quantity}`
     );
@@ -49,21 +50,32 @@ export default function DashboardPage() {
     if (link.download !== undefined) {
       const url = URL.createObjectURL(blob);
       link.setAttribute("href", url);
-      link.setAttribute("download", "entregas_suministros.csv"); // Nombre de archivo en español
+      link.setAttribute("download", "entregas_suministros.csv");
       link.style.visibility = 'hidden';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
       toast({
-        title: "Exportación Exitosa",
+        title: "Exportación CSV Exitosa",
         description: "Las entregas se han exportado a CSV.",
       });
     } else {
        toast({
-        title: "Exportación Fallida",
+        title: "Exportación CSV Fallida",
         description: "Tu navegador no soporta descargas directas.",
         variant: "destructive",
+      });
+    }
+  };
+
+  const handleExportOption = (format: 'csv' | 'sheets' | 'excel' | 'pdf') => {
+    if (format === 'csv') {
+      exportToCSV();
+    } else {
+      toast({
+        title: "Próximamente",
+        description: `La exportación a ${format.toUpperCase()} aún no está implementada.`,
       });
     }
   };
@@ -74,16 +86,10 @@ export default function DashboardPage() {
     } else if (cardTitle === "Registro") {
       router.push('/dashboard/registry');
     } else if (cardTitle === "Historial") {
-       toast({
-        title: `"${cardTitle}" presionado`,
-        description: `Navegación para "${cardTitle}" aún no implementada.`,
-      });
-      console.log(`Acción para la tarjeta "${cardTitle}" activada.`);
-    } else {
-      // For "Exportar", the action is directly called.
+      router.push('/dashboard/history');
     }
+    // "Exportar" is handled by DropdownMenu, so no direct action here
   };
-
 
   if (!isClient) {
     return (
@@ -105,8 +111,8 @@ export default function DashboardPage() {
   const cardItems = [
     { title: "Registro", icon: ClipboardPenLine, action: () => handleCardClick("Registro") },
     { title: "Proveedores", icon: Users, action: () => handleCardClick("Proveedores") },
-    { title: "Exportar", icon: Download, action: exportToCSV },
-    { title: "Historial", icon: History, action: () => handleCardClick("Historial") },
+    { title: "Exportar", icon: Download }, // Action is removed, handled by DropdownMenu
+    { title: "Historial", icon: HistoryIcon, action: () => handleCardClick("Historial") },
   ];
 
   return (
@@ -115,13 +121,45 @@ export default function DashboardPage() {
       <main className="flex-grow grid grid-cols-1 sm:grid-cols-2 gap-6 md:gap-8 p-4 md:p-8 items-center">
         {cardItems.map((item) => {
           const IconComponent = item.icon;
+          if (item.title === "Exportar") {
+            return (
+              <DropdownMenu key={item.title}>
+                <DropdownMenuTrigger asChild>
+                  <Card
+                    role="button"
+                    tabIndex={0}
+                    className="flex flex-col items-center justify-center p-4 hover:shadow-xl transition-all duration-200 ease-in-out cursor-pointer aspect-square rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 shadow-md"
+                    aria-label={item.title}
+                    // onKeyDown for DropdownMenuTrigger is handled internally if needed
+                  >
+                    <IconComponent className="h-20 w-20 text-primary mb-3" strokeWidth={1.5} />
+                    <p className="text-lg font-semibold text-center text-foreground">{item.title}</p>
+                  </Card>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuItem onClick={() => handleExportOption('csv')}>
+                    Exportar a CSV
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleExportOption('sheets')}>
+                    Exportar a Sheets
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleExportOption('excel')}>
+                    Exportar a Excel
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleExportOption('pdf')}>
+                    Exportar a PDF
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            );
+          }
           return (
             <Card
               key={item.title}
               role="button"
               tabIndex={0}
               onClick={item.action}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); item.action(); } }}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); item.action?.(); } }}
               className="flex flex-col items-center justify-center p-4 hover:shadow-xl transition-all duration-200 ease-in-out cursor-pointer aspect-square rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 shadow-md"
               aria-label={item.title}
             >
