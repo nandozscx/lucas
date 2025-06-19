@@ -86,7 +86,7 @@ const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="weeklySummary" className="w-full">
-          <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2 md:grid-cols-3 mb-6">
+          <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3 gap-1 mb-6">
             <TabsTrigger value="weeklySummary" className="flex items-center gap-2 text-sm sm:text-base">
               <CalendarRange className="h-4 w-4 sm:h-5 sm:w-5"/> Resumen Semanal
             </TabsTrigger>
@@ -113,6 +113,7 @@ const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals
             ) : (
               <ScrollArea className="h-[400px] sm:h-[500px] rounded-md border whitespace-nowrap">
                 <Table>
+                  {(weeklyTableData.length > 5 || daysOfWeekHeaders.length > 5) && <TableCaption>Desplázate para ver más proveedores o días.</TableCaption>}
                   <TableHeader className="sticky top-0 bg-card z-10">
                     <TableRow>
                       <TableHead className="font-semibold sticky left-0 bg-card z-10 min-w-[150px] pl-4">Proveedor</TableHead>
@@ -134,7 +135,6 @@ const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals
                     ))}
                   </TableBody>
                 </Table>
-                {(weeklyTableData.length > 5 || daysOfWeekHeaders.length > 5) && <TableCaption>Desplázate para ver más proveedores o días.</TableCaption>}
                 <ScrollBar orientation="horizontal" />
               </ScrollArea>
             )}
@@ -146,6 +146,7 @@ const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals
             ) : (
               <ScrollArea className="h-[400px] sm:h-[500px] rounded-md border">
                 <Table>
+                  {sortedDailyTotals.length > 5 && <TableCaption>Desplázate para ver más entradas.</TableCaption>}
                   <TableHeader>
                     <TableRow>
                       <TableHead className="font-semibold pl-4">Fecha</TableHead>
@@ -160,7 +161,6 @@ const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals
                       </TableRow>
                     ))}
                   </TableBody>
-                   {sortedDailyTotals.length > 5 && <TableCaption>Desplázate para ver más entradas.</TableCaption>}
                 </Table>
               </ScrollArea>
             )}
@@ -172,6 +172,7 @@ const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals
             ) : (
               <ScrollArea className="h-[400px] sm:h-[500px] rounded-md border">
                 <Table>
+                  {enrichedVendorTotals.length > 5 && <TableCaption>Desplázate para ver más entradas.</TableCaption>}
                   <TableHeader>
                     <TableRow>
                       <TableHead className="font-semibold pl-4">Proveedor</TableHead>
@@ -190,7 +191,6 @@ const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals
                       </TableRow>
                     ))}
                   </TableBody>
-                   {enrichedVendorTotals.length > 5 && <TableCaption>Desplázate para ver más entradas.</TableCaption>}
                 </Table>
               </ScrollArea>
             )}
@@ -202,3 +202,6 @@ const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals
 };
 
 export default SupplyDataView;
+
+
+    
