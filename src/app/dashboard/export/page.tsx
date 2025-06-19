@@ -3,34 +3,45 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, File, Sheet, FileSpreadsheet, FileText as FileTextIcon } from 'lucide-react'; // Changed FileCsv to File
+import { ArrowLeft, File as FileIcon, Sheet, FileSpreadsheet, FileText as FileTextIcon } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import type { Delivery } from '@/types';
+import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
+
+// Extend jsPDF with autoTable - this is a common way to handle plugins with jsPDF
+interface jsPDFWithAutoTable extends jsPDF {
+  autoTable: (options: any) => jsPDF;
+}
 
 export default function ExportPage() {
   const [isClient, setIsClient] = useState(false);
-  const router = useRouter();
   const { toast } = useToast();
 
   useEffect(() => {
     setIsClient(true);
   }, []);
 
-  const exportToCSV = () => {
+  const getDeliveries = (): Delivery[] => {
+    if (typeof window === 'undefined') return [];
     const storedDeliveriesData = localStorage.getItem('dailySupplyTrackerDeliveries');
-    const currentDeliveries: Delivery[] = storedDeliveriesData ? JSON.parse(storedDeliveriesData) : [];
+    return storedDeliveriesData ? JSON.parse(storedDeliveriesData) : [];
+  };
+
+  const exportToCSV = (filename = "entregas_suministros.csv") => {
+    const currentDeliveries = getDeliveries();
 
     if (currentDeliveries.length === 0) {
       toast({
         title: "Sin Datos",
-        description: "No hay datos para exportar a CSV.",
+        description: "No hay datos para exportar.",
         variant: "destructive",
       });
-      return;
+      return false;
     }
 
     const headers = "Proveedor,Fecha,Cantidad\n";
@@ -45,32 +56,101 @@ export default function ExportPage() {
     if (link.download !== undefined) {
       const url = URL.createObjectURL(blob);
       link.setAttribute("href", url);
-      link.setAttribute("download", "entregas_suministros.csv");
+      link.setAttribute("download", filename);
       link.style.visibility = 'hidden';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
+      return true;
+    }
+    toast({
+      title: "Exportación Fallida",
+      description: "Tu navegador no soporta descargas directas.",
+      variant: "destructive",
+    });
+    return false;
+  };
+
+  const exportToXLSX = () => {
+    const currentDeliveries = getDeliveries();
+    if (currentDeliveries.length === 0) {
       toast({
-        title: "Exportación CSV Exitosa",
-        description: "Las entregas se han exportado a CSV.",
-      });
-    } else {
-       toast({
-        title: "Exportación CSV Fallida",
-        description: "Tu navegador no soporta descargas directas.",
+        title: "Sin Datos",
+        description: "No hay datos para exportar a Excel.",
         variant: "destructive",
       });
+      return;
     }
+
+    const worksheetData = currentDeliveries.map(d => ({
+      Proveedor: d.providerName,
+      Fecha: d.date,
+      Cantidad: d.quantity,
+    }));
+    const worksheet = XLSX.utils.json_to_sheet(worksheetData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Entregas");
+    XLSX.writeFile(workbook, "entregas_suministros.xlsx");
+    toast({
+      title: "Exportación Excel Exitosa",
+      description: "Las entregas se han exportado a XLSX.",
+    });
   };
+
+  const exportToPDF = () => {
+    const currentDeliveries = getDeliveries();
+    if (currentDeliveries.length === 0) {
+      toast({
+        title: "Sin Datos",
+        description: "No hay datos para exportar a PDF.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const doc = new jsPDF() as jsPDFWithAutoTable;
+    doc.autoTable({
+      head: [['Proveedor', 'Fecha', 'Cantidad']],
+      body: currentDeliveries.map(d => [d.providerName, d.date, d.quantity]),
+      startY: 20,
+      didDrawPage: (data) => {
+        doc.setFontSize(18);
+        doc.text('Reporte de Entregas de Suministros', data.settings.margin.left, 15);
+      }
+    });
+    doc.save('entregas_suministros.pdf');
+    toast({
+      title: "Exportación PDF Exitosa",
+      description: "Las entregas se han exportado a PDF.",
+    });
+  };
+
 
   const handleExportOptionClick = (format: 'csv' | 'sheets' | 'excel' | 'pdf') => {
     if (format === 'csv') {
-      exportToCSV();
+      if(exportToCSV()) {
+        toast({
+          title: "Exportación CSV Exitosa",
+          description: "Las entregas se han exportado a CSV.",
+        });
+      }
+    } else if (format === 'sheets') {
+      if(exportToCSV("entregas_para_sheets.csv")) {
+         toast({
+          title: "CSV Descargado para Sheets",
+          description: "Archivo CSV descargado. Puedes importarlo manualmente en Google Sheets.",
+        });
+      }
+    } else if (format === 'excel') {
+      exportToXLSX();
+    } else if (format === 'pdf') {
+      exportToPDF();
     } else {
       toast({
-        title: "Próximamente",
-        description: `La exportación a ${format.toUpperCase()} aún no está implementada.`,
+        title: "Formato Desconocido",
+        description: `La exportación a ${format.toUpperCase()} aún no está implementada o no es reconocida.`,
+        variant: "destructive"
       });
     }
   };
@@ -95,7 +175,7 @@ export default function ExportPage() {
   }
 
   const exportOptions = [
-    { title: "Exportar a CSV", icon: File, action: () => handleExportOptionClick('csv') }, // Changed FileCsv to File
+    { title: "Exportar a CSV", icon: FileIcon, action: () => handleExportOptionClick('csv') },
     { title: "Exportar a Google Sheets", icon: Sheet, action: () => handleExportOptionClick('sheets') },
     { title: "Exportar a Excel", icon: FileSpreadsheet, action: () => handleExportOptionClick('excel') },
     { title: "Exportar a PDF", icon: FileTextIcon, action: () => handleExportOptionClick('pdf') },
