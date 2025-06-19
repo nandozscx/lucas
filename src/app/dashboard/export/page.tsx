@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, FileCsv, Sheet, FileSpreadsheet, FileText as FileTextIcon } from 'lucide-react';
+import { ArrowLeft, File, Sheet, FileSpreadsheet, FileText as FileTextIcon } from 'lucide-react'; // Changed FileCsv to File
 import { useToast } from "@/hooks/use-toast";
 import type { Delivery } from '@/types';
 
@@ -95,7 +95,7 @@ export default function ExportPage() {
   }
 
   const exportOptions = [
-    { title: "Exportar a CSV", icon: FileCsv, action: () => handleExportOptionClick('csv') },
+    { title: "Exportar a CSV", icon: File, action: () => handleExportOptionClick('csv') }, // Changed FileCsv to File
     { title: "Exportar a Google Sheets", icon: Sheet, action: () => handleExportOptionClick('sheets') },
     { title: "Exportar a Excel", icon: FileSpreadsheet, action: () => handleExportOptionClick('excel') },
     { title: "Exportar a PDF", icon: FileTextIcon, action: () => handleExportOptionClick('pdf') },

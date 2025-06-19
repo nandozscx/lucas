@@ -2,7 +2,7 @@
 "use client";
 
 import React from 'react';
-import type { Delivery, VendorTotal, Provider } from '@/types';
+import type { Delivery, Provider } from '@/types'; // Removed VendorTotal as it's not directly used as prop
 import {
   Table,
   TableBody,
@@ -15,18 +15,17 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import { Users, CalendarDays, Info, CalendarRange, DollarSign, ShoppingBag } from 'lucide-react';
+import { Users, CalendarDays, Info, CalendarRange, ShoppingBag } from 'lucide-react';
 import { format, parseISO, getDay, startOfWeek, endOfWeek, isWithinInterval, addDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 interface SupplyDataViewProps {
   deliveries: Delivery[];
   dailyTotals: Record<string, number>;
-  vendorTotals: VendorTotal[];
   providers: Provider[];
 }
 
-const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals, vendorTotals, providers }) => {
+const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals, providers }) => {
   
   const currentWeekStart = startOfWeek(new Date(), { weekStartsOn: 0, locale: es }); // Sunday as start
   const currentWeekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 0, locale: es });
@@ -49,7 +48,7 @@ const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals
         row.quantities[dayIndex] = (row.quantities[dayIndex] || 0) + delivery.quantity;
       });
     return row;
-  });
+  }).sort((a,b) => a.providerName.localeCompare(b.providerName));
 
   const daysOfWeekHeaders = Array.from({ length: 7 }).map((_, i) => 
     format(addDays(currentWeekStart, i), "EEEE", { locale: es })
@@ -59,21 +58,33 @@ const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals
     parseISO(dateB).getTime() - parseISO(dateA).getTime()
   );
 
-  const enrichedVendorTotals = vendorTotals.map(vt => {
-    const providerInfo = providers.find(p => p.name === vt.originalName);
-    const price = providerInfo?.price ?? 0;
-    const totalToPay = vt.totalQuantity * price;
-    return {
-      ...vt,
-      price,
-      totalToPay,
-    };
-  }).sort((a, b) => a.originalName.localeCompare(b.originalName));
+  // Calculate vendor totals specifically for the current week
+  const weeklyVendorTotalsMap: Record<string, { totalQuantity: number }> = {};
+  deliveriesForCurrentWeek.forEach(delivery => {
+    if (!weeklyVendorTotalsMap[delivery.providerName]) {
+      weeklyVendorTotalsMap[delivery.providerName] = { totalQuantity: 0 };
+    }
+    weeklyVendorTotalsMap[delivery.providerName].totalQuantity += delivery.quantity;
+  });
+
+  const enrichedVendorTotalsForCurrentWeek = Object.entries(weeklyVendorTotalsMap)
+    .map(([name, data]) => {
+      const providerInfo = providers.find(p => p.name === name);
+      const price = providerInfo?.price ?? 0;
+      const totalToPay = data.totalQuantity * price;
+      return {
+        originalName: name,
+        totalQuantity: data.totalQuantity,
+        price,
+        totalToPay,
+      };
+    })
+    .sort((a, b) => a.originalName.localeCompare(b.originalName));
 
 
-  const EmptyState: React.FC<{ message: string; icon?: React.ElementType }> = ({ message, icon: Icon = Info }) => (
-    <div className="flex flex-col items-center justify-center text-center text-muted-foreground py-10 border border-dashed rounded-md">
-      <Icon className="h-12 w-12 mb-3 opacity-50" />
+  const EmptyState: React.FC<{ message: string; icon?: React.ElementType }> = ({ message, icon: IconComponent = Info }) => (
+    <div className="flex flex-col items-center justify-center text-center text-muted-foreground py-10 border border-dashed rounded-md min-h-[300px]">
+      <IconComponent className="h-12 w-12 mb-3 opacity-50" />
       <p className="text-lg font-medium">No Hay Datos Disponibles</p>
       <p className="text-sm">{message}</p>
     </div>
@@ -167,22 +178,22 @@ const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals
           </TabsContent>
 
           <TabsContent value="vendorTotals">
-            {enrichedVendorTotals.length === 0 ? (
-              <EmptyState message="Los totales por proveedor se calcularán y mostrarán aquí." icon={Users}/>
+            {enrichedVendorTotalsForCurrentWeek.length === 0 ? (
+              <EmptyState message="Los totales por proveedor para la semana actual se calcularán y mostrarán aquí." icon={Users}/>
             ) : (
               <ScrollArea className="h-[400px] sm:h-[500px] rounded-md border">
                 <Table>
-                  {enrichedVendorTotals.length > 5 && <TableCaption>Desplázate para ver más entradas.</TableCaption>}
+                  {enrichedVendorTotalsForCurrentWeek.length > 5 && <TableCaption>Desplázate para ver más entradas.</TableCaption>}
                   <TableHeader>
                     <TableRow>
                       <TableHead className="font-semibold pl-4">Proveedor</TableHead>
-                      <TableHead className="text-right font-semibold">Cantidad Total</TableHead>
+                      <TableHead className="text-right font-semibold">Cantidad Total (Semanal)</TableHead>
                       <TableHead className="text-right font-semibold">Precio Unit.</TableHead>
-                      <TableHead className="text-right font-semibold pr-4">Total a Pagar</TableHead>
+                      <TableHead className="text-right font-semibold pr-4">Total a Pagar (Semanal)</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {enrichedVendorTotals.map((vendor) => (
+                    {enrichedVendorTotalsForCurrentWeek.map((vendor) => (
                       <TableRow key={vendor.originalName}>
                         <TableCell className="font-medium pl-4">{vendor.originalName}</TableCell>
                         <TableCell className="text-right">{vendor.totalQuantity.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
@@ -202,6 +213,3 @@ const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals
 };
 
 export default SupplyDataView;
-
-
-    

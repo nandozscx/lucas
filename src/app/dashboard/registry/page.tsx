@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import type { Delivery as DeliveryType, VendorTotal, Provider } from '@/types';
+import type { Delivery as DeliveryType, Provider } from '@/types'; // Removed VendorTotal, as it's no longer passed to SupplyDataView
 import SupplyEntryForm, { type DailyRegistryFormData } from '@/components/supply-entry-form';
 import SupplyDataView from '@/components/supply-data-view';
 import { useToast } from "@/hooks/use-toast";
@@ -21,7 +21,7 @@ export default function RegistryPage() {
   const [deliveries, setDeliveries] = useState<DeliveryType[]>([]);
   const [providers, setProviders] = useState<Provider[]>([]);
   const [dailyTotals, setDailyTotals] = useState<Record<string, number>>({});
-  const [vendorTotals, setVendorTotals] = useState<VendorTotal[]>([]);
+  // const [vendorTotals, setVendorTotals] = useState<VendorTotal[]>([]); // Kept for now if RegistryPage itself needs it, but not passed down.
   const [isClient, setIsClient] = useState(false);
   const { toast } = useToast();
 
@@ -74,21 +74,25 @@ export default function RegistryPage() {
       });
       setDailyTotals(newDailyTotals);
 
-      const newVendorTotalsMap: Record<string, { totalQuantity: number }> = {};
-      deliveries.forEach(delivery => {
-        if (!newVendorTotalsMap[delivery.providerName]) {
-          newVendorTotalsMap[delivery.providerName] = { totalQuantity: 0 };
-        }
-        newVendorTotalsMap[delivery.providerName].totalQuantity += delivery.quantity;
-      });
+      // The following vendorTotals calculation is for the RegistryPage's own state,
+      // but it's not passed to SupplyDataView anymore for the weekly vendor totals tab.
+      // SupplyDataView calculates its weekly vendor totals internally.
+      // This can be removed if RegistryPage itself has no other use for all-time vendor totals.
+      // const newVendorTotalsMap: Record<string, { totalQuantity: number }> = {};
+      // deliveries.forEach(delivery => {
+      //   if (!newVendorTotalsMap[delivery.providerName]) {
+      //     newVendorTotalsMap[delivery.providerName] = { totalQuantity: 0 };
+      //   }
+      //   newVendorTotalsMap[delivery.providerName].totalQuantity += delivery.quantity;
+      // });
       
-      const newVendorTotalsArray = Object.entries(newVendorTotalsMap)
-        .map(([name, data]) => ({
-          originalName: name,
-          totalQuantity: data.totalQuantity,
-        }))
-        .sort((a, b) => a.originalName.localeCompare(b.originalName));
-      setVendorTotals(newVendorTotalsArray);
+      // const newVendorTotalsArray = Object.entries(newVendorTotalsMap)
+      //   .map(([name, data]) => ({
+      //     originalName: name,
+      //     totalQuantity: data.totalQuantity,
+      //   }))
+      //   .sort((a, b) => a.originalName.localeCompare(b.originalName));
+      // setVendorTotals(newVendorTotalsArray);
     }
   }, [deliveries, isClient]);
 
@@ -101,7 +105,7 @@ export default function RegistryPage() {
       if (entry.quantity !== undefined && entry.quantity !== null && entry.quantity > 0) {
         const newDelivery: DeliveryType = {
           id: crypto.randomUUID(),
-          providerName: entry.providerName, // Storing name for simplicity, could be ID
+          providerName: entry.providerName, 
           date: dateStr,
           quantity: entry.quantity,
         };
@@ -123,7 +127,7 @@ export default function RegistryPage() {
       toast({
         title: "Sin Entregas para Registrar",
         description: "No se ingresaron cantidades para la fecha seleccionada.",
-        variant: "default", // Using default variant for informational non-critical message
+        variant: "default",
       });
     }
   }, [toast]);
@@ -188,7 +192,7 @@ export default function RegistryPage() {
           <SupplyDataView
             deliveries={deliveries}
             dailyTotals={dailyTotals}
-            vendorTotals={vendorTotals}
+            // vendorTotals prop removed
             providers={providers} 
           />
         </div>
