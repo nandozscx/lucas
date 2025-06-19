@@ -2,26 +2,25 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import type { Delivery } from '@/types';
-import DashboardHeader from '@/components/dashboard-header';
-import { useToast } from "@/hooks/use-toast";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ClipboardPenLine, Users, Download, HistoryIcon, FileCsv, Sheet, FileSpreadsheet, FileText as FileTextIcon } from 'lucide-react';
+import { Skeleton } from "@/components/ui/skeleton";
+import { ArrowLeft, FileCsv, Sheet, FileSpreadsheet, FileText as FileTextIcon } from 'lucide-react';
+import { useToast } from "@/hooks/use-toast";
+import type { Delivery } from '@/types';
 
-export default function DashboardPage() {
-  const { toast } = useToast();
+export default function ExportPage() {
   const [isClient, setIsClient] = useState(false);
   const router = useRouter();
+  const { toast } = useToast();
 
   useEffect(() => {
     setIsClient(true);
   }, []);
 
-  // Original exportToCSV logic is now moved to /dashboard/export/page.tsx
-  // It's kept here only for the DashboardHeader button, which might be refactored later.
-  const exportToCSVForHeader = () => {
+  const exportToCSV = () => {
     const storedDeliveriesData = localStorage.getItem('dailySupplyTrackerDeliveries');
     const currentDeliveries: Delivery[] = storedDeliveriesData ? JSON.parse(storedDeliveriesData) : [];
 
@@ -65,48 +64,58 @@ export default function DashboardPage() {
     }
   };
 
-
-  const handleCardClick = (cardTitle: string) => {
-    if (cardTitle === "Proveedores") {
-      router.push('/dashboard/providers');
-    } else if (cardTitle === "Registro") {
-      router.push('/dashboard/registry');
-    } else if (cardTitle === "Historial") {
-      router.push('/dashboard/history');
-    } else if (cardTitle === "Exportar") {
-      router.push('/dashboard/export');
+  const handleExportOptionClick = (format: 'csv' | 'sheets' | 'excel' | 'pdf') => {
+    if (format === 'csv') {
+      exportToCSV();
+    } else {
+      toast({
+        title: "Próximamente",
+        description: `La exportación a ${format.toUpperCase()} aún no está implementada.`,
+      });
     }
   };
 
   if (!isClient) {
     return (
       <div className="min-h-screen flex flex-col p-4 md:p-8 space-y-6 bg-background">
-        <Skeleton className="h-20 w-full rounded-lg" /> {/* Header Placeholder */}
+        <header className="flex items-center justify-between mb-6 md:mb-10 p-4 bg-card shadow-md rounded-lg">
+          <Skeleton className="h-8 w-1/3" />
+          <Skeleton className="h-10 w-36" />
+        </header>
         <main className="flex-grow grid grid-cols-1 sm:grid-cols-2 gap-6 md:gap-8 p-4 md:p-8 items-center">
-            <Skeleton className="w-full rounded-lg aspect-square" />
-            <Skeleton className="w-full rounded-lg aspect-square" />
-            <Skeleton className="w-full rounded-lg aspect-square" />
-            <Skeleton className="w-full rounded-lg aspect-square" />
+          {[...Array(4)].map((_, i) => (
+            <Skeleton key={i} className="w-full rounded-lg aspect-square" />
+          ))}
         </main>
         <footer className="text-center text-sm text-muted-foreground py-4 mt-auto">
-            <Skeleton className="h-6 w-1/2 mx-auto rounded-md" />
+          <Skeleton className="h-6 w-1/2 mx-auto rounded-md" />
         </footer>
       </div>
     );
   }
 
-  const cardItems = [
-    { title: "Registro", icon: ClipboardPenLine, action: () => handleCardClick("Registro") },
-    { title: "Proveedores", icon: Users, action: () => handleCardClick("Proveedores") },
-    { title: "Exportar", icon: Download, action: () => handleCardClick("Exportar") },
-    { title: "Historial", icon: HistoryIcon, action: () => handleCardClick("Historial") },
+  const exportOptions = [
+    { title: "Exportar a CSV", icon: FileCsv, action: () => handleExportOptionClick('csv') },
+    { title: "Exportar a Google Sheets", icon: Sheet, action: () => handleExportOptionClick('sheets') },
+    { title: "Exportar a Excel", icon: FileSpreadsheet, action: () => handleExportOptionClick('excel') },
+    { title: "Exportar a PDF", icon: FileTextIcon, action: () => handleExportOptionClick('pdf') },
   ];
 
   return (
-    <div className="min-h-screen flex flex-col p-4 md:p-8 space-y-6 bg-background">
-      <DashboardHeader onExportCSV={exportToCSVForHeader} />
+    <div className="min-h-screen flex flex-col p-4 md:p-8 bg-background">
+      <header className="flex flex-col sm:flex-row items-center justify-between mb-6 md:mb-10 p-4 bg-card shadow-md rounded-lg gap-4">
+        <Link href="/dashboard" className="flex items-center text-primary hover:underline text-sm mb-4 sm:mb-0 self-start sm:self-center">
+          <ArrowLeft className="mr-1 h-4 w-4" />
+          Volver al Panel
+        </Link>
+        <h1 className="text-2xl md:text-3xl font-bold text-primary flex items-center order-first sm:order-none mx-auto sm:mx-0">
+          Opciones de Exportación
+        </h1>
+        <div className="w-0 sm:w-auto"></div> {/* Spacer for alignment */}
+      </header>
+
       <main className="flex-grow grid grid-cols-1 sm:grid-cols-2 gap-6 md:gap-8 p-4 md:p-8 items-center">
-        {cardItems.map((item) => {
+        {exportOptions.map((item) => {
           const IconComponent = item.icon;
           return (
             <Card
@@ -114,7 +123,7 @@ export default function DashboardPage() {
               role="button"
               tabIndex={0}
               onClick={item.action}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); item.action?.(); } }}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); item.action(); } }}
               className="flex flex-col items-center justify-center p-4 hover:shadow-xl transition-all duration-200 ease-in-out cursor-pointer aspect-square rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 shadow-md"
               aria-label={item.title}
             >
@@ -124,6 +133,7 @@ export default function DashboardPage() {
           );
         })}
       </main>
+      
       <footer className="text-center text-sm text-muted-foreground py-4 mt-auto">
         <p>&copy; {new Date().getFullYear()} Daily Supply Tracker. Todos los derechos reservados.</p>
       </footer>

@@ -3,11 +3,11 @@ import type { Metadata } from 'next';
 import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
-  title: 'Historial de Entregas Semanales - Daily Supply Tracker',
-  description: 'Consulta y navega por los registros de entregas semanales anteriores.',
+  title: 'Opciones de Exportación - Daily Supply Tracker',
+  description: 'Selecciona un formato para exportar tus datos de entregas.',
 };
 
-export default function HistoryLayout({
+export default function ExportLayout({
   children,
 }: {
   children: React.ReactNode;
