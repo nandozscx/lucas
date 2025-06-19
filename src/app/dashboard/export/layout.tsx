@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
-  title: 'Opciones de Exportación - Daily Supply Tracker',
+  title: 'Opciones de Exportación - acopiapp',
   description: 'Selecciona un formato para exportar tus datos de entregas.',
 };
 

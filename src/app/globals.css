@@ -14,11 +14,11 @@
     --popover: 0 0% 100%;
     --popover-foreground: 0 0% 3.9%;
 
-    --primary: 271 76% 54%; /* Violet-blue #8A2BE2 */
+    --primary: 0 0% 25%; /* Dark Gray (representing gray at 80% "strength" or darkness) */
     --primary-foreground: 0 0% 98%; /* Light text for primary */
 
-    --secondary: 271 76% 90%; /* Lighter shade of primary for secondary elements */
-    --secondary-foreground: 271 76% 20%; /* Darker shade of primary for text on secondary */
+    --secondary: 271 76% 90%; /* Lighter shade of original primary for secondary elements */
+    --secondary-foreground: 271 76% 20%; /* Darker shade of original primary for text on secondary */
 
     --muted: 0 0% 96.1%; /* Default light gray */
     --muted-foreground: 0 0% 45.1%; /* Default medium gray text for muted */
@@ -31,7 +31,7 @@
 
     --border: 0 0% 89.8%; /* Default light gray border */
     --input: 0 0% 95%; /* Slightly off-white for input backgrounds */
-    --ring: 271 76% 54%; /* Primary color for ring */
+    --ring: 0 0% 25%; /* Primary color for ring (updated to new gray) */
 
     --radius: 0.5rem;
 
@@ -53,7 +53,7 @@
     --card-foreground: 0 0% 98%;
     --popover: 240 10% 3.9%;
     --popover-foreground: 0 0% 98%;
-    --primary: 271 76% 65%; /* Adjusted primary for dark mode */
+    --primary: 0 0% 40%; /* Medium Gray for dark mode buttons */
     --primary-foreground: 0 0% 98%;
     --secondary: 271 76% 15%; /* Adjusted secondary for dark mode */
     --secondary-foreground: 0 0% 98%;
@@ -65,7 +65,7 @@
     --destructive-foreground: 0 0% 98%;
     --border: 0 0% 14.9%;
     --input: 0 0% 14.9%;
-    --ring: 271 76% 65%; /* Adjusted ring for dark mode */
+    --ring: 0 0% 40%; /* Adjusted ring for dark mode (updated to new gray) */
     
     /* Dark Sidebar specific colors */
     --sidebar-background: 240 5.9% 10%;

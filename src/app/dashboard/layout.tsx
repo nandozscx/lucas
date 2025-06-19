@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
-  title: 'Daily Supply Tracker', // App name, can remain or be translated if preferred
+  title: 'acopiapp', 
   description: 'Rastrea entregas diarias de suministros de proveedores.',
 };
 

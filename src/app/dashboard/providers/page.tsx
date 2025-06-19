@@ -235,7 +235,7 @@ export default function ProvidersPage() {
         </AlertDialogContent>
       </AlertDialog>
        <footer className="text-center text-sm text-muted-foreground py-4 mt-auto">
-            <p>&copy; {new Date().getFullYear()} Daily Supply Tracker. Todos los derechos reservados.</p>
+            <p>&copy; {new Date().getFullYear()} acopiapp. Todos los derechos reservados.</p>
         </footer>
     </div>
   );
