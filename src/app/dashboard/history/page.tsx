@@ -158,8 +158,13 @@ export default function HistoryPage() {
                   <TableHeader className="sticky top-0 bg-card z-10">
                     <TableRow>
                       <TableHead className="font-semibold sticky left-0 bg-card z-10 min-w-[150px] pl-4">Proveedor</TableHead>
-                      {daysOfWeekHeaders.map(day => (
-                        <TableHead key={day} className="text-right font-semibold min-w-[100px] capitalize pr-4">{day}</TableHead>
+                      {daysOfWeekHeaders.map((day, index) => (
+                        <TableHead 
+                          key={day} 
+                          className={`text-right font-semibold min-w-[100px] capitalize ${index === daysOfWeekHeaders.length - 1 ? 'pr-4' : ''}`}
+                        >
+                          {day}
+                        </TableHead>
                       ))}
                     </TableRow>
                   </TableHeader>
@@ -168,7 +173,10 @@ export default function HistoryPage() {
                       <TableRow key={row.providerName}>
                         <TableCell className="font-medium sticky left-0 bg-card z-10 pl-4">{row.providerName}</TableCell>
                         {row.quantities.map((quantity, index) => (
-                          <TableCell key={index} className="text-right pr-4">
+                          <TableCell 
+                            key={index} 
+                            className={`text-right ${index === row.quantities.length - 1 ? 'pr-4' : ''}`}
+                          >
                             {quantity !== undefined ? quantity.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2}) : "-"}
                           </TableCell>
                         ))}
