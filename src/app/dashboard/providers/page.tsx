@@ -95,7 +95,7 @@ export default function ProvidersPage() {
       toast({ title: "Proveedor Actualizado", description: `El proveedor "${data.name}" ha sido actualizado exitosamente.` });
     } else {
       const newProvider: Provider = { ...data, id: crypto.randomUUID() };
-      setProviders(prev => [newProvider, ...prev]);
+      setProviders(prev => [...prev, newProvider]);
       toast({ title: "Proveedor Agregado", description: `El proveedor "${data.name}" ha sido agregado exitosamente.` });
     }
     handleCloseDialog();
