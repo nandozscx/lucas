@@ -79,7 +79,7 @@ export default function HistoryPage() {
         row.quantities[dayIndex] = (row.quantities[dayIndex] || 0) + delivery.quantity;
       });
     return row;
-  }).sort((a,b) => a.providerName.localeCompare(b.providerName));
+  });
 
   const daysOfWeekHeaders = Array.from({ length: 7 }).map((_, i) => 
     format(addDays(currentWeekStart, i), "EEEE", { locale: es })
@@ -197,4 +197,3 @@ export default function HistoryPage() {
     </div>
   );
 }
-
