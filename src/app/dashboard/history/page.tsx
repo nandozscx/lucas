@@ -1,11 +1,10 @@
-
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, History, ChevronLeft, ChevronRight, ShoppingBag, Users as UsersIcon } from 'lucide-react';
+import { ArrowLeft, History, ChevronLeft, ChevronRight, ShoppingBag, Users as UsersIcon, Download } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import {
@@ -20,6 +19,14 @@ import {
 import { format, parseISO, getDay, startOfWeek, endOfWeek, isWithinInterval, addDays, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { Delivery, Provider } from '@/types';
+import { useToast } from "@/hooks/use-toast";
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
+
+interface jsPDFWithAutoTable extends jsPDF {
+  autoTable: (options: any) => jsPDF;
+}
+
 
 const DELIVERIES_STORAGE_KEY = 'dailySupplyTrackerDeliveries';
 const PROVIDERS_STORAGE_KEY = 'dailySupplyTrackerProviders';
@@ -29,6 +36,7 @@ export default function HistoryPage() {
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [providers, setProviders] = useState<Provider[]>([]);
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(startOfWeek(new Date(), { weekStartsOn: 0, locale: es }));
+  const { toast } = useToast();
 
   useEffect(() => {
     setIsClient(true);
@@ -85,6 +93,43 @@ export default function HistoryPage() {
     format(addDays(currentWeekStart, i), "EEEE", { locale: es })
   );
 
+  const exportHistoryToPDF = () => {
+    if (weeklyTableData.every(row => row.quantities.every(q => q === undefined)) && deliveriesForCurrentWeek.length === 0) {
+      toast({
+        title: "Sin Datos",
+        description: "No hay datos en la semana actual para exportar a PDF.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const doc = new jsPDF() as jsPDFWithAutoTable;
+    const tableHeaders = ['Proveedor', ...daysOfWeekHeaders.map(d => d.charAt(0).toUpperCase() + d.slice(1))];
+    const tableBody = weeklyTableData.map(row => [
+      row.providerName,
+      ...row.quantities.map(q => (q !== undefined ? q.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2}) : "-"))
+    ]);
+    
+    const weekTitle = `Semana del ${format(currentWeekStart, "dd 'de' MMMM", { locale: es })} al ${format(currentWeekEnd, "dd 'de' MMMM 'de' yyyy", { locale: es })}`;
+
+    doc.setFontSize(18);
+    doc.text('Historial de Entregas Semanales', 14, 15);
+    doc.setFontSize(12);
+    doc.text(weekTitle, 14, 22);
+
+    doc.autoTable({
+      head: [tableHeaders],
+      body: tableBody,
+      startY: 28,
+    });
+
+    doc.save(`historial_semanal_${format(currentWeekStart, "yyyy-MM-dd")}.pdf`);
+    toast({
+      title: "Exportación PDF Exitosa",
+      description: "El historial semanal se ha exportado a PDF.",
+    });
+  };
+
   const EmptyState: React.FC<{ message: string; icon?: React.ElementType }> = ({ message, icon: Icon = History }) => (
     <div className="flex flex-col items-center justify-center text-center text-muted-foreground py-10 border border-dashed rounded-md min-h-[300px]">
       <Icon className="h-12 w-12 mb-3 opacity-50" />
@@ -130,9 +175,9 @@ export default function HistoryPage() {
           <CardHeader>
             <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
               <CardTitle className="text-xl text-center sm:text-left">
-                Semana del {format(currentWeekStart, "dd 'de' MMMM", { locale: es })} al {format(currentWeekEnd, "dd 'de' MMMM 'de' yyyy", { locale: es })}
+                {format(currentWeekStart, "dd 'de' MMMM", { locale: es })} - {format(currentWeekEnd, "dd 'de' MMMM 'de' yyyy", { locale: es })}
               </CardTitle>
-              <div className="flex gap-2">
+              <div className="flex items-center gap-2">
                 <Button variant="outline" onClick={handlePreviousWeek}>
                   <ChevronLeft className="h-4 w-4 mr-1 sm:mr-2" />
                   <span className="hidden sm:inline">Semana Anterior</span>
@@ -143,6 +188,11 @@ export default function HistoryPage() {
                   <span className="sm:hidden">Sig.</span>
                   <ChevronRight className="h-4 w-4 ml-1 sm:ml-2" />
                 </Button>
+                 <Button onClick={exportHistoryToPDF} className="bg-accent text-accent-foreground hover:bg-accent/90">
+                    <Download className="mr-2 h-4 w-4" />
+                    <span className="hidden sm:inline">Exportar PDF</span>
+                    <span className="sm:hidden">PDF</span>
+                  </Button>
               </div>
             </div>
           </CardHeader>

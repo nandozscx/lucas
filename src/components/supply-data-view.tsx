@@ -1,8 +1,7 @@
-
 "use client";
 
 import React from 'react';
-import type { Delivery, Provider } from '@/types'; // Removed VendorTotal as it's not directly used as prop
+import type { Delivery, Provider } from '@/types';
 import {
   Table,
   TableBody,
@@ -15,9 +14,17 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import { Users, CalendarDays, Info, CalendarRange, ShoppingBag } from 'lucide-react';
+import { Users, CalendarDays, Info, CalendarRange, ShoppingBag, Download } from 'lucide-react';
 import { format, parseISO, getDay, startOfWeek, endOfWeek, isWithinInterval, addDays } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { useToast } from "@/hooks/use-toast";
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
+import { Button } from './ui/button';
+
+interface jsPDFWithAutoTable extends jsPDF {
+  autoTable: (options: any) => jsPDF;
+}
 
 interface SupplyDataViewProps {
   deliveries: Delivery[];
@@ -27,6 +34,7 @@ interface SupplyDataViewProps {
 
 const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals, providers }) => {
   
+  const { toast } = useToast();
   const currentWeekStart = startOfWeek(new Date(), { weekStartsOn: 0, locale: es }); // Sunday as start
   const currentWeekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 0, locale: es });
 
@@ -58,7 +66,6 @@ const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals
     parseISO(dateB).getTime() - parseISO(dateA).getTime()
   );
 
-  // Calculate vendor totals specifically for the current week
   const weeklyVendorTotalsMap: Record<string, { totalQuantity: number }> = {};
   deliveriesForCurrentWeek.forEach(delivery => {
     if (!weeklyVendorTotalsMap[delivery.providerName]) {
@@ -80,7 +87,45 @@ const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals
       };
     })
     .sort((a, b) => a.originalName.localeCompare(b.originalName));
+  
+  const exportVendorTotalsToPDF = () => {
+    if (enrichedVendorTotalsForCurrentWeek.length === 0) {
+      toast({
+        title: "Sin Datos",
+        description: "No hay totales de proveedor para la semana actual para exportar.",
+        variant: "destructive",
+      });
+      return;
+    }
 
+    const doc = new jsPDF() as jsPDFWithAutoTable;
+    const tableHeaders = ['Proveedor', 'Cantidad Total (Semanal)', 'Precio Unit.', 'Total a Pagar (Semanal)'];
+    const tableBody = enrichedVendorTotalsForCurrentWeek.map(vendor => [
+      vendor.originalName,
+      vendor.totalQuantity.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+      vendor.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+      vendor.totalToPay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+    ]);
+
+    const weekTitle = `Semana del ${format(currentWeekStart, "dd 'de' MMMM", { locale: es })} al ${format(currentWeekEnd, "dd 'de' MMMM 'de' yyyy", { locale: es })}`;
+
+    doc.setFontSize(18);
+    doc.text('Totales Semanales por Proveedor', 14, 15);
+    doc.setFontSize(12);
+    doc.text(weekTitle, 14, 22);
+
+    doc.autoTable({
+      head: [tableHeaders],
+      body: tableBody,
+      startY: 28,
+    });
+
+    doc.save(`totales_proveedor_${format(currentWeekStart, "yyyy-MM-dd")}.pdf`);
+    toast({
+      title: "Exportación PDF Exitosa",
+      description: "Los totales por proveedor se han exportado a PDF.",
+    });
+  };
 
   const EmptyState: React.FC<{ message: string; icon?: React.ElementType }> = ({ message, icon: IconComponent = Info }) => (
     <div className="flex flex-col items-center justify-center text-center text-muted-foreground py-10 border border-dashed rounded-md min-h-[300px]">
@@ -178,6 +223,12 @@ const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals
           </TabsContent>
 
           <TabsContent value="vendorTotals">
+            <div className="flex justify-end mb-4">
+              <Button onClick={exportVendorTotalsToPDF} className="bg-accent text-accent-foreground hover:bg-accent/90">
+                <Download className="mr-2 h-4 w-4" />
+                Exportar a PDF
+              </Button>
+            </div>
             {enrichedVendorTotalsForCurrentWeek.length === 0 ? (
               <EmptyState message="Los totales por proveedor para la semana actual se calcularán y mostrarán aquí." icon={Users}/>
             ) : (
