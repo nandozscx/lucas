@@ -157,11 +157,11 @@ export default function ProvidersPage() {
         </Button>
       </header>
 
-      <main className="flex-grow">
+      <main className="flex-grow flex flex-col">
         {providers.length === 0 ? (
            <EmptyState message="Haz clic en el botón de arriba para agregar tu primer proveedor." onAddClick={handleOpenAddDialog}/>
         ) : (
-          <ScrollArea className="h-[calc(100vh-280px)] sm:h-[calc(100vh-250px)] rounded-md border shadow-md">
+          <ScrollArea className="flex-1 min-h-0 rounded-md border shadow-md">
             <Table>
               <TableHeader className="sticky top-0 bg-card z-10">
                 <TableRow>

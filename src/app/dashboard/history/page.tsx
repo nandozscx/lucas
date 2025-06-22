@@ -176,8 +176,8 @@ export default function HistoryPage() {
         <div className="w-0 sm:w-auto"></div> {/* Spacer for alignment */}
       </header>
 
-      <main className="flex-grow">
-        <Card className="w-full shadow-xl">
+      <main className="flex-grow flex flex-col">
+        <Card className="w-full shadow-xl flex flex-col flex-1">
           <CardHeader>
             <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
               <CardTitle className="text-xl text-center sm:text-left">
@@ -202,13 +202,13 @@ export default function HistoryPage() {
               </div>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex-1 min-h-0">
             {providers.length === 0 ? (
               <EmptyState message="No hay proveedores registrados. Agregue proveedores para ver el historial." icon={UsersIcon}/>
             ) : weeklyTableData.every(row => row.quantities.every(q => q === undefined)) && deliveriesForCurrentWeek.length === 0 ? (
                <EmptyState message="No hay entregas registradas para esta semana." icon={ShoppingBag}/>
             ) : (
-              <ScrollArea className="h-auto max-h-[calc(100vh-350px)] sm:max-h-[calc(100vh-320px)] rounded-md border whitespace-nowrap">
+              <ScrollArea className="h-full rounded-md border whitespace-nowrap">
                 <Table>
                   {(weeklyTableData.length > 8 || daysOfWeekHeaders.length > 5) && <TableCaption>Desplázate para ver más proveedores o días.</TableCaption>}
                   <TableHeader className="sticky top-0 bg-card z-10">
