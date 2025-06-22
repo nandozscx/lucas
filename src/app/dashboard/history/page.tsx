@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -20,8 +21,7 @@ import { format, parseISO, getDay, startOfWeek, endOfWeek, isWithinInterval, add
 import { es } from 'date-fns/locale';
 import type { Delivery, Provider } from '@/types';
 import { useToast } from "@/hooks/use-toast";
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import type jsPDF from 'jspdf';
 
 interface jsPDFWithAutoTable extends jsPDF {
   autoTable: (options: any) => jsPDF;
@@ -93,7 +93,7 @@ export default function HistoryPage() {
     format(addDays(currentWeekStart, i), "EEEE", { locale: es })
   );
 
-  const exportHistoryToPDF = () => {
+  const exportHistoryToPDF = async () => {
     if (weeklyTableData.every(row => row.quantities.every(q => q === undefined)) && deliveriesForCurrentWeek.length === 0) {
       toast({
         title: "Sin Datos",
@@ -103,7 +103,10 @@ export default function HistoryPage() {
       return;
     }
 
-    const doc = new jsPDF() as jsPDFWithAutoTable;
+    const { default: jsPDFConstructor } = await import('jspdf');
+    await import('jspdf-autotable');
+
+    const doc = new jsPDFConstructor() as jsPDFWithAutoTable;
     const tableHeaders = ['Proveedor', ...daysOfWeekHeaders.map(d => d.charAt(0).toUpperCase() + d.slice(1))];
     const tableBody = weeklyTableData.map(row => [
       row.providerName,

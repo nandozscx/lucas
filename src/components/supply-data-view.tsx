@@ -1,3 +1,4 @@
+
 "use client";
 
 import React from 'react';
@@ -18,8 +19,7 @@ import { Users, CalendarDays, Info, CalendarRange, ShoppingBag, Download } from 
 import { format, parseISO, getDay, startOfWeek, endOfWeek, isWithinInterval, addDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useToast } from "@/hooks/use-toast";
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import type jsPDF from 'jspdf';
 import { Button } from './ui/button';
 
 interface jsPDFWithAutoTable extends jsPDF {
@@ -56,7 +56,7 @@ const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals
         row.quantities[dayIndex] = (row.quantities[dayIndex] || 0) + delivery.quantity;
       });
     return row;
-  }).sort((a,b) => a.providerName.localeCompare(b.providerName));
+  });
 
   const daysOfWeekHeaders = Array.from({ length: 7 }).map((_, i) => 
     format(addDays(currentWeekStart, i), "EEEE", { locale: es })
@@ -88,7 +88,7 @@ const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals
     })
     .sort((a, b) => a.originalName.localeCompare(b.originalName));
   
-  const exportVendorTotalsToPDF = () => {
+  const exportVendorTotalsToPDF = async () => {
     if (enrichedVendorTotalsForCurrentWeek.length === 0) {
       toast({
         title: "Sin Datos",
@@ -97,8 +97,11 @@ const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals
       });
       return;
     }
+    
+    const { default: jsPDFConstructor } = await import('jspdf');
+    await import('jspdf-autotable');
 
-    const doc = new jsPDF() as jsPDFWithAutoTable;
+    const doc = new jsPDFConstructor() as jsPDFWithAutoTable;
     const tableHeaders = ['Proveedor', 'Cantidad Total (Semanal)', 'Precio Unit.', 'Total a Pagar (Semanal)'];
     const tableBody = enrichedVendorTotalsForCurrentWeek.map(vendor => [
       vendor.originalName,

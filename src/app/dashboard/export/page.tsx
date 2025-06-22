@@ -10,8 +10,7 @@ import { ArrowLeft, File as FileIcon, Sheet, FileSpreadsheet, FileText as FileTe
 import { useToast } from "@/hooks/use-toast";
 import type { Delivery } from '@/types';
 import * as XLSX from 'xlsx';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import type jsPDF from 'jspdf';
 
 // Extend jsPDF with autoTable - this is a common way to handle plugins with jsPDF
 interface jsPDFWithAutoTable extends jsPDF {
@@ -98,7 +97,7 @@ export default function ExportPage() {
     });
   };
 
-  const exportToPDF = () => {
+  const exportToPDF = async () => {
     const currentDeliveries = getDeliveries();
     if (currentDeliveries.length === 0) {
       toast({
@@ -109,7 +108,10 @@ export default function ExportPage() {
       return;
     }
 
-    const doc = new jsPDF() as jsPDFWithAutoTable;
+    const { default: jsPDFConstructor } = await import('jspdf');
+    await import('jspdf-autotable');
+
+    const doc = new jsPDFConstructor() as jsPDFWithAutoTable;
     doc.autoTable({
       head: [['Proveedor', 'Fecha', 'Cantidad']],
       body: currentDeliveries.map(d => [d.providerName, d.date, d.quantity]),
