@@ -128,7 +128,6 @@ const ProviderForm: React.FC<ProviderFormProps> = ({ onSubmit, onCancel, initial
                 <Input 
                   type="number" 
                   placeholder="Ej: 10.50" 
-                  step="0.01" 
                   {...field} 
                   value={field.value === undefined ? '' : field.value}
                   onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))}

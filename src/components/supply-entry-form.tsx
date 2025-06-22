@@ -166,7 +166,6 @@ const SupplyEntryForm: React.FC<SupplyEntryFormProps> = ({ onSubmitDeliveries, p
                           id={`entries.${index}.quantity`}
                           type="number"
                           placeholder="Cantidad (ej. 150.5)"
-                          step="0.01" // Allows decimals
                           {...field}
                           value={field.value === undefined || field.value === null ? '' : field.value} // Handle undefined for controlled input
                           onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))}
