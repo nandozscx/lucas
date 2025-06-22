@@ -8,6 +8,7 @@ import {
   TableBody,
   TableCell,
   TableCaption,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
@@ -38,6 +39,7 @@ const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals
   const [weekDates, setWeekDates] = React.useState<{start: Date, end: Date} | null>(null);
 
   React.useEffect(() => {
+    // This effect runs only on the client
     const start = startOfWeek(new Date(), { weekStartsOn: 0, locale: es });
     const end = endOfWeek(start, { weekStartsOn: 0, locale: es });
     setWeekDates({ start, end });
@@ -94,19 +96,20 @@ const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals
     weeklyVendorTotalsMap[delivery.providerName].totalQuantity += delivery.quantity;
   });
 
-  const enrichedVendorTotalsForCurrentWeek = Object.entries(weeklyVendorTotalsMap)
-    .map(([name, data]) => {
-      const providerInfo = providers.find(p => p.name === name);
-      const price = providerInfo?.price ?? 0;
-      const totalToPay = data.totalQuantity * price;
+  const enrichedVendorTotalsForCurrentWeek = providers.map(provider => {
+      const vendorData = weeklyVendorTotalsMap[provider.name];
+      const totalQuantity = vendorData?.totalQuantity || 0;
+      const price = provider.price;
+      const totalToPay = totalQuantity * price;
       return {
-        originalName: name,
-        totalQuantity: data.totalQuantity,
-        price,
-        totalToPay,
+          originalName: provider.name,
+          totalQuantity,
+          price,
+          totalToPay,
       };
-    })
-    .sort((a, b) => a.originalName.localeCompare(b.originalName));
+  }).filter(v => v.totalQuantity > 0);
+
+  const grandTotalToPay = enrichedVendorTotalsForCurrentWeek.reduce((sum, vendor) => sum + vendor.totalToPay, 0);
   
   const exportVendorTotalsToPDF = async () => {
     if (enrichedVendorTotalsForCurrentWeek.length === 0) {
@@ -140,6 +143,10 @@ const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals
     doc.autoTable({
       head: [tableHeaders],
       body: tableBody,
+      foot: [
+        ['', '', 'Total General:', grandTotalToPay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })]
+      ],
+      footStyles: { fontStyle: 'bold', halign: 'right' },
       startY: 28,
     });
 
@@ -276,6 +283,14 @@ const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals
                       </TableRow>
                     ))}
                   </TableBody>
+                  <TableFooter>
+                    <TableRow>
+                      <TableCell colSpan={3} className="text-right font-bold text-lg">Total General:</TableCell>
+                      <TableCell className="text-right font-bold text-lg pr-4">
+                        {grandTotalToPay.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                      </TableCell>
+                    </TableRow>
+                  </TableFooter>
                 </Table>
               </ScrollArea>
             )}
