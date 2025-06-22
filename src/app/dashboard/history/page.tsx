@@ -15,7 +15,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-  TableCaption
+  TableCaption,
+  TableFooter
 } from "@/components/ui/table";
 import { format, parseISO, getDay, startOfWeek, endOfWeek, isWithinInterval, addDays, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -97,19 +98,26 @@ export default function HistoryPage() {
   });
 
   const weeklyTableData = providers.map(provider => {
-    const row: { providerName: string; quantities: (number | undefined)[] } = {
-      providerName: provider.name,
-      quantities: Array(7).fill(undefined), // Sunday to Saturday
-    };
+    const quantities: (number | undefined)[] = Array(7).fill(undefined);
     deliveriesForCurrentWeek
       .filter(d => d.providerName === provider.name)
       .forEach(delivery => {
         const deliveryDate = parseISO(delivery.date);
         const dayIndex = getDay(deliveryDate); // 0 for Sunday ... 6 for Saturday
-        row.quantities[dayIndex] = (row.quantities[dayIndex] || 0) + delivery.quantity;
+        quantities[dayIndex] = (quantities[dayIndex] || 0) + delivery.quantity;
       });
-    return row;
+
+    const weeklyTotalQuantity = quantities.reduce((acc, q) => acc + (q || 0), 0);
+    const totalToPay = weeklyTotalQuantity * provider.price;
+    
+    return {
+      providerName: provider.name,
+      quantities: quantities,
+      totalToPay: totalToPay
+    };
   });
+
+  const grandTotalToPay = weeklyTableData.reduce((sum, row) => sum + row.totalToPay, 0);
 
   const daysOfWeekHeaders = Array.from({ length: 7 }).map((_, i) => 
     format(addDays(currentWeekStart, i), "EEEE", { locale: es })
@@ -129,10 +137,11 @@ export default function HistoryPage() {
     await import('jspdf-autotable');
 
     const doc = new (jsPDFConstructor as any)() as jsPDFWithAutoTable;
-    const tableHeaders = ['Proveedor', ...daysOfWeekHeaders.map(d => d.charAt(0).toUpperCase() + d.slice(1))];
+    const tableHeaders = ['Proveedor', ...daysOfWeekHeaders.map(d => d.charAt(0).toUpperCase() + d.slice(1)), 'Total a Pagar'];
     const tableBody = weeklyTableData.map(row => [
       row.providerName,
-      ...row.quantities.map(q => (q !== undefined ? q.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2}) : "-"))
+      ...row.quantities.map(q => (q !== undefined ? q.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2}) : "-")),
+      row.totalToPay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     ]);
     
     const weekTitle = `Semana del ${format(currentWeekStart, "dd 'de' MMMM", { locale: es })} al ${format(currentWeekEnd, "dd 'de' MMMM 'de' yyyy", { locale: es })}`;
@@ -146,6 +155,16 @@ export default function HistoryPage() {
       head: [tableHeaders],
       body: tableBody,
       startY: 28,
+      foot: [
+          ['', '', '', '', '', '', '', 'Total General:', grandTotalToPay.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})]
+      ],
+      footStyles: { fontStyle: 'bold', halign: 'right' },
+      headStyles: { halign: 'center' },
+      styles: { halign: 'center' },
+      columnStyles: {
+          0: { halign: 'left' },
+          8: { halign: 'right'},
+      }
     });
 
     doc.save(`historial_semanal_${format(currentWeekStart, "yyyy-MM-dd")}.pdf`);
@@ -222,6 +241,7 @@ export default function HistoryPage() {
                           {day}
                         </TableHead>
                       ))}
+                      <TableHead className="text-right font-semibold min-w-[120px] pr-4">Total a Pagar</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -236,9 +256,20 @@ export default function HistoryPage() {
                             {quantity !== undefined ? quantity.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2}) : "-"}
                           </TableCell>
                         ))}
+                        <TableCell className="text-right font-semibold pr-4">
+                          {row.totalToPay.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
+                   <TableFooter>
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-right font-bold text-lg">Total General:</TableCell>
+                      <TableCell className="text-right font-bold text-lg pr-4">
+                        {grandTotalToPay.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                      </TableCell>
+                    </TableRow>
+                  </TableFooter>
                 </Table>
                 <ScrollBar orientation="horizontal" />
               </ScrollArea>
