@@ -9,7 +9,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, File as FileIcon, Sheet, FileSpreadsheet, FileText as FileTextIcon } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import type { Delivery } from '@/types';
-import * as XLSX from 'xlsx';
 import type jsPDF from 'jspdf';
 
 // Extend jsPDF with autoTable - this is a common way to handle plugins with jsPDF
@@ -71,7 +70,8 @@ export default function ExportPage() {
     return false;
   };
 
-  const exportToXLSX = () => {
+  const exportToXLSX = async () => {
+    const XLSX = await import('xlsx');
     const currentDeliveries = getDeliveries();
     if (currentDeliveries.length === 0) {
       toast({
