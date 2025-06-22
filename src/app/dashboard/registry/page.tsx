@@ -98,38 +98,47 @@ export default function RegistryPage() {
 
   const handleAddDeliveries = useCallback((data: DailyRegistryFormData) => {
     const dateStr = format(data.date, "yyyy-MM-dd");
-    let deliveriesAddedCount = 0;
-    const newDeliveries: DeliveryType[] = [];
 
-    data.entries.forEach(entry => {
-      if (entry.quantity !== undefined && entry.quantity !== null && entry.quantity > 0) {
-        const newDelivery: DeliveryType = {
-          id: crypto.randomUUID(),
-          providerName: entry.providerName, 
-          date: dateStr,
-          quantity: entry.quantity,
-        };
-        newDeliveries.push(newDelivery);
-        deliveriesAddedCount++;
-      }
-    });
+    // Obtiene solo las entradas del formulario que tienen una cantidad válida.
+    const submittedEntries = data.entries.filter(
+      (entry) => entry.quantity !== undefined && entry.quantity !== null && entry.quantity >= 0
+    );
 
-    if (newDeliveries.length > 0) {
-      setDeliveries(prev => [...newDeliveries, ...prev]);
-    }
-
-    if (deliveriesAddedCount > 0) {
-      toast({
-        title: "Entregas Registradas",
-        description: `${deliveriesAddedCount} entrega(s) para el ${format(data.date, "PPP", { locale: es })} han sido registradas.`,
-      });
-    } else {
+    if (submittedEntries.length === 0) {
       toast({
         title: "Sin Entregas para Registrar",
         description: "No se ingresaron cantidades para la fecha seleccionada.",
         variant: "default",
       });
+      return;
     }
+    
+    // Crea un conjunto con los nombres de los proveedores que se están enviando.
+    const submittedProviderNames = new Set(submittedEntries.map(e => e.providerName));
+
+    setDeliveries(prevDeliveries => {
+      // Filtra las entregas para eliminar cualquier entrada existente para el mismo proveedor en la misma fecha.
+      // Esto previene la duplicación y asegura que el nuevo valor reemplace al antiguo.
+      const otherDeliveries = prevDeliveries.filter(delivery => {
+        return delivery.date !== dateStr || !submittedProviderNames.has(delivery.providerName);
+      });
+
+      // Crea los nuevos registros de entrega a partir del formulario.
+      const newDeliveriesForDate: DeliveryType[] = submittedEntries.map(entry => ({
+        id: crypto.randomUUID(),
+        providerName: entry.providerName,
+        date: dateStr,
+        quantity: entry.quantity!, // Ya se filtró para no ser nulo/indefinido.
+      }));
+      
+      // Combina las entregas filtradas (las antiguas de otras fechas/proveedores) con las nuevas.
+      return [...otherDeliveries, ...newDeliveriesForDate];
+    });
+
+    toast({
+      title: "Entregas Registradas",
+      description: `${submittedEntries.length} entrega(s) para el ${format(data.date, "PPP", { locale: es })} han sido registradas/actualizadas.`,
+    });
   }, [toast]);
   
 
