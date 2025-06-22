@@ -29,7 +29,7 @@ const dailyEntrySchema = z.object({
   providerName: z.string(),
   quantity: z.coerce
     .number({ invalid_type_error: "Debe ser un número." })
-    .positive({ message: "La cantidad debe ser un número positivo." })
+    .min(0, { message: "La cantidad no puede ser negativa." })
     .optional()
     .or(z.literal(undefined))
     .or(z.literal('')),
