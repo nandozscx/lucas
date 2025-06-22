@@ -21,7 +21,6 @@ import { format, parseISO, getDay, startOfWeek, endOfWeek, isWithinInterval, add
 import { es } from 'date-fns/locale';
 import type { Delivery, Provider } from '@/types';
 import { useToast } from "@/hooks/use-toast";
-import type jsPDF from 'jspdf';
 
 interface jsPDFWithAutoTable extends jsPDF {
   autoTable: (options: any) => jsPDF;
@@ -35,11 +34,12 @@ export default function HistoryPage() {
   const [isClient, setIsClient] = useState(false);
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [providers, setProviders] = useState<Provider[]>([]);
-  const [currentWeekStart, setCurrentWeekStart] = useState<Date>(startOfWeek(new Date(), { weekStartsOn: 0, locale: es }));
+  const [currentWeekStart, setCurrentWeekStart] = useState<Date | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
     setIsClient(true);
+    setCurrentWeekStart(startOfWeek(new Date(), { weekStartsOn: 0, locale: es }));
     if (typeof window !== 'undefined') {
       const storedDeliveries = localStorage.getItem(DELIVERIES_STORAGE_KEY);
       if (storedDeliveries) {
@@ -60,12 +60,34 @@ export default function HistoryPage() {
   }, []);
   
   const handlePreviousWeek = () => {
-    setCurrentWeekStart(prev => subDays(prev, 7));
+    if (currentWeekStart) {
+      setCurrentWeekStart(prev => subDays(prev!, 7));
+    }
   };
 
   const handleNextWeek = () => {
-    setCurrentWeekStart(prev => addDays(prev, 7));
+    if (currentWeekStart) {
+      setCurrentWeekStart(prev => addDays(prev!, 7));
+    }
   };
+
+  if (!isClient || !currentWeekStart) {
+    return (
+      <div className="min-h-screen flex flex-col p-4 md:p-8 bg-background">
+        <header className="flex items-center justify-between mb-6 md:mb-10 p-4 bg-card shadow-md rounded-lg">
+          <Skeleton className="h-8 w-1/3" />
+          <Skeleton className="h-10 w-36" />
+        </header>
+        <main className="flex-grow space-y-6">
+          <Skeleton className="h-12 w-full rounded-lg" /> {/* Week navigation placeholder */}
+          <Skeleton className="h-96 w-full rounded-lg" /> {/* Table placeholder */}
+        </main>
+        <footer className="text-center text-sm text-muted-foreground py-4 mt-auto">
+          <Skeleton className="h-6 w-1/2 mx-auto rounded-md" />
+        </footer>
+      </div>
+    );
+  }
 
   const currentWeekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 0, locale: es });
 
@@ -106,7 +128,7 @@ export default function HistoryPage() {
     const { default: jsPDFConstructor } = await import('jspdf');
     await import('jspdf-autotable');
 
-    const doc = new jsPDFConstructor() as jsPDFWithAutoTable;
+    const doc = new (jsPDFConstructor as any)() as jsPDFWithAutoTable;
     const tableHeaders = ['Proveedor', ...daysOfWeekHeaders.map(d => d.charAt(0).toUpperCase() + d.slice(1))];
     const tableBody = weeklyTableData.map(row => [
       row.providerName,
@@ -140,25 +162,6 @@ export default function HistoryPage() {
       <p className="text-sm">{message}</p>
     </div>
   );
-
-
-  if (!isClient) {
-    return (
-      <div className="min-h-screen flex flex-col p-4 md:p-8 bg-background">
-        <header className="flex items-center justify-between mb-6 md:mb-10 p-4 bg-card shadow-md rounded-lg">
-          <Skeleton className="h-8 w-1/3" />
-          <Skeleton className="h-10 w-36" />
-        </header>
-        <main className="flex-grow space-y-6">
-          <Skeleton className="h-12 w-full rounded-lg" /> {/* Week navigation placeholder */}
-          <Skeleton className="h-96 w-full rounded-lg" /> {/* Table placeholder */}
-        </main>
-        <footer className="text-center text-sm text-muted-foreground py-4 mt-auto">
-          <Skeleton className="h-6 w-1/2 mx-auto rounded-md" />
-        </footer>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen flex flex-col p-4 md:p-8 bg-background">

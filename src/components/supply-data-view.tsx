@@ -19,8 +19,8 @@ import { Users, CalendarDays, Info, CalendarRange, ShoppingBag, Download } from 
 import { format, parseISO, getDay, startOfWeek, endOfWeek, isWithinInterval, addDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useToast } from "@/hooks/use-toast";
-import type jsPDF from 'jspdf';
 import { Button } from './ui/button';
+import { Skeleton } from './ui/skeleton';
 
 interface jsPDFWithAutoTable extends jsPDF {
   autoTable: (options: any) => jsPDF;
@@ -35,8 +35,28 @@ interface SupplyDataViewProps {
 const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals, providers }) => {
   
   const { toast } = useToast();
-  const currentWeekStart = startOfWeek(new Date(), { weekStartsOn: 0, locale: es }); // Sunday as start
-  const currentWeekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 0, locale: es });
+  const [weekDates, setWeekDates] = React.useState<{start: Date, end: Date} | null>(null);
+
+  React.useEffect(() => {
+    const start = startOfWeek(new Date(), { weekStartsOn: 0, locale: es });
+    const end = endOfWeek(start, { weekStartsOn: 0, locale: es });
+    setWeekDates({ start, end });
+  }, []);
+
+  if (!weekDates) {
+    return (
+      <Card className="shadow-lg rounded-lg">
+        <CardHeader>
+          <CardTitle className="text-xl text-primary">Información de Entregas</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Skeleton className="w-full h-[550px]" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const { start: currentWeekStart, end: currentWeekEnd } = weekDates;
 
   const deliveriesForCurrentWeek = deliveries.filter(d => {
     const deliveryDate = parseISO(d.date);
@@ -101,7 +121,7 @@ const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals
     const { default: jsPDFConstructor } = await import('jspdf');
     await import('jspdf-autotable');
 
-    const doc = new jsPDFConstructor() as jsPDFWithAutoTable;
+    const doc = new (jsPDFConstructor as any)() as jsPDFWithAutoTable;
     const tableHeaders = ['Proveedor', 'Cantidad Total (Semanal)', 'Precio Unit.', 'Total a Pagar (Semanal)'];
     const tableBody = enrichedVendorTotalsForCurrentWeek.map(vendor => [
       vendor.originalName,
