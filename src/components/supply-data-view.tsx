@@ -260,7 +260,7 @@ const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals
             {enrichedVendorTotalsForCurrentWeek.filter(v => v.totalQuantity > 0).length === 0 ? (
               <EmptyState message="Los totales por proveedor para la semana actual se calcularán y mostrarán aquí." icon={Users}/>
             ) : (
-              <ScrollArea className="h-[400px] sm:h-[500px] rounded-md border">
+              <ScrollArea className="h-[400px] sm:h-[500px] rounded-md border whitespace-nowrap">
                 <Table>
                   {enrichedVendorTotalsForCurrentWeek.length > 5 && <TableCaption>Desplázate para ver más entradas.</TableCaption>}
                   <TableHeader>
@@ -291,6 +291,7 @@ const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals
                     </TableRow>
                   </TableFooter>
                 </Table>
+                <ScrollBar orientation="horizontal" />
               </ScrollArea>
             )}
           </TabsContent>
