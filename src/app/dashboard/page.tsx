@@ -13,10 +13,12 @@ import { ClipboardPenLine, Users, Download, HistoryIcon, FileCsv, Sheet, FileSpr
 export default function DashboardPage() {
   const { toast } = useToast();
   const [isClient, setIsClient] = useState(false);
+  const [currentYear, setCurrentYear] = useState('');
   const router = useRouter();
 
   useEffect(() => {
     setIsClient(true);
+    setCurrentYear(new Date().getFullYear().toString());
   }, []);
 
   // Original exportToCSV logic is now moved to /dashboard/export/page.tsx
@@ -125,7 +127,7 @@ export default function DashboardPage() {
         })}
       </main>
       <footer className="text-center text-sm text-muted-foreground py-4 mt-auto">
-        <p>&copy; {new Date().getFullYear()} acopiapp. Todos los derechos reservados.</p>
+        <p>&copy; {currentYear} acopiapp. Todos los derechos reservados.</p>
       </footer>
     </div>
   );

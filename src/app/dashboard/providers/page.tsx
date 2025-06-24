@@ -45,10 +45,12 @@ export default function ProvidersPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProvider, setEditingProvider] = useState<Provider | null>(null);
   const [providerToDelete, setProviderToDelete] = useState<Provider | null>(null);
+  const [currentYear, setCurrentYear] = useState('');
   const { toast } = useToast();
 
   useEffect(() => {
     setIsClient(true);
+    setCurrentYear(new Date().getFullYear().toString());
     if (typeof window !== 'undefined') {
       const storedProviders = localStorage.getItem(PROVIDERS_STORAGE_KEY);
       if (storedProviders) {
@@ -235,7 +237,7 @@ export default function ProvidersPage() {
         </AlertDialogContent>
       </AlertDialog>
        <footer className="text-center text-sm text-muted-foreground py-4 mt-auto">
-            <p>&copy; {new Date().getFullYear()} acopiapp. Todos los derechos reservados.</p>
+            <p>&copy; {currentYear} acopiapp. Todos los derechos reservados.</p>
         </footer>
     </div>
   );

@@ -23,10 +23,12 @@ export default function RegistryPage() {
   const [dailyTotals, setDailyTotals] = useState<Record<string, number>>({});
   // const [vendorTotals, setVendorTotals] = useState<VendorTotal[]>([]); // Kept for now if RegistryPage itself needs it, but not passed down.
   const [isClient, setIsClient] = useState(false);
+  const [currentYear, setCurrentYear] = useState('');
   const { toast } = useToast();
 
   useEffect(() => {
     setIsClient(true);
+    setCurrentYear(new Date().getFullYear().toString());
     if (typeof window !== 'undefined') {
       const storedDeliveries = localStorage.getItem(DELIVERIES_STORAGE_KEY);
       if (storedDeliveries) {
@@ -208,7 +210,7 @@ export default function RegistryPage() {
       </main>
       
       <footer className="text-center text-sm text-muted-foreground py-4 mt-auto">
-        <p>&copy; {new Date().getFullYear()} acopiapp. Todos los derechos reservados.</p>
+        <p>&copy; {currentYear} acopiapp. Todos los derechos reservados.</p>
       </footer>
     </div>
   );

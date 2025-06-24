@@ -18,10 +18,12 @@ interface jsPDFWithAutoTable extends jsPDF {
 
 export default function ExportPage() {
   const [isClient, setIsClient] = useState(false);
+  const [currentYear, setCurrentYear] = useState('');
   const { toast } = useToast();
 
   useEffect(() => {
     setIsClient(true);
+    setCurrentYear(new Date().getFullYear().toString());
   }, []);
 
   const getDeliveries = (): Delivery[] => {
@@ -217,7 +219,7 @@ export default function ExportPage() {
       </main>
       
       <footer className="text-center text-sm text-muted-foreground py-4 mt-auto">
-        <p>&copy; {new Date().getFullYear()} acopiapp. Todos los derechos reservados.</p>
+        <p>&copy; {currentYear} acopiapp. Todos los derechos reservados.</p>
       </footer>
     </div>
   );
