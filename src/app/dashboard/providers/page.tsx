@@ -30,7 +30,7 @@ import {
   TableRow,
   TableCaption
 } from "@/components/ui/table";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import ProviderForm, { type ProviderFormData } from '@/components/provider-form';
 import type { Provider } from '@/types';
 import { useToast } from "@/hooks/use-toast";
@@ -163,7 +163,7 @@ export default function ProvidersPage() {
         {providers.length === 0 ? (
            <EmptyState message="Haz clic en el botón de arriba para agregar tu primer proveedor." onAddClick={handleOpenAddDialog}/>
         ) : (
-          <ScrollArea className="flex-1 min-h-0 rounded-md border shadow-md">
+          <ScrollArea className="flex-1 min-h-0 rounded-md border shadow-md whitespace-nowrap">
             <Table>
               <TableHeader className="sticky top-0 bg-card z-10">
                 <TableRow>
@@ -178,7 +178,7 @@ export default function ProvidersPage() {
                 {providers.map((provider) => (
                   <TableRow key={provider.id}>
                     <TableCell className="font-medium py-3 pl-4">{provider.name}</TableCell>
-                    <TableCell className="py-3 whitespace-pre-wrap">{provider.address}</TableCell>
+                    <TableCell className="py-3 whitespace-normal">{provider.address}</TableCell>
                     <TableCell className="py-3">{provider.phone}</TableCell>
                     <TableCell className="py-3 text-right">
                       {provider.price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
@@ -196,6 +196,7 @@ export default function ProvidersPage() {
               </TableBody>
               {providers.length > 8 && <TableCaption>Desplázate para ver más proveedores.</TableCaption>}
             </Table>
+            <ScrollBar orientation="horizontal" />
           </ScrollArea>
         )}
       </main>
