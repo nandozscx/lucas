@@ -82,7 +82,7 @@ export default function DashboardPage() {
     return (
       <div className="min-h-screen flex flex-col p-4 md:p-8 space-y-6 bg-background">
         <Skeleton className="h-20 w-full rounded-lg" /> {/* Header Placeholder */}
-        <main className="flex-grow grid grid-cols-1 sm:grid-cols-2 gap-6 md:gap-8 p-4 md:p-8 items-center">
+        <main className="flex-grow grid grid-cols-2 gap-6 md:gap-8 p-4 md:p-8 items-center">
             <Skeleton className="w-full rounded-lg aspect-square" />
             <Skeleton className="w-full rounded-lg aspect-square" />
             <Skeleton className="w-full rounded-lg aspect-square" />
@@ -105,7 +105,7 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen flex flex-col p-4 md:p-8 space-y-6 bg-background">
       <DashboardHeader onExportCSV={exportToCSVForHeader} />
-      <main className="flex-grow grid grid-cols-1 sm:grid-cols-2 gap-6 md:gap-8 p-4 md:p-8 items-center">
+      <main className="flex-grow grid grid-cols-2 gap-6 md:gap-8 p-4 md:p-8 items-center">
         {cardItems.map((item) => {
           const IconComponent = item.icon;
           return (
