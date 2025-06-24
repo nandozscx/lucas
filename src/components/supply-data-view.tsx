@@ -14,7 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Users, CalendarDays, Info, CalendarRange, ShoppingBag, Download } from 'lucide-react';
 import { format, parseISO, getDay, startOfWeek, endOfWeek, isWithinInterval, addDays } from 'date-fns';
@@ -107,12 +107,12 @@ const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals
           price,
           totalToPay,
       };
-  }).filter(v => v.totalQuantity > 0);
+  });
 
   const grandTotalToPay = enrichedVendorTotalsForCurrentWeek.reduce((sum, vendor) => sum + vendor.totalToPay, 0);
   
   const exportVendorTotalsToPDF = async () => {
-    if (enrichedVendorTotalsForCurrentWeek.length === 0) {
+    if (enrichedVendorTotalsForCurrentWeek.filter(v => v.totalQuantity > 0).length === 0) {
       toast({
         title: "Sin Datos",
         description: "No hay totales de proveedor para la semana actual para exportar.",
@@ -126,11 +126,13 @@ const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals
 
     const doc = new (jsPDFConstructor as any)() as jsPDFWithAutoTable;
     const tableHeaders = ['Proveedor', 'Cantidad Total (Semanal)', 'Precio Unit.', 'Total a Pagar (Semanal)'];
-    const tableBody = enrichedVendorTotalsForCurrentWeek.map(vendor => [
-      vendor.originalName,
-      vendor.totalQuantity.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-      vendor.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-      vendor.totalToPay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+    const tableBody = enrichedVendorTotalsForCurrentWeek
+      .filter(v => v.totalQuantity > 0)
+      .map(vendor => [
+        vendor.originalName,
+        vendor.totalQuantity.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        vendor.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        vendor.totalToPay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
     ]);
 
     const weekTitle = `Semana del ${format(currentWeekStart, "dd 'de' MMMM", { locale: es })} al ${format(currentWeekEnd, "dd 'de' MMMM 'de' yyyy", { locale: es })}`;
@@ -169,6 +171,9 @@ const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals
     <Card className="shadow-lg rounded-lg">
       <CardHeader>
         <CardTitle className="text-xl text-primary">Información de Entregas</CardTitle>
+         <CardDescription className="text-center pt-2">
+            Semana del {format(currentWeekStart, "dd 'de' MMMM", { locale: es })} al {format(currentWeekEnd, "dd 'de' MMMM 'de' yyyy", { locale: es })}
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="weeklySummary" className="w-full">
@@ -185,13 +190,6 @@ const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals
           </TabsList>
 
           <TabsContent value="weeklySummary">
-            <div className="mb-4">
-              <div className="text-center">
-                <p className="font-semibold text-primary">
-                  Semana del {format(currentWeekStart, "dd 'de' MMMM", { locale: es })} al {format(currentWeekEnd, "dd 'de' MMMM 'de' yyyy", { locale: es })}
-                </p>
-              </div>
-            </div>
             {providers.length === 0 ? (
               <EmptyState message="No hay proveedores registrados para mostrar el resumen semanal." icon={Users}/>
             ) : weeklyTableData.every(row => row.quantities.every(q => q === undefined)) && deliveriesForCurrentWeek.length === 0 ? (
@@ -259,7 +257,7 @@ const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals
                 Exportar a PDF
               </Button>
             </div>
-            {enrichedVendorTotalsForCurrentWeek.length === 0 ? (
+            {enrichedVendorTotalsForCurrentWeek.filter(v => v.totalQuantity > 0).length === 0 ? (
               <EmptyState message="Los totales por proveedor para la semana actual se calcularán y mostrarán aquí." icon={Users}/>
             ) : (
               <ScrollArea className="h-[400px] sm:h-[500px] rounded-md border">
@@ -275,6 +273,7 @@ const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals
                   </TableHeader>
                   <TableBody>
                     {enrichedVendorTotalsForCurrentWeek.map((vendor) => (
+                      vendor.totalQuantity > 0 &&
                       <TableRow key={vendor.originalName}>
                         <TableCell className="font-medium pl-4">{vendor.originalName}</TableCell>
                         <TableCell className="text-right">{vendor.totalQuantity.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
