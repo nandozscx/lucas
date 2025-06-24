@@ -115,7 +115,7 @@ export default function DashboardPage() {
               tabIndex={0}
               onClick={item.action}
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); item.action?.(); } }}
-              className="flex flex-col items-center justify-center p-4 hover:shadow-xl transition-all duration-200 ease-in-out cursor-pointer aspect-square rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 shadow-md"
+              className="flex flex-col items-center justify-center p-4 hover:shadow-xl transition-all duration-200 ease-in-out cursor-pointer h-40 sm:h-auto sm:aspect-square rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 shadow-md"
               aria-label={item.title}
             >
               <IconComponent className="h-20 w-20 text-primary mb-3" strokeWidth={1.5} />
