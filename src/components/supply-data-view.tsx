@@ -181,7 +181,7 @@ const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals
                   <Users className="h-4 w-4 sm:h-5 sm:w-5"/> Totales por Proveedor
               </TabsTrigger>
           </TabsList>
-          <div className="text-center">
+          <div className="text-center pt-12">
             <CardTitle className="text-xl text-primary">Información de Entregas</CardTitle>
             <CardDescription className="pt-2">
                 Semana del {format(currentWeekStart, "dd 'de' MMMM", { locale: es })} al {format(currentWeekEnd, "dd 'de' MMMM 'de' yyyy", { locale: es })}
