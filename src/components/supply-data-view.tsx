@@ -168,8 +168,8 @@ const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals
   
   return (
     <Card className="shadow-lg rounded-lg">
-      <Tabs defaultValue="weeklySummary" className="w-full">
-        <CardHeader className="space-y-4">
+      <Tabs defaultValue="vendorTotals" className="w-full">
+        <CardHeader>
           <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3 gap-1">
               <TabsTrigger value="weeklySummary" className="flex items-center gap-2 text-sm sm:text-base">
                   <CalendarRange className="h-4 w-4 sm:h-5 sm:w-5"/> Resumen Semanal
@@ -181,15 +181,16 @@ const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals
                   <Users className="h-4 w-4 sm:h-5 sm:w-5"/> Totales por Proveedor
               </TabsTrigger>
           </TabsList>
-          <div className="text-center pt-12">
-            <CardTitle className="text-xl text-primary">Información de Entregas</CardTitle>
-            <CardDescription className="pt-2">
-                Semana del {format(currentWeekStart, "dd 'de' MMMM", { locale: es })} al {format(currentWeekEnd, "dd 'de' MMMM 'de' yyyy", { locale: es })}
-            </CardDescription>
-          </div>
         </CardHeader>
       
-        <CardContent className="mt-4">
+        <div className="text-center pt-8 pb-4">
+          <CardTitle className="text-xl text-primary">Información de Entregas</CardTitle>
+          <CardDescription className="pt-2">
+              Semana del {format(currentWeekStart, "dd 'de' MMMM", { locale: es })} al {format(currentWeekEnd, "dd 'de' MMMM 'de' yyyy", { locale: es })}
+          </CardDescription>
+        </div>
+
+        <CardContent>
             <TabsContent value="weeklySummary">
                 {providers.length === 0 ? (
                 <EmptyState message="No hay proveedores registrados para mostrar el resumen semanal." icon={Users}/>
