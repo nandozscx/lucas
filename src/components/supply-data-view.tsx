@@ -1,4 +1,3 @@
-
 "use client";
 
 import React from 'react';
@@ -169,134 +168,137 @@ const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals
   
   return (
     <Card className="shadow-lg rounded-lg">
-      <CardHeader>
-        <CardTitle className="text-xl text-primary">Información de Entregas</CardTitle>
-         <CardDescription className="text-center pt-2">
-            Semana del {format(currentWeekStart, "dd 'de' MMMM", { locale: es })} al {format(currentWeekEnd, "dd 'de' MMMM 'de' yyyy", { locale: es })}
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
         <Tabs defaultValue="weeklySummary" className="w-full">
-          <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3 gap-1 mb-6">
-            <TabsTrigger value="weeklySummary" className="flex items-center gap-2 text-sm sm:text-base">
-              <CalendarRange className="h-4 w-4 sm:h-5 sm:w-5"/> Resumen Semanal
-            </TabsTrigger>
-            <TabsTrigger value="dailyTotals" className="flex items-center gap-2 text-sm sm:text-base">
-              <CalendarDays className="h-4 w-4 sm:h-5 sm:w-5"/> Totales Diarios
-            </TabsTrigger>
-            <TabsTrigger value="vendorTotals" className="flex items-center gap-2 text-sm sm:text-base">
-              <Users className="h-4 w-4 sm:h-5 sm:w-5"/> Totales por Proveedor
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="weeklySummary">
-            {providers.length === 0 ? (
-              <EmptyState message="No hay proveedores registrados para mostrar el resumen semanal." icon={Users}/>
-            ) : weeklyTableData.every(row => row.quantities.every(q => q === undefined)) && deliveriesForCurrentWeek.length === 0 ? (
-               <EmptyState message="No hay entregas registradas para esta semana." icon={ShoppingBag}/>
-            ) : (
-              <ScrollArea className="max-h-[400px] sm:max-h-[500px] rounded-md border whitespace-nowrap">
-                <Table>
-                  {(weeklyTableData.length > 5 || daysOfWeekHeaders.length > 5) && <TableCaption>Desplázate para ver más proveedores o días.</TableCaption>}
-                  <TableHeader className="sticky top-0 bg-card z-10">
-                    <TableRow>
-                      <TableHead className="font-semibold sticky left-0 bg-card z-10 min-w-[150px] pl-4">Proveedor</TableHead>
-                      {daysOfWeekHeaders.map(day => (
-                        <TableHead key={day} className="text-right font-semibold min-w-[100px] capitalize pr-4">{day}</TableHead>
-                      ))}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {weeklyTableData.map((row) => (
-                      <TableRow key={row.providerName}>
-                        <TableCell className="font-medium sticky left-0 bg-card z-10 pl-4">{row.providerName}</TableCell>
-                        {row.quantities.map((quantity, index) => (
-                          <TableCell key={index} className="text-right pr-4">
-                            {quantity !== undefined ? quantity.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2}) : "-"}
-                          </TableCell>
-                        ))}
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-                <ScrollBar orientation="horizontal" />
-              </ScrollArea>
-            )}
-          </TabsContent>
-
-          <TabsContent value="dailyTotals">
-             {sortedDailyTotals.length === 0 ? (
-              <EmptyState message="Los totales diarios aparecerán aquí una vez que se añadan entregas." icon={CalendarDays}/>
-            ) : (
-              <ScrollArea className="max-h-[400px] sm:max-h-[500px] rounded-md border">
-                <Table>
-                  {sortedDailyTotals.length > 5 && <TableCaption>Desplázate para ver más entradas.</TableCaption>}
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="font-semibold pl-4">Fecha</TableHead>
-                      <TableHead className="text-right font-semibold pr-4">Cantidad Total</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {sortedDailyTotals.map(([date, total]) => (
-                      <TableRow key={date}>
-                        <TableCell className="font-medium pl-4">{format(parseISO(date), "PPP", { locale: es })}</TableCell>
-                        <TableCell className="text-right pr-4">{total.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </ScrollArea>
-            )}
-          </TabsContent>
-
-          <TabsContent value="vendorTotals">
-            <div className="flex justify-end mb-4">
-              <Button onClick={exportVendorTotalsToPDF} className="bg-accent text-accent-foreground hover:bg-accent/90">
-                <Download className="mr-2 h-4 w-4" />
-                Exportar a PDF
-              </Button>
+            <div className="p-6 pb-2">
+                <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3 gap-1">
+                    <TabsTrigger value="weeklySummary" className="flex items-center gap-2 text-sm sm:text-base">
+                        <CalendarRange className="h-4 w-4 sm:h-5 sm:w-5"/> Resumen Semanal
+                    </TabsTrigger>
+                    <TabsTrigger value="dailyTotals" className="flex items-center gap-2 text-sm sm:text-base">
+                        <CalendarDays className="h-4 w-4 sm:h-5 sm:w-5"/> Totales Diarios
+                    </TabsTrigger>
+                    <TabsTrigger value="vendorTotals" className="flex items-center gap-2 text-sm sm:text-base">
+                        <Users className="h-4 w-4 sm:h-5 sm:w-5"/> Totales por Proveedor
+                    </TabsTrigger>
+                </TabsList>
             </div>
-            {enrichedVendorTotalsForCurrentWeek.filter(v => v.totalQuantity > 0).length === 0 ? (
-              <EmptyState message="Los totales por proveedor para la semana actual se calcularán y mostrarán aquí." icon={Users}/>
-            ) : (
-              <ScrollArea className="max-h-[400px] sm:max-h-[500px] rounded-md border whitespace-nowrap">
-                <Table>
-                  {enrichedVendorTotalsForCurrentWeek.length > 5 && <TableCaption>Desplázate para ver más entradas.</TableCaption>}
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="font-semibold pl-4">Proveedor</TableHead>
-                      <TableHead className="text-right font-semibold">Cantidad Total (Semanal)</TableHead>
-                      <TableHead className="text-right font-semibold">Precio Unit.</TableHead>
-                      <TableHead className="text-right font-semibold pr-4">Total a Pagar (Semanal)</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {enrichedVendorTotalsForCurrentWeek.map((vendor) => (
-                      vendor.totalQuantity > 0 &&
-                      <TableRow key={vendor.originalName}>
-                        <TableCell className="font-medium pl-4">{vendor.originalName}</TableCell>
-                        <TableCell className="text-right">{vendor.totalQuantity.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
-                        <TableCell className="text-right">{vendor.price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
-                        <TableCell className="text-right pr-4">{vendor.totalToPay.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                  <TableFooter>
-                    <TableRow>
-                      <TableCell colSpan={3} className="text-right font-bold text-lg">Total General:</TableCell>
-                      <TableCell className="text-right font-bold text-lg pr-4">
-                        {grandTotalToPay.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
-                      </TableCell>
-                    </TableRow>
-                  </TableFooter>
-                </Table>
-                <ScrollBar orientation="horizontal" />
-              </ScrollArea>
-            )}
-          </TabsContent>
+            
+            <CardHeader className="pt-2 text-center">
+                <CardTitle className="text-xl text-primary">Información de Entregas</CardTitle>
+                <CardDescription className="pt-2">
+                    Semana del {format(currentWeekStart, "dd 'de' MMMM", { locale: es })} al {format(currentWeekEnd, "dd 'de' MMMM 'de' yyyy", { locale: es })}
+                </CardDescription>
+            </CardHeader>
+      
+            <CardContent>
+                <TabsContent value="weeklySummary">
+                    {providers.length === 0 ? (
+                    <EmptyState message="No hay proveedores registrados para mostrar el resumen semanal." icon={Users}/>
+                    ) : weeklyTableData.every(row => row.quantities.every(q => q === undefined)) && deliveriesForCurrentWeek.length === 0 ? (
+                    <EmptyState message="No hay entregas registradas para esta semana." icon={ShoppingBag}/>
+                    ) : (
+                    <ScrollArea className="max-h-[400px] rounded-md border whitespace-nowrap">
+                        <Table>
+                        {(weeklyTableData.length > 5 || daysOfWeekHeaders.length > 5) && <TableCaption>Desplázate para ver más proveedores o días.</TableCaption>}
+                        <TableHeader className="sticky top-0 bg-card z-10">
+                            <TableRow>
+                            <TableHead className="font-semibold sticky left-0 bg-card z-10 min-w-[150px] pl-4">Proveedor</TableHead>
+                            {daysOfWeekHeaders.map(day => (
+                                <TableHead key={day} className="text-right font-semibold min-w-[100px] capitalize pr-4">{day}</TableHead>
+                            ))}
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {weeklyTableData.map((row) => (
+                            <TableRow key={row.providerName}>
+                                <TableCell className="font-medium sticky left-0 bg-card z-10 pl-4">{row.providerName}</TableCell>
+                                {row.quantities.map((quantity, index) => (
+                                <TableCell key={index} className="text-right pr-4">
+                                    {quantity !== undefined ? quantity.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2}) : "-"}
+                                </TableCell>
+                                ))}
+                            </TableRow>
+                            ))}
+                        </TableBody>
+                        </Table>
+                        <ScrollBar orientation="horizontal" />
+                    </ScrollArea>
+                    )}
+                </TabsContent>
+
+                <TabsContent value="dailyTotals">
+                    {sortedDailyTotals.length === 0 ? (
+                    <EmptyState message="Los totales diarios aparecerán aquí una vez que se añadan entregas." icon={CalendarDays}/>
+                    ) : (
+                    <ScrollArea className="max-h-[400px] rounded-md border">
+                        <Table>
+                        {sortedDailyTotals.length > 5 && <TableCaption>Desplázate para ver más entradas.</TableCaption>}
+                        <TableHeader>
+                            <TableRow>
+                            <TableHead className="font-semibold pl-4">Fecha</TableHead>
+                            <TableHead className="text-right font-semibold pr-4">Cantidad Total</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {sortedDailyTotals.map(([date, total]) => (
+                            <TableRow key={date}>
+                                <TableCell className="font-medium pl-4">{format(parseISO(date), "PPP", { locale: es })}</TableCell>
+                                <TableCell className="text-right pr-4">{total.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})}</TableCell>
+                            </TableRow>
+                            ))}
+                        </TableBody>
+                        </Table>
+                    </ScrollArea>
+                    )}
+                </TabsContent>
+
+                <TabsContent value="vendorTotals">
+                    <div className="flex justify-end mb-4">
+                    <Button onClick={exportVendorTotalsToPDF} className="bg-accent text-accent-foreground hover:bg-accent/90">
+                        <Download className="mr-2 h-4 w-4" />
+                        Exportar a PDF
+                    </Button>
+                    </div>
+                    {enrichedVendorTotalsForCurrentWeek.filter(v => v.totalQuantity > 0).length === 0 ? (
+                    <EmptyState message="Los totales por proveedor para la semana actual se calcularán y mostrarán aquí." icon={Users}/>
+                    ) : (
+                    <ScrollArea className="max-h-[400px] rounded-md border whitespace-nowrap">
+                        <Table>
+                        {enrichedVendorTotalsForCurrentWeek.length > 5 && <TableCaption>Desplázate para ver más entradas.</TableCaption>}
+                        <TableHeader>
+                            <TableRow>
+                            <TableHead className="font-semibold pl-4">Proveedor</TableHead>
+                            <TableHead className="text-right font-semibold">Cantidad Total (Semanal)</TableHead>
+                            <TableHead className="text-right font-semibold">Precio Unit.</TableHead>
+                            <TableHead className="text-right font-semibold pr-4">Total a Pagar (Semanal)</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {enrichedVendorTotalsForCurrentWeek.map((vendor) => (
+                            vendor.totalQuantity > 0 &&
+                            <TableRow key={vendor.originalName}>
+                                <TableCell className="font-medium pl-4">{vendor.originalName}</TableCell>
+                                <TableCell className="text-right">{vendor.totalQuantity.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
+                                <TableCell className="text-right">{vendor.price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
+                                <TableCell className="text-right pr-4">{vendor.totalToPay.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
+                            </TableRow>
+                            ))}
+                        </TableBody>
+                        <TableFooter>
+                            <TableRow>
+                            <TableCell colSpan={3} className="text-right font-bold text-lg">Total General:</TableCell>
+                            <TableCell className="text-right font-bold text-lg pr-4">
+                                {grandTotalToPay.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                            </TableCell>
+                            </TableRow>
+                        </TableFooter>
+                        </Table>
+                        <ScrollBar orientation="horizontal" />
+                    </ScrollArea>
+                    )}
+                </TabsContent>
+            </CardContent>
         </Tabs>
-      </CardContent>
     </Card>
   );
 };
