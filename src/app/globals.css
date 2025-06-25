@@ -14,36 +14,36 @@
     --popover: 0 0% 100%;
     --popover-foreground: 0 0% 3.9%;
 
-    --primary: 0 0% 25%; /* Dark Gray (representing gray at 80% "strength" or darkness) */
+    --primary: 0 0% 25%; /* Dark Gray (representing black) */
     --primary-foreground: 0 0% 98%; /* Light text for primary */
 
-    --secondary: 271 76% 90%; /* Lighter shade of original primary for secondary elements */
-    --secondary-foreground: 271 76% 20%; /* Darker shade of original primary for text on secondary */
+    --secondary: 0 0% 96.1%; /* Neutral light gray */
+    --secondary-foreground: 0 0% 9%;    /* Neutral dark gray text */
 
     --muted: 0 0% 96.1%; /* Default light gray */
     --muted-foreground: 0 0% 45.1%; /* Default medium gray text for muted */
 
-    --accent: 348 83% 47%; /* Crimson #DC143C */
+    --accent: 348 83% 47%; /* Red (Crimson) */
     --accent-foreground: 0 0% 98%; /* Light text for accent */
 
-    --destructive: 348 83% 47%; /* Crimson for destructive */
+    --destructive: 348 83% 47%; /* Red (Crimson) for destructive */
     --destructive-foreground: 0 0% 98%;
 
     --border: 0 0% 89.8%; /* Default light gray border */
     --input: 0 0% 95%; /* Slightly off-white for input backgrounds */
-    --ring: 0 0% 25%; /* Primary color for ring (updated to new gray) */
+    --ring: 0 0% 25%; /* Primary color for ring (dark gray) */
 
     --radius: 0.5rem;
 
-    /* Sidebar specific colors - can be adjusted if sidebar is used extensively */
+    /* Sidebar specific colors - now using shades of gray */
     --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-foreground: 0 0% 20%;
+    --sidebar-primary: 0 0% 10%;
     --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-accent: 0 0% 95%;
+    --sidebar-accent-foreground: 0 0% 10%;
+    --sidebar-border: 0 0% 91%;
+    --sidebar-ring: 0 0% 25%;
   }
 
   .dark {
@@ -55,27 +55,27 @@
     --popover-foreground: 0 0% 98%;
     --primary: 0 0% 40%; /* Medium Gray for dark mode buttons */
     --primary-foreground: 0 0% 98%;
-    --secondary: 271 76% 15%; /* Adjusted secondary for dark mode */
+    --secondary: 0 0% 14.9%; /* Neutral dark gray */
     --secondary-foreground: 0 0% 98%;
     --muted: 0 0% 14.9%;
     --muted-foreground: 0 0% 63.9%;
-    --accent: 348 83% 57%; /* Adjusted accent for dark mode */
+    --accent: 348 83% 57%; /* Lighter Red for dark mode */
     --accent-foreground: 0 0% 98%;
-    --destructive: 348 83% 57%; /* Adjusted destructive for dark mode */
+    --destructive: 348 83% 57%; /* Lighter Red for dark mode */
     --destructive-foreground: 0 0% 98%;
     --border: 0 0% 14.9%;
     --input: 0 0% 14.9%;
-    --ring: 0 0% 40%; /* Adjusted ring for dark mode (updated to new gray) */
+    --ring: 0 0% 40%; /* Adjusted ring for dark mode (medium gray) */
     
-    /* Dark Sidebar specific colors */
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    /* Dark Sidebar specific colors - now using shades of gray */
+    --sidebar-background: 0 0% 10%;
+    --sidebar-foreground: 0 0% 95%;
+    --sidebar-primary: 0 0% 40%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 0 0% 15%;
+    --sidebar-accent-foreground: 0 0% 95%;
+    --sidebar-border: 0 0% 15%;
+    --sidebar-ring: 0 0% 40%;
   }
 }
 
