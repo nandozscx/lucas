@@ -5,77 +5,86 @@
 
 @layer base {
   :root {
-    --background: 195 53% 79%; /* Light Pastel Blue #ADD8E6 */
-    --foreground: 0 0% 3.9%; /* Black for text on background */
+    --background: 210 100% 90%; /* Pastel Blue */
+    --foreground: 0 0% 9%; /* Near Black */
 
-    --card: 0 0% 100%; /* White cards */
-    --card-foreground: 0 0% 3.9%; /* Black text on cards */
+    --card: 0 0% 100%; /* White */
+    --card-foreground: 0 0% 9%; /* Near Black */
 
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 3.9%;
+    --popover-foreground: 0 0% 9%;
 
-    --primary: 0 0% 25%; /* Dark Gray (representing black) */
-    --primary-foreground: 0 0% 98%; /* Light text for primary */
+    --primary: 0 0% 9%; /* Black */
+    --primary-foreground: 0 0% 98%; /* White */
 
-    --secondary: 0 0% 96.1%; /* Neutral light gray */
-    --secondary-foreground: 0 0% 9%;    /* Neutral dark gray text */
+    --secondary: 210 40% 96.1%; /* Lighter, less saturated blue-gray */
+    --secondary-foreground: 0 0% 9%; /* Near Black */
 
-    --muted: 0 0% 96.1%; /* Default light gray */
-    --muted-foreground: 0 0% 45.1%; /* Default medium gray text for muted */
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 0 0% 45.1%; /* Medium Gray */
 
-    --accent: 348 83% 47%; /* Red (Crimson) */
-    --accent-foreground: 0 0% 98%; /* Light text for accent */
+    --accent: 0 84.2% 60.2%; /* Red */
+    --accent-foreground: 0 0% 98%; /* White */
 
-    --destructive: 348 83% 47%; /* Red (Crimson) for destructive */
+    --destructive: 0 84.2% 60.2%; /* Red */
     --destructive-foreground: 0 0% 98%;
 
-    --border: 0 0% 89.8%; /* Default light gray border */
-    --input: 0 0% 95%; /* Slightly off-white for input backgrounds */
-    --ring: 0 0% 25%; /* Primary color for ring (dark gray) */
+    --border: 210 40% 91.4%; /* Light blue-gray border */
+    --input: 210 40% 94.1%; /* Very light blue-gray for input */
+    --ring: 210 100% 50%; /* A more vibrant blue for focus rings */
 
     --radius: 0.5rem;
 
-    /* Sidebar specific colors - now using shades of gray */
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 0 0% 20%;
-    --sidebar-primary: 0 0% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 0 0% 95%;
-    --sidebar-accent-foreground: 0 0% 10%;
-    --sidebar-border: 0 0% 91%;
-    --sidebar-ring: 0 0% 25%;
+    /* Sidebar will use the same theme */
+    --sidebar-background: 0 0% 100%; /* White sidebar */
+    --sidebar-foreground: 0 0% 9%; /* Black text */
+    --sidebar-primary: 0 0% 9%; /* Black primary elements */
+    --sidebar-primary-foreground: 0 0% 98%; /* White text on primary */
+    --sidebar-accent: 210 100% 90%; /* Pastel blue for accents */
+    --sidebar-accent-foreground: 0 0% 9%; /* Black text on accent */
+    --sidebar-border: 0 0% 90%; /* Gray border */
+    --sidebar-ring: 210 100% 50%; /* Blue ring */
   }
 
   .dark {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
+    /* Define a dark theme that still respects the color palette */
+    --background: 0 0% 9%; /* Near Black */
+    --foreground: 0 0% 98%; /* White */
+
+    --card: 0 0% 14%; /* Dark Gray */
     --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
+
+    --popover: 0 0% 9%;
     --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 40%; /* Medium Gray for dark mode buttons */
-    --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 14.9%; /* Neutral dark gray */
+
+    --primary: 0 0% 98%; /* White */
+    --primary-foreground: 0 0% 9%; /* Black */
+
+    --secondary: 0 0% 20%;
     --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
+
+    --muted: 0 0% 20%;
     --muted-foreground: 0 0% 63.9%;
-    --accent: 348 83% 57%; /* Lighter Red for dark mode */
+
+    --accent: 0 72.2% 50.6%; /* Slightly less intense Red for dark mode */
     --accent-foreground: 0 0% 98%;
-    --destructive: 348 83% 57%; /* Lighter Red for dark mode */
+
+    --destructive: 0 72.2% 50.6%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 0% 40%; /* Adjusted ring for dark mode (medium gray) */
+
+    --border: 0 0% 20%;
+    --input: 0 0% 20%;
+    --ring: 0 72.2% 50.6%; /* Red ring for dark mode */
     
-    /* Dark Sidebar specific colors - now using shades of gray */
-    --sidebar-background: 0 0% 10%;
-    --sidebar-foreground: 0 0% 95%;
-    --sidebar-primary: 0 0% 40%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 0 0% 15%;
-    --sidebar-accent-foreground: 0 0% 95%;
-    --sidebar-border: 0 0% 15%;
-    --sidebar-ring: 0 0% 40%;
+    /* Dark Sidebar */
+    --sidebar-background: 0 0% 14%;
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-primary: 0 0% 98%;
+    --sidebar-primary-foreground: 0 0% 9%;
+    --sidebar-accent: 0 0% 25%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 0 0% 20%;
+    --sidebar-ring: 0 72.2% 50.6%;
   }
 }
 
