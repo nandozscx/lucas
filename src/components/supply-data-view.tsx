@@ -195,7 +195,7 @@ const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals
             ) : weeklyTableData.every(row => row.quantities.every(q => q === undefined)) && deliveriesForCurrentWeek.length === 0 ? (
                <EmptyState message="No hay entregas registradas para esta semana." icon={ShoppingBag}/>
             ) : (
-              <ScrollArea className="h-[400px] sm:h-[500px] rounded-md border whitespace-nowrap">
+              <ScrollArea className="max-h-[400px] sm:max-h-[500px] rounded-md border whitespace-nowrap">
                 <Table>
                   {(weeklyTableData.length > 5 || daysOfWeekHeaders.length > 5) && <TableCaption>Desplázate para ver más proveedores o días.</TableCaption>}
                   <TableHeader className="sticky top-0 bg-card z-10">
@@ -228,7 +228,7 @@ const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals
              {sortedDailyTotals.length === 0 ? (
               <EmptyState message="Los totales diarios aparecerán aquí una vez que se añadan entregas." icon={CalendarDays}/>
             ) : (
-              <ScrollArea className="h-[400px] sm:h-[500px] rounded-md border">
+              <ScrollArea className="max-h-[400px] sm:max-h-[500px] rounded-md border">
                 <Table>
                   {sortedDailyTotals.length > 5 && <TableCaption>Desplázate para ver más entradas.</TableCaption>}
                   <TableHeader>
@@ -260,7 +260,7 @@ const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals
             {enrichedVendorTotalsForCurrentWeek.filter(v => v.totalQuantity > 0).length === 0 ? (
               <EmptyState message="Los totales por proveedor para la semana actual se calcularán y mostrarán aquí." icon={Users}/>
             ) : (
-              <ScrollArea className="h-[400px] sm:h-[500px] rounded-md border whitespace-nowrap">
+              <ScrollArea className="max-h-[400px] sm:max-h-[500px] rounded-md border whitespace-nowrap">
                 <Table>
                   {enrichedVendorTotalsForCurrentWeek.length > 5 && <TableCaption>Desplázate para ver más entradas.</TableCaption>}
                   <TableHeader>
