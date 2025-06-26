@@ -61,7 +61,7 @@ import { format, parseISO } from "date-fns";
 import { es } from 'date-fns/locale';
 
 import ClientForm, { type ClientFormData } from '@/components/client-form';
-import type { Client, Sale } from '@/types';
+import type { Client, Sale, Payment } from '@/types';
 import type jsPDF from 'jspdf';
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -319,13 +319,24 @@ export default function SalesClientsPage() {
       const storedSales = localStorage.getItem(SALES_STORAGE_KEY);
         if (storedSales) {
             try {
-                const parsedSales = JSON.parse(storedSales);
-                if (Array.isArray(parsedSales) && (parsedSales.length === 0 || 'totalAmount' in parsedSales[0])) {
-                    setSales(parsedSales);
-                } else {
-                    console.warn("Estructura de ventas antigua detectada. Se borrarán los datos antiguos.");
-                    localStorage.removeItem(SALES_STORAGE_KEY);
-                }
+                // Allow any to handle old structure temporarily
+                const parsedSales: any[] = JSON.parse(storedSales);
+                const migratedSales: Sale[] = parsedSales.map(sale => {
+                    // If sale has downPayment but not payments, it's the old structure
+                    if (sale.downPayment !== undefined && !sale.payments) {
+                        const { downPayment, ...rest } = sale;
+                        return {
+                            ...rest,
+                            payments: downPayment > 0 ? [{ date: sale.date, amount: downPayment }] : [],
+                        };
+                    }
+                    // Ensure payments is an array for sales that might have been partially migrated or corrupted
+                    if (!Array.isArray(sale.payments)) {
+                        sale.payments = [];
+                    }
+                    return sale;
+                });
+                setSales(migratedSales);
             } catch (error) {
                 console.error("Falló al parsear ventas desde localStorage", error);
                 localStorage.removeItem(SALES_STORAGE_KEY);
@@ -399,7 +410,7 @@ export default function SalesClientsPage() {
 
     const totalAmount = data.price * data.quantity * (data.unit === 'baldes' ? 100 : 1);
     const finalDownPayment = data.downPayment ?? 0;
-
+    
     const newSale: Sale = {
       id: crypto.randomUUID(),
       date: format(data.date, "yyyy-MM-dd"),
@@ -409,7 +420,7 @@ export default function SalesClientsPage() {
       quantity: data.quantity,
       unit: data.unit,
       totalAmount: totalAmount,
-      downPayment: finalDownPayment,
+      payments: finalDownPayment > 0 ? [{ date: format(data.date, "yyyy-MM-dd"), amount: finalDownPayment }] : [],
     };
     
     setSales(prev => [...prev, newSale].sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime()));
@@ -423,7 +434,8 @@ export default function SalesClientsPage() {
     : [];
     
   const totalDebtForSelectedClient = salesForSelectedClient.reduce((total, sale) => {
-    const balance = sale.totalAmount - sale.downPayment;
+    const totalPaid = sale.payments.reduce((sum, p) => sum + p.amount, 0);
+    const balance = sale.totalAmount - totalPaid;
     return total + balance;
   }, 0);
 
@@ -433,7 +445,7 @@ export default function SalesClientsPage() {
     setSales(prevSales =>
         prevSales.map(sale =>
             sale.id === saleForPayment.id
-                ? { ...sale, downPayment: sale.downPayment + data.amount }
+                ? { ...sale, payments: [...sale.payments, { date: format(new Date(), "yyyy-MM-dd"), amount: data.amount }] }
                 : sale
         )
     );
@@ -476,14 +488,18 @@ export default function SalesClientsPage() {
     doc.text(title, 14, 15);
 
     const tableHeaders = ['Fecha', 'Cantidad', 'Precio Unit.', 'Monto Total', 'Abono', 'Saldo'];
-    const tableBody = salesForSelectedClient.map(sale => [
-      format(parseISO(sale.date), "PPP", { locale: es }),
-      `${sale.quantity} ${sale.unit}`,
-      sale.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-      sale.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-      sale.downPayment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-      (sale.totalAmount - sale.downPayment).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-    ]);
+    const tableBody = salesForSelectedClient.map(sale => {
+      const totalPaid = sale.payments.reduce((sum, p) => sum + p.amount, 0);
+      const balance = sale.totalAmount - totalPaid;
+      return [
+        format(parseISO(sale.date), "PPP", { locale: es }),
+        `${sale.quantity} ${sale.unit}`,
+        sale.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        sale.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        totalPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      ];
+    });
 
     doc.autoTable({
       head: [tableHeaders],
@@ -589,14 +605,15 @@ export default function SalesClientsPage() {
                                             </TableHeader>
                                             <TableBody>
                                                 {salesForSelectedClient.map(sale => {
-                                                  const balance = sale.totalAmount - sale.downPayment;
+                                                  const totalPaid = sale.payments.reduce((sum, p) => sum + p.amount, 0);
+                                                  const balance = sale.totalAmount - totalPaid;
                                                   return (
                                                     <TableRow key={sale.id}>
                                                       <TableCell>{format(parseISO(sale.date), "PPP", { locale: es })}</TableCell>
                                                       <TableCell>{`${sale.quantity} ${sale.unit}`}</TableCell>
                                                       <TableCell className="text-right">{sale.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
                                                       <TableCell className="text-right">{sale.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
-                                                      <TableCell className="text-right">{sale.downPayment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                                                      <TableCell className="text-right">{totalPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
                                                       <TableCell className={`text-right font-medium ${balance > 0 ? 'text-destructive' : ''}`}>{balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
                                                       <TableCell className="text-center">
                                                           <Button
@@ -745,7 +762,8 @@ export default function SalesClientsPage() {
 
 // Payment Dialog Component
 const PaymentDialog = ({ sale, onClose, onSubmit }: { sale: Sale, onClose: () => void, onSubmit: (data: { amount: number }) => void }) => {
-  const balance = sale.totalAmount - sale.downPayment;
+  const totalPaid = sale.payments.reduce((sum, p) => sum + p.amount, 0);
+  const balance = sale.totalAmount - totalPaid;
 
   const paymentFormSchema = z.object({
     amount: z.coerce
@@ -774,11 +792,30 @@ const PaymentDialog = ({ sale, onClose, onSubmit }: { sale: Sale, onClose: () =>
                       Añadir un nuevo abono para la venta del {format(parseISO(sale.date), "PPP", { locale: es })}.
                   </DialogDescription>
               </DialogHeader>
-              <div className="text-sm">
+
+              {sale.payments.length > 0 && (
+                <div className="space-y-2 pt-4">
+                    <h4 className="font-medium text-sm text-muted-foreground">Historial de Abonos</h4>
+                    <ScrollArea className="h-[100px] w-full rounded-md border p-2">
+                        <div className="space-y-1">
+                            {sale.payments.map((payment, index) => (
+                                <div key={index} className="flex justify-between items-center text-sm">
+                                    <span>{format(parseISO(payment.date), "PPP", { locale: es })}</span>
+                                    <span className="font-mono">{payment.amount.toLocaleString(undefined, { style: 'currency', currency: 'USD' })}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </ScrollArea>
+                </div>
+              )}
+
+              <div className="text-sm space-y-1">
                   <p><strong>Cliente:</strong> {sale.clientName}</p>
                   <p><strong>Monto Total:</strong> {sale.totalAmount.toLocaleString(undefined, { style: 'currency', currency: 'USD' })}</p>
+                  <p><strong>Total Abonado:</strong> {totalPaid.toLocaleString(undefined, { style: 'currency', currency: 'USD' })}</p>
                   <p><strong>Saldo Actual:</strong> <span className="font-bold text-destructive">{balance.toLocaleString(undefined, { style: 'currency', currency: 'USD' })}</span></p>
               </div>
+
               <Form {...form}>
                   <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-4">
                       <FormField
@@ -804,5 +841,3 @@ const PaymentDialog = ({ sale, onClose, onSubmit }: { sale: Sale, onClose: () =>
       </Dialog>
   );
 };
-
-    

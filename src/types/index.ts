@@ -26,6 +26,11 @@ export interface Client {
   phone: string;
 }
 
+export interface Payment {
+  date: string; // YYYY-MM-DD format
+  amount: number;
+}
+
 export interface Sale {
   id: string;
   date: string; // YYYY-MM-DD format
@@ -35,5 +40,5 @@ export interface Sale {
   quantity: number;
   unit: 'baldes' | 'unidades';
   totalAmount: number;
-  downPayment: number; // Abono
+  payments: Payment[];
 }
