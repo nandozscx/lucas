@@ -65,7 +65,7 @@ import type { Client, Sale, Payment } from '@/types';
 import type jsPDF from 'jspdf';
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PlusCircle, Edit2, Trash2, Users, ArrowLeft, Info, ShoppingCart, DollarSign, CalendarIcon, Package, Box, Download, HandCoins } from 'lucide-react';
+import { PlusCircle, Edit2, Trash2, Users, ArrowLeft, Info, ShoppingCart, DollarSign, CalendarIcon, Package, Box, Download, HandCoins, Library } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 
@@ -114,10 +114,10 @@ const SaleForm = ({ onSubmitSale, clients, onClientChange }: { onSubmitSale: (da
         defaultValues: {
             date: new Date(),
             clientId: undefined,
-            price: '',
-            quantity: '',
+            price: '' as any,
+            quantity: '' as any,
             unit: 'baldes',
-            downPayment: '',
+            downPayment: '' as any,
         },
     });
 
@@ -126,10 +126,10 @@ const SaleForm = ({ onSubmitSale, clients, onClientChange }: { onSubmitSale: (da
         form.reset({
             date: new Date(),
             clientId: undefined,
-            price: '',
-            quantity: '',
+            price: '' as any,
+            quantity: '' as any,
             unit: 'baldes',
-            downPayment: '',
+            downPayment: '' as any,
         });
     };
 
@@ -297,6 +297,7 @@ export default function SalesClientsPage() {
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
   const [saleForPayment, setSaleForPayment] = useState<Sale | null>(null);
+  const [isConsolidatedDialogOpen, setIsConsolidatedDialogOpen] = useState(false);
   const { toast } = useToast();
   const [currentYear, setCurrentYear] = useState('');
   const [selectedClientIdForHistory, setSelectedClientIdForHistory] = useState<string | null>(null);
@@ -632,7 +633,7 @@ export default function SalesClientsPage() {
                                             </TableBody>
                                              <TableFooter>
                                                 <TableRow>
-                                                    <TableCell colSpan={6} className="text-right font-bold text-lg">Deuda Total:</TableCell>
+                                                    <TableCell colSpan={5} className="text-right font-bold text-lg">Deuda Total:</TableCell>
                                                     <TableCell className="text-right font-bold text-lg text-destructive">
                                                         {totalDebtForSelectedClient.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                     </TableCell>
@@ -645,7 +646,11 @@ export default function SalesClientsPage() {
                                 )}
                             </CardContent>
                              {salesForSelectedClient.length > 0 && (
-                                <CardFooter className="justify-end border-t pt-6">
+                                <CardFooter className="justify-end border-t pt-6 space-x-2">
+                                     <Button onClick={() => setIsConsolidatedDialogOpen(true)} variant="outline">
+                                        <Library className="mr-2 h-4 w-4" />
+                                        Consolidado de Deuda
+                                    </Button>
                                     <Button onClick={exportSalesToPDF} className="bg-accent text-accent-foreground hover:bg-accent/90">
                                         <Download className="mr-2 h-4 w-4" />
                                         Exportar Historial a PDF
@@ -712,6 +717,17 @@ export default function SalesClientsPage() {
           sale={saleForPayment}
           onClose={() => setSaleForPayment(null)}
           onSubmit={handlePaymentSubmit}
+        />
+      )}
+      
+      {/* Consolidated Debt Dialog */}
+      {selectedClientIdForHistory && (
+        <ConsolidatedDebtDialog
+            isOpen={isConsolidatedDialogOpen}
+            onClose={() => setIsConsolidatedDialogOpen(false)}
+            client={clients.find(c => c.id === selectedClientIdForHistory)!}
+            sales={salesForSelectedClient}
+            toast={toast}
         />
       )}
 
@@ -839,5 +855,122 @@ const PaymentDialog = ({ sale, onClose, onSubmit }: { sale: Sale, onClose: () =>
               </Form>
           </DialogContent>
       </Dialog>
+  );
+};
+
+
+// Consolidated Debt Dialog Component
+const ConsolidatedDebtDialog = ({ isOpen, onClose, client, sales, toast }: { isOpen: boolean, onClose: () => void, client: Client, sales: Sale[], toast: any }) => {
+  if (!isOpen) return null;
+
+  const transactions = React.useMemo(() => {
+    const allTransactions = sales.flatMap(sale => ([
+      { date: sale.date, description: `Venta (${sale.quantity} ${sale.unit})`, debit: sale.totalAmount, credit: 0 },
+      ...sale.payments.map(p => ({ date: p.date, description: 'Abono', debit: 0, credit: p.amount }))
+    ])).sort((a, b) => {
+        const dateA = parseISO(a.date).getTime();
+        const dateB = parseISO(b.date).getTime();
+        if (dateA !== dateB) return dateA - dateB;
+        // If dates are same, sales (debit) should come before payments (credit)
+        return b.debit - a.debit;
+    });
+
+    let runningBalance = 0;
+    return allTransactions.map(t => {
+      runningBalance += t.debit - t.credit;
+      return { ...t, balance: runningBalance };
+    });
+  }, [sales]);
+
+  const exportConsolidatedToPDF = async () => {
+    const { default: jsPDFConstructor } = await import('jspdf');
+    await import('jspdf-autotable');
+
+    const doc = new jsPDFConstructor() as jsPDFWithAutoTable;
+    
+    const title = `Estado de Cuenta Consolidado - ${client.name}`;
+    
+    doc.setFontSize(18);
+    doc.text(title, 14, 20);
+
+    const tableHeaders = ['Fecha', 'Descripción', 'Cargo', 'Abono', 'Saldo'];
+    const tableBody = transactions.map(t => [
+        format(parseISO(t.date), "PPP", { locale: es }),
+        t.description,
+        t.debit > 0 ? t.debit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-',
+        t.credit > 0 ? t.credit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-',
+        t.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    ]);
+
+    const finalBalance = transactions.length > 0 ? transactions[transactions.length - 1].balance : 0;
+
+    doc.autoTable({
+      head: [tableHeaders],
+      body: tableBody,
+      startY: 28,
+      foot: [
+        ['', '', '', 'Saldo Final:', finalBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })]
+      ],
+      footStyles: { fontStyle: 'bold', halign: 'right' },
+       columnStyles: {
+          2: { halign: 'right' },
+          3: { halign: 'right'},
+          4: { halign: 'right'},
+      }
+    });
+
+    doc.save(`consolidado_${client.name.replace(/\s/g, '_')}.pdf`);
+    toast({
+      title: "Exportación PDF Exitosa",
+      description: "El estado de cuenta consolidado se ha exportado a PDF.",
+    });
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>Consolidado de Deuda: {client.name}</DialogTitle>
+          <DialogDescription>
+            Historial de todas las deudas y pagos ordenados por fecha.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="max-h-[60vh] overflow-y-auto border rounded-md">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Fecha</TableHead>
+                <TableHead>Descripción</TableHead>
+                <TableHead className="text-right">Cargo</TableHead>
+                <TableHead className="text-right">Abono</TableHead>
+                <TableHead className="text-right">Saldo</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {transactions.length > 0 ? transactions.map((t, index) => (
+                 <TableRow key={index}>
+                    <TableCell>{format(parseISO(t.date), "PPP", { locale: es })}</TableCell>
+                    <TableCell>{t.description}</TableCell>
+                    <TableCell className="text-right font-mono">{t.debit > 0 ? t.debit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
+                    <TableCell className="text-right font-mono text-green-500">{t.credit > 0 ? t.credit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
+                    <TableCell className="text-right font-mono font-medium">{t.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                 </TableRow>
+              )) : (
+                <TableRow>
+                    <TableCell colSpan={5} className="text-center h-24">No hay transacciones para este cliente.</TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+        <DialogFooter className="pt-4">
+           <Button onClick={exportConsolidatedToPDF} variant="outline" disabled={transactions.length === 0}>
+              <Download className="mr-2 h-4 w-4" />
+              Exportar a PDF
+            </Button>
+            <Button onClick={onClose}>Cerrar</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };
