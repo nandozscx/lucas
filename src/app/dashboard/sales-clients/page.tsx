@@ -57,7 +57,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, subDays, subMonths, subYears } from "date-fns";
 import { es } from 'date-fns/locale';
 
 import ClientForm, { type ClientFormData } from '@/components/client-form';
@@ -861,16 +861,16 @@ const PaymentDialog = ({ sale, onClose, onSubmit }: { sale: Sale, onClose: () =>
 
 // Consolidated Debt Dialog Component
 const ConsolidatedDebtDialog = ({ isOpen, onClose, client, sales, toast }: { isOpen: boolean, onClose: () => void, client: Client, sales: Sale[], toast: any }) => {
+  const [dateRange, setDateRange] = React.useState('all');
+
   if (!isOpen) return null;
 
   const transactions = React.useMemo(() => {
     const allTransactions = sales.flatMap(sale => {
-      // Find the initial payment made on the same day as the sale.
       const initialPaymentAmount = sale.payments
         .filter(p => p.date === sale.date)
         .reduce((sum, p) => sum + p.amount, 0);
 
-      // Create the main sale transaction, including the initial payment as a credit.
       const saleTransaction = {
         date: sale.date,
         description: `Venta (${sale.quantity} ${sale.unit})`,
@@ -878,7 +878,6 @@ const ConsolidatedDebtDialog = ({ isOpen, onClose, client, sales, toast }: { isO
         credit: initialPaymentAmount,
       };
       
-      // Get all subsequent payments (those made on a different day).
       const subsequentPayments = sale.payments
         .filter(p => p.date !== sale.date)
         .map(p => ({
@@ -889,22 +888,62 @@ const ConsolidatedDebtDialog = ({ isOpen, onClose, client, sales, toast }: { isO
         }));
         
       return [saleTransaction, ...subsequentPayments];
-    });
-
-    const sortedTransactions = allTransactions.sort((a, b) => {
+    }).sort((a, b) => {
         const dateA = parseISO(a.date).getTime();
         const dateB = parseISO(b.date).getTime();
         if (dateA !== dateB) return dateA - dateB;
-        // If dates are same, sale (debit > 0) should come before payment (debit === 0).
         return b.debit - a.debit;
     });
 
-    let runningBalance = 0;
-    return sortedTransactions.map(t => {
-      runningBalance += t.debit - t.credit;
-      return { ...t, balance: runningBalance };
+    const now = new Date();
+    let startDate: Date | null = null;
+    if (dateRange === 'lastWeek') startDate = subDays(now, 7);
+    if (dateRange === 'lastMonth') startDate = subMonths(now, 1);
+    if (dateRange === 'last6Months') startDate = subMonths(now, 6);
+    if (dateRange === 'lastYear') startDate = subYears(now, 1);
+
+    if (!startDate) {
+        let runningBalance = 0;
+        return allTransactions.map(t => {
+            runningBalance += t.debit - t.credit;
+            return { ...t, balance: runningBalance };
+        });
+    }
+
+    let openingBalance = 0;
+    const transactionsInRange: any[] = [];
+
+    allTransactions.forEach(t => {
+        if (parseISO(t.date) < startDate!) {
+            openingBalance += t.debit - t.credit;
+        } else {
+            transactionsInRange.push(t);
+        }
     });
-  }, [sales]);
+    
+    let runningBalance = openingBalance;
+    const processedTransactions = transactionsInRange.map(t => {
+        runningBalance += t.debit - t.credit;
+        return { ...t, balance: runningBalance };
+    });
+
+    if (openingBalance !== 0 || processedTransactions.length > 0) {
+        return [
+            {
+                date: format(startDate, "yyyy-MM-dd"),
+                description: "Saldo Anterior",
+                debit: 0,
+                credit: 0,
+                balance: openingBalance,
+                isOpeningBalance: true,
+            },
+            ...processedTransactions,
+        ];
+    }
+    
+    return [];
+
+  }, [sales, dateRange]);
 
   const exportConsolidatedToPDF = async () => {
     const { default: jsPDFConstructor } = await import('jspdf');
@@ -918,13 +957,24 @@ const ConsolidatedDebtDialog = ({ isOpen, onClose, client, sales, toast }: { isO
     doc.text(title, 14, 20);
 
     const tableHeaders = ['Fecha', 'Descripción', 'Cargo', 'Abono', 'Saldo'];
-    const tableBody = transactions.map(t => [
-        format(parseISO(t.date), "PPP", { locale: es }),
-        t.description,
-        t.debit > 0 ? t.debit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-',
-        t.credit > 0 ? t.credit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-',
-        t.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-    ]);
+    const tableBody = transactions.map(t => {
+        if (t.isOpeningBalance) {
+            return [
+                format(parseISO(t.date), "PPP", { locale: es }),
+                t.description,
+                '',
+                '',
+                t.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+            ];
+        }
+        return [
+            format(parseISO(t.date), "PPP", { locale: es }),
+            t.description,
+            t.debit > 0 ? t.debit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-',
+            t.credit > 0 ? t.credit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-',
+            t.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        ]
+    });
 
     const finalBalance = transactions.length > 0 ? transactions[transactions.length - 1].balance : 0;
 
@@ -954,10 +1004,26 @@ const ConsolidatedDebtDialog = ({ isOpen, onClose, client, sales, toast }: { isO
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-3xl">
         <DialogHeader>
-          <DialogTitle>Consolidado de Deuda: {client.name}</DialogTitle>
-          <DialogDescription>
-            Historial de todas las deudas y pagos ordenados por fecha.
-          </DialogDescription>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div className="text-left">
+                  <DialogTitle>Consolidado de Deuda: {client.name}</DialogTitle>
+                  <DialogDescription>
+                      Historial de todas las deudas y pagos ordenados por fecha.
+                  </DialogDescription>
+              </div>
+              <Select onValueChange={setDateRange} value={dateRange}>
+                  <SelectTrigger className="w-full sm:w-[200px]">
+                      <SelectValue placeholder="Filtrar por fecha" />
+                  </SelectTrigger>
+                  <SelectContent>
+                      <SelectItem value="all">Todo el Historial</SelectItem>
+                      <SelectItem value="lastWeek">Últimos 7 días</SelectItem>
+                      <SelectItem value="lastMonth">Último Mes</SelectItem>
+                      <SelectItem value="last6Months">Últimos 6 Meses</SelectItem>
+                      <SelectItem value="lastYear">Último Año</SelectItem>
+                  </SelectContent>
+              </Select>
+          </div>
         </DialogHeader>
         <div className="max-h-[60vh] overflow-y-auto border rounded-md">
           <Table>
@@ -972,16 +1038,16 @@ const ConsolidatedDebtDialog = ({ isOpen, onClose, client, sales, toast }: { isO
             </TableHeader>
             <TableBody>
               {transactions.length > 0 ? transactions.map((t, index) => (
-                 <TableRow key={index}>
+                 <TableRow key={index} className={cn(t.isOpeningBalance && "bg-muted/50 font-semibold")}>
                     <TableCell>{format(parseISO(t.date), "PPP", { locale: es })}</TableCell>
                     <TableCell>{t.description}</TableCell>
-                    <TableCell className="text-right font-mono">{t.debit > 0 ? t.debit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
-                    <TableCell className="text-right font-mono text-green-500">{t.credit > 0 ? t.credit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
+                    <TableCell className="text-right font-mono">{!t.isOpeningBalance && t.debit > 0 ? t.debit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
+                    <TableCell className="text-right font-mono text-green-500">{!t.isOpeningBalance && t.credit > 0 ? t.credit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
                     <TableCell className="text-right font-mono font-medium">{t.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
                  </TableRow>
               )) : (
                 <TableRow>
-                    <TableCell colSpan={5} className="text-center h-24">No hay transacciones para este cliente.</TableCell>
+                    <TableCell colSpan={5} className="text-center h-24">No hay transacciones para el período seleccionado.</TableCell>
                 </TableRow>
               )}
             </TableBody>
