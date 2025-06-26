@@ -201,7 +201,7 @@ const SaleForm = ({ onSubmitSale, clients }: { onSubmitSale: (data: SaleFormData
                                 <FormItem>
                                     <FormLabel className="font-semibold">Precio de Venta (Unitario)</FormLabel>
                                     <FormControl>
-                                        <Input type="number" placeholder="Ej: 15.25" {...field} onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))} />
+                                        <Input type="number" placeholder="Ej: 15.25" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -214,7 +214,7 @@ const SaleForm = ({ onSubmitSale, clients }: { onSubmitSale: (data: SaleFormData
                                 <FormItem>
                                     <FormLabel className="font-semibold">Cantidad</FormLabel>
                                     <FormControl>
-                                        <Input type="number" placeholder="Ej: 10" {...field} onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))} />
+                                        <Input type="number" placeholder="Ej: 10" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -257,7 +257,7 @@ const SaleForm = ({ onSubmitSale, clients }: { onSubmitSale: (data: SaleFormData
                                 <FormItem>
                                     <FormLabel className="font-semibold">Abono (Acta)</FormLabel>
                                     <FormControl>
-                                        <Input type="number" placeholder="Opcional. Ej: 500" {...field} onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))} />
+                                        <Input type="number" placeholder="Opcional. Ej: 500" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
