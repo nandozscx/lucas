@@ -61,14 +61,19 @@ import { es } from 'date-fns/locale';
 
 import ClientForm, { type ClientFormData } from '@/components/client-form';
 import type { Client, Sale } from '@/types';
+import type jsPDF from 'jspdf';
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PlusCircle, Edit2, Trash2, Users, ArrowLeft, Info, ShoppingCart, DollarSign, CalendarIcon, Package, Box } from 'lucide-react';
+import { PlusCircle, Edit2, Trash2, Users, ArrowLeft, Info, ShoppingCart, DollarSign, CalendarIcon, Package, Box, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 
 const CLIENTS_STORAGE_KEY = 'dailySupplyTrackerClients';
 const SALES_STORAGE_KEY = 'dailySupplyTrackerSales';
+
+interface jsPDFWithAutoTable extends jsPDF {
+  autoTable: (options: any) => jsPDF;
+}
 
 // Sales Form Schema
 const saleFormSchema = z.object({
@@ -108,10 +113,10 @@ const SaleForm = ({ onSubmitSale, clients, onClientChange }: { onSubmitSale: (da
         defaultValues: {
             date: new Date(),
             clientId: undefined,
-            price: undefined,
-            quantity: undefined,
-            unit: 'unidades',
-            downPayment: undefined,
+            price: '',
+            quantity: '',
+            unit: 'baldes',
+            downPayment: '',
         },
     });
 
@@ -120,10 +125,10 @@ const SaleForm = ({ onSubmitSale, clients, onClientChange }: { onSubmitSale: (da
         form.reset({
             date: new Date(),
             clientId: undefined,
-            price: undefined,
-            quantity: undefined,
-            unit: 'unidades',
-            downPayment: undefined,
+            price: '',
+            quantity: '',
+            unit: 'baldes',
+            downPayment: '',
         });
     };
 
@@ -421,6 +426,63 @@ export default function SalesClientsPage() {
     return total + balance;
   }, 0);
 
+  const exportSalesToPDF = async () => {
+    if (!selectedClientIdForHistory) {
+      toast({
+        title: "Seleccione un Cliente",
+        description: "Por favor, seleccione un cliente para exportar su historial de ventas.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (salesForSelectedClient.length === 0) {
+      toast({
+        title: "Sin Datos",
+        description: "El cliente seleccionado no tiene ventas para exportar.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const { default: jsPDFConstructor } = await import('jspdf');
+    await import('jspdf-autotable');
+
+    const doc = new jsPDFConstructor() as jsPDFWithAutoTable;
+    
+    const clientName = clients.find(c => c.id === selectedClientIdForHistory)?.name || 'Cliente Desconocido';
+    const title = `Historial de Ventas - ${clientName}`;
+    
+    doc.setFontSize(18);
+    doc.text(title, 14, 15);
+
+    const tableHeaders = ['Fecha', 'Cantidad', 'Precio Unit.', 'Monto Total', 'Abono', 'Saldo'];
+    const tableBody = salesForSelectedClient.map(sale => [
+      format(parseISO(sale.date), "PPP", { locale: es }),
+      `${sale.quantity} ${sale.unit}`,
+      sale.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+      sale.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+      sale.downPayment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+      (sale.totalAmount - sale.downPayment).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    ]);
+
+    doc.autoTable({
+      head: [tableHeaders],
+      body: tableBody,
+      startY: 22,
+      foot: [
+        ['', '', '', '', 'Deuda Total:', totalDebtForSelectedClient.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })]
+      ],
+      footStyles: { fontStyle: 'bold', halign: 'right' },
+    });
+
+    doc.save(`historial_ventas_${clientName.replace(/\s/g, '_')}.pdf`);
+    toast({
+      title: "Exportación PDF Exitosa",
+      description: "El historial de ventas se ha exportado a PDF.",
+    });
+  };
+
   if (!isClient) {
     return (
       <div className="min-h-screen flex flex-col p-4 md:p-8 bg-background">
@@ -493,7 +555,7 @@ export default function SalesClientsPage() {
                                 ) : salesForSelectedClient.length === 0 ? (
                                     <EmptyState message="Este cliente aún no tiene ventas registradas." icon={ShoppingCart}/>
                                 ) : (
-                                    <ScrollArea className="h-[500px] rounded-md border whitespace-nowrap">
+                                    <ScrollArea className="h-[440px] rounded-md border whitespace-nowrap">
                                         <Table>
                                             <TableHeader>
                                                 <TableRow>
@@ -535,6 +597,14 @@ export default function SalesClientsPage() {
                                     </ScrollArea>
                                 )}
                             </CardContent>
+                             {salesForSelectedClient.length > 0 && (
+                                <CardFooter className="justify-end border-t pt-6">
+                                    <Button onClick={exportSalesToPDF} className="bg-accent text-accent-foreground hover:bg-accent/90">
+                                        <Download className="mr-2 h-4 w-4" />
+                                        Exportar Historial a PDF
+                                    </Button>
+                                </CardFooter>
+                            )}
                         </Card>
                     </div>
                 </div>
