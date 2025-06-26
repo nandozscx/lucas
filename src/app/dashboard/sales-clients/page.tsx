@@ -296,6 +296,7 @@ export default function SalesClientsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
+  const [saleToDelete, setSaleToDelete] = useState<Sale | null>(null);
   const [saleForPayment, setSaleForPayment] = useState<Sale | null>(null);
   const [isConsolidatedDialogOpen, setIsConsolidatedDialogOpen] = useState(false);
   const { toast } = useToast();
@@ -398,6 +399,18 @@ export default function SalesClientsPage() {
       setClients(prev => prev.filter(p => p.id !== clientToDelete.id));
       toast({ title: "Cliente Eliminado", description: `El cliente "${clientToDelete.name}" ha sido eliminado.`, variant: "destructive" });
       setClientToDelete(null);
+    }
+  };
+  
+  const confirmDeleteSale = () => {
+    if (saleToDelete) {
+      setSales(prev => prev.filter(s => s.id !== saleToDelete.id));
+      toast({
+        title: "Venta Eliminada",
+        description: `La venta para "${saleToDelete.clientName}" ha sido eliminada.`,
+        variant: "destructive",
+      });
+      setSaleToDelete(null);
     }
   };
 
@@ -601,7 +614,7 @@ export default function SalesClientsPage() {
                                                     <TableHead className="text-right">Monto Total</TableHead>
                                                     <TableHead className="text-right">Abono</TableHead>
                                                     <TableHead className="text-right">Saldo</TableHead>
-                                                    <TableHead className="text-center">Acciones</TableHead>
+                                                    <TableHead className="text-center w-[120px]">Acciones</TableHead>
                                                 </TableRow>
                                             </TableHeader>
                                             <TableBody>
@@ -625,6 +638,14 @@ export default function SalesClientsPage() {
                                                               aria-label="Añadir pago"
                                                           >
                                                               <HandCoins className="h-4 w-4 text-green-500" />
+                                                          </Button>
+                                                          <Button
+                                                              variant="ghost"
+                                                              size="icon"
+                                                              onClick={() => setSaleToDelete(sale)}
+                                                              aria-label="Eliminar Venta"
+                                                          >
+                                                              <Trash2 className="h-4 w-4 text-destructive" />
                                                           </Button>
                                                       </TableCell>
                                                     </TableRow>
@@ -765,6 +786,24 @@ export default function SalesClientsPage() {
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setClientToDelete(null)}>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDeleteClient} className="bg-destructive hover:bg-destructive/90">
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      
+      {/* Sale Delete Confirmation */}
+      <AlertDialog open={!!saleToDelete} onOpenChange={(open) => { if (!open) setSaleToDelete(null);}}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. Esto eliminará permanentemente la venta del {saleToDelete ? format(parseISO(saleToDelete.date), "PPP", { locale: es }) : ''} para el cliente "{saleToDelete?.clientName}".
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setSaleToDelete(null)}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteSale} className="bg-destructive hover:bg-destructive/90">
               Eliminar
             </AlertDialogAction>
           </AlertDialogFooter>
