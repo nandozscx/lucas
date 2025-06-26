@@ -1,46 +1,25 @@
 
 "use client";
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { ArrowLeft, File as FileIcon, Sheet, FileSpreadsheet, FileText as FileTextIcon, DatabaseBackup, Upload } from 'lucide-react';
+import { ArrowLeft, File as FileIcon, Sheet, FileSpreadsheet, FileText as FileTextIcon } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import type { Delivery } from '@/types';
 import type jsPDF from 'jspdf';
-import { format } from 'date-fns';
 
 // Extend jsPDF with autoTable - this is a common way to handle plugins with jsPDF
 interface jsPDFWithAutoTable extends jsPDF {
   autoTable: (options: any) => jsPDF;
 }
 
-const STORAGE_KEYS = [
-  'dailySupplyTrackerDeliveries',
-  'dailySupplyTrackerProviders',
-  'dailySupplyTrackerClients',
-  'dailySupplyTrackerSales'
-];
-
 export default function ExportPage() {
   const [isClient, setIsClient] = useState(false);
   const [currentYear, setCurrentYear] = useState('');
   const { toast } = useToast();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [isRestoreConfirmOpen, setIsRestoreConfirmOpen] = useState(false);
-  const [fileToRestore, setFileToRestore] = useState<File | null>(null);
 
   useEffect(() => {
     setIsClient(true);
@@ -151,109 +130,7 @@ export default function ExportPage() {
     });
   };
   
-  const handleBackup = () => {
-    const backupData: { [key: string]: any } = {};
-    let hasData = false;
-    STORAGE_KEYS.forEach(key => {
-        const data = localStorage.getItem(key);
-        if (data) {
-            try {
-                backupData[key] = JSON.parse(data);
-                hasData = true;
-            } catch (e) {
-                console.error(`Error parsing data from localStorage for key ${key}:`, e);
-            }
-        }
-    });
-
-    if (!hasData) {
-        toast({
-            title: "Sin Datos",
-            description: "No hay datos en la aplicación para crear una copia de seguridad.",
-            variant: "destructive",
-        });
-        return;
-    }
-
-    const jsonString = JSON.stringify(backupData, null, 2);
-    const blob = new Blob([jsonString], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    const dateStr = format(new Date(), "yyyy-MM-dd");
-    link.download = `acopiapp_backup_${dateStr}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-     toast({
-      title: "Copia de Seguridad Creada",
-      description: "El archivo de respaldo se ha descargado exitosamente.",
-    });
-  };
-
-  const triggerRestore = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      setFileToRestore(file);
-      setIsRestoreConfirmOpen(true);
-    }
-    // Reset file input to allow selecting the same file again
-    event.target.value = '';
-  };
-  
-  const confirmRestore = () => {
-    if (!fileToRestore) return;
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const text = e.target?.result;
-        if (typeof text !== 'string') throw new Error("File content is not readable.");
-
-        const data = JSON.parse(text);
-        
-        const requiredKeys = STORAGE_KEYS;
-        const hasAllKeys = requiredKeys.every(key => data.hasOwnProperty(key));
-
-        if (!hasAllKeys) {
-          throw new Error("El archivo de respaldo está corrupto o no tiene el formato correcto.");
-        }
-
-        requiredKeys.forEach(key => {
-          localStorage.setItem(key, JSON.stringify(data[key]));
-        });
-
-        toast({
-          title: "Restauración Exitosa",
-          description: "Los datos se han restaurado. La página se recargará ahora.",
-        });
-
-        // Reload the page to apply changes
-        setTimeout(() => {
-          window.location.reload();
-        }, 2000);
-
-      } catch (error: any) {
-        toast({
-          title: "Error de Restauración",
-          description: error.message || "No se pudo procesar el archivo de respaldo.",
-          variant: "destructive",
-        });
-      } finally {
-        setIsRestoreConfirmOpen(false);
-        setFileToRestore(null);
-      }
-    };
-    reader.readAsText(fileToRestore);
-  };
-
-
-  const handleExportOptionClick = (format: 'csv' | 'sheets' | 'excel' | 'pdf' | 'backup' | 'restore') => {
+  const handleExportOptionClick = (format: 'csv' | 'sheets' | 'excel' | 'pdf') => {
     if (format === 'csv') {
       if(exportToCSV()) {
         toast({
@@ -272,10 +149,6 @@ export default function ExportPage() {
       exportToXLSX();
     } else if (format === 'pdf') {
       exportToPDF();
-    } else if (format === 'backup') {
-        handleBackup();
-    } else if (format === 'restore') {
-        triggerRestore();
     } else {
       toast({
         title: "Formato Desconocido",
@@ -292,8 +165,8 @@ export default function ExportPage() {
           <Skeleton className="h-8 w-1/3" />
           <Skeleton className="h-10 w-36" />
         </header>
-        <main className="flex-grow grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8 p-4 md:p-8 items-center">
-          {[...Array(6)].map((_, i) => (
+        <main className="flex-grow grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-6 md:gap-8 p-4 md:p-8 items-center lg:max-w-4xl lg:mx-auto">
+          {[...Array(4)].map((_, i) => (
             <Skeleton key={i} className="w-full rounded-lg aspect-square" />
           ))}
         </main>
@@ -309,8 +182,6 @@ export default function ExportPage() {
     { title: "Exportar a Google Sheets", icon: Sheet, action: () => handleExportOptionClick('sheets') },
     { title: "Exportar a Excel", icon: FileSpreadsheet, action: () => handleExportOptionClick('excel') },
     { title: "Exportar a PDF", icon: FileTextIcon, action: () => handleExportOptionClick('pdf') },
-    { title: "Crear Copia de Seguridad", icon: DatabaseBackup, action: () => handleExportOptionClick('backup') },
-    { title: "Restaurar Copia de Seguridad", icon: Upload, action: () => handleExportOptionClick('restore') },
   ];
 
   return (
@@ -321,20 +192,12 @@ export default function ExportPage() {
           Volver al Panel
         </Link>
         <h1 className="text-2xl md:text-3xl font-bold text-primary flex items-center order-first sm:order-none mx-auto sm:mx-0">
-          Opciones de Exportación y Respaldo
+          Opciones de Exportación
         </h1>
         <div className="w-0 sm:w-auto"></div> {/* Spacer for alignment */}
       </header>
       
-      <input
-        type="file"
-        ref={fileInputRef}
-        onChange={handleFileChange}
-        className="hidden"
-        accept=".json"
-      />
-
-      <main className="flex-grow grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8 p-4 md:p-8 items-center">
+      <main className="flex-grow grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-6 md:gap-8 p-4 md:p-8 items-center lg:max-w-4xl lg:mx-auto">
         {exportOptions.map((item) => {
           const IconComponent = item.icon;
           return (
@@ -357,25 +220,6 @@ export default function ExportPage() {
       <footer className="text-center text-sm text-muted-foreground py-4 mt-auto">
         <p>&copy; {currentYear} acopiapp. Todos los derechos reservados.</p>
       </footer>
-
-      <AlertDialog open={isRestoreConfirmOpen} onOpenChange={setIsRestoreConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Confirmar Restauración?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta acción reemplazará TODOS los datos actuales de la aplicación con los del archivo de respaldo.
-              <br />
-              <strong>Esta acción no se puede deshacer.</strong> ¿Estás seguro de que quieres continuar?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => { setIsRestoreConfirmOpen(false); setFileToRestore(null); }}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmRestore} className="bg-destructive hover:bg-destructive/90">
-              Sí, Restaurar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }
