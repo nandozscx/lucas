@@ -863,8 +863,6 @@ const PaymentDialog = ({ sale, onClose, onSubmit }: { sale: Sale, onClose: () =>
 const ConsolidatedDebtDialog = ({ isOpen, onClose, client, sales, toast }: { isOpen: boolean, onClose: () => void, client: Client, sales: Sale[], toast: any }) => {
   const [dateRange, setDateRange] = React.useState('all');
 
-  if (!isOpen) return null;
-
   const transactions = React.useMemo(() => {
     const allTransactions = sales.flatMap(sale => {
       const initialPaymentAmount = sale.payments
@@ -944,6 +942,8 @@ const ConsolidatedDebtDialog = ({ isOpen, onClose, client, sales, toast }: { isO
     return [];
 
   }, [sales, dateRange]);
+
+  if (!isOpen) return null;
 
   const exportConsolidatedToPDF = async () => {
     const { default: jsPDFConstructor } = await import('jspdf');
