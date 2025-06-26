@@ -113,7 +113,7 @@ const SaleForm = ({ onSubmitSale, clients, onClientChange }: { onSubmitSale: (da
         resolver: zodResolver(saleFormSchema),
         defaultValues: {
             date: new Date(),
-            clientId: undefined,
+            clientId: '',
             price: '' as any,
             quantity: '' as any,
             unit: 'baldes',
@@ -125,7 +125,7 @@ const SaleForm = ({ onSubmitSale, clients, onClientChange }: { onSubmitSale: (da
         onSubmitSale(data);
         form.reset({
             date: new Date(),
-            clientId: undefined,
+            clientId: '',
             price: '' as any,
             quantity: '' as any,
             unit: 'baldes',
@@ -703,6 +703,7 @@ export default function SalesClientsPage() {
                                 ))}
                               </TableBody>
                             </Table>
+                            <ScrollBar orientation="horizontal" />
                           </ScrollArea>
                         )}
                     </CardContent>
@@ -1025,7 +1026,7 @@ const ConsolidatedDebtDialog = ({ isOpen, onClose, client, sales, toast }: { isO
               </Select>
           </div>
         </DialogHeader>
-        <div className="max-h-[60vh] overflow-y-auto border rounded-md">
+        <ScrollArea className="max-h-[60vh] border rounded-md whitespace-nowrap">
           <Table>
             <TableHeader>
               <TableRow>
@@ -1052,7 +1053,8 @@ const ConsolidatedDebtDialog = ({ isOpen, onClose, client, sales, toast }: { isO
               )}
             </TableBody>
           </Table>
-        </div>
+          <ScrollBar orientation="horizontal" />
+        </ScrollArea>
         <DialogFooter className="pt-4">
            <Button onClick={exportConsolidatedToPDF} variant="outline" disabled={transactions.length === 0}>
               <Download className="mr-2 h-4 w-4" />
