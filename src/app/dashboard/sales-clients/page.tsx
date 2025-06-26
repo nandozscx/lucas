@@ -11,6 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -64,7 +65,7 @@ import type { Client, Sale } from '@/types';
 import type jsPDF from 'jspdf';
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PlusCircle, Edit2, Trash2, Users, ArrowLeft, Info, ShoppingCart, DollarSign, CalendarIcon, Package, Box, Download } from 'lucide-react';
+import { PlusCircle, Edit2, Trash2, Users, ArrowLeft, Info, ShoppingCart, DollarSign, CalendarIcon, Package, Box, Download, HandCoins } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 
@@ -295,6 +296,7 @@ export default function SalesClientsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
+  const [saleForPayment, setSaleForPayment] = useState<Sale | null>(null);
   const { toast } = useToast();
   const [currentYear, setCurrentYear] = useState('');
   const [selectedClientIdForHistory, setSelectedClientIdForHistory] = useState<string | null>(null);
@@ -318,7 +320,6 @@ export default function SalesClientsPage() {
         if (storedSales) {
             try {
                 const parsedSales = JSON.parse(storedSales);
-                // Check for new structure to avoid loading incompatible old data
                 if (Array.isArray(parsedSales) && (parsedSales.length === 0 || 'totalAmount' in parsedSales[0])) {
                     setSales(parsedSales);
                 } else {
@@ -411,7 +412,7 @@ export default function SalesClientsPage() {
       downPayment: finalDownPayment,
     };
     
-    setSales(prev => [...prev, newSale]);
+    setSales(prev => [...prev, newSale].sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime()));
     toast({ title: "Venta Registrada", description: `Se ha registrado una venta para ${client.name}.` });
   }, [clients, toast]);
   
@@ -425,6 +426,24 @@ export default function SalesClientsPage() {
     const balance = sale.totalAmount - sale.downPayment;
     return total + balance;
   }, 0);
+
+  const handlePaymentSubmit = (data: { amount: number }) => {
+    if (!saleForPayment) return;
+
+    setSales(prevSales =>
+        prevSales.map(sale =>
+            sale.id === saleForPayment.id
+                ? { ...sale, downPayment: sale.downPayment + data.amount }
+                : sale
+        )
+    );
+
+    toast({
+        title: "Pago Registrado",
+        description: `Se registró un pago de ${data.amount.toLocaleString(undefined, {style: 'currency', currency: 'USD'})} para la venta del ${format(parseISO(saleForPayment.date), "PPP", { locale: es })}.`
+    });
+    setSaleForPayment(null); // Close the dialog
+  };
 
   const exportSalesToPDF = async () => {
     if (!selectedClientIdForHistory) {
@@ -560,12 +579,12 @@ export default function SalesClientsPage() {
                                             <TableHeader>
                                                 <TableRow>
                                                     <TableHead>Fecha</TableHead>
-                                                    <TableHead>Cliente</TableHead>
-                                                    <TableHead className="text-right">Cantidad</TableHead>
+                                                    <TableHead>Cantidad</TableHead>
                                                     <TableHead className="text-right">Precio Unit.</TableHead>
                                                     <TableHead className="text-right">Monto Total</TableHead>
                                                     <TableHead className="text-right">Abono</TableHead>
                                                     <TableHead className="text-right">Saldo</TableHead>
+                                                    <TableHead className="text-center">Acciones</TableHead>
                                                 </TableRow>
                                             </TableHeader>
                                             <TableBody>
@@ -574,12 +593,22 @@ export default function SalesClientsPage() {
                                                   return (
                                                     <TableRow key={sale.id}>
                                                       <TableCell>{format(parseISO(sale.date), "PPP", { locale: es })}</TableCell>
-                                                      <TableCell>{sale.clientName}</TableCell>
-                                                      <TableCell className="text-right">{`${sale.quantity} ${sale.unit}`}</TableCell>
+                                                      <TableCell>{`${sale.quantity} ${sale.unit}`}</TableCell>
                                                       <TableCell className="text-right">{sale.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
                                                       <TableCell className="text-right">{sale.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
                                                       <TableCell className="text-right">{sale.downPayment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
                                                       <TableCell className={`text-right font-medium ${balance > 0 ? 'text-destructive' : ''}`}>{balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                                                      <TableCell className="text-center">
+                                                          <Button
+                                                              variant="ghost"
+                                                              size="icon"
+                                                              onClick={() => setSaleForPayment(sale)}
+                                                              disabled={balance <= 0}
+                                                              aria-label="Añadir pago"
+                                                          >
+                                                              <HandCoins className="h-4 w-4 text-green-500" />
+                                                          </Button>
+                                                      </TableCell>
                                                     </TableRow>
                                                   );
                                                 })}
@@ -590,6 +619,7 @@ export default function SalesClientsPage() {
                                                     <TableCell className="text-right font-bold text-lg text-destructive">
                                                         {totalDebtForSelectedClient.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                     </TableCell>
+                                                    <TableCell></TableCell>
                                                 </TableRow>
                                             </TableFooter>
                                         </Table>
@@ -659,6 +689,16 @@ export default function SalesClientsPage() {
         </Tabs>
       </main>
 
+      {/* Payment Dialog */}
+      {saleForPayment && (
+        <PaymentDialog
+          sale={saleForPayment}
+          onClose={() => setSaleForPayment(null)}
+          onSubmit={handlePaymentSubmit}
+        />
+      )}
+
+      {/* Client Edit/Add Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={(open) => { if (!open) handleCloseDialog(); else setIsDialogOpen(true);}}>
         <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -679,6 +719,7 @@ export default function SalesClientsPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Client Delete Confirmation */}
       <AlertDialog open={!!clientToDelete} onOpenChange={(open) => { if (!open) setClientToDelete(null);}}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -701,3 +742,67 @@ export default function SalesClientsPage() {
     </div>
   );
 }
+
+// Payment Dialog Component
+const PaymentDialog = ({ sale, onClose, onSubmit }: { sale: Sale, onClose: () => void, onSubmit: (data: { amount: number }) => void }) => {
+  const balance = sale.totalAmount - sale.downPayment;
+
+  const paymentFormSchema = z.object({
+    amount: z.coerce
+      .number({ invalid_type_error: "El monto debe ser un número." })
+      .positive({ message: "El monto debe ser un número positivo." })
+      .max(balance, { message: `El pago no puede exceder el saldo de ${balance.toLocaleString()}`})
+  });
+
+  type PaymentFormData = z.infer<typeof paymentFormSchema>;
+
+  const form = useForm<PaymentFormData>({
+    resolver: zodResolver(paymentFormSchema),
+    defaultValues: { amount: undefined },
+  });
+
+  const handleFormSubmit = (data: PaymentFormData) => {
+    onSubmit(data);
+  };
+  
+  return (
+      <Dialog open={true} onOpenChange={(open) => !open && onClose()}>
+          <DialogContent>
+              <DialogHeader>
+                  <DialogTitle>Registrar Pago</DialogTitle>
+                  <DialogDescription>
+                      Añadir un nuevo abono para la venta del {format(parseISO(sale.date), "PPP", { locale: es })}.
+                  </DialogDescription>
+              </DialogHeader>
+              <div className="text-sm">
+                  <p><strong>Cliente:</strong> {sale.clientName}</p>
+                  <p><strong>Monto Total:</strong> {sale.totalAmount.toLocaleString(undefined, { style: 'currency', currency: 'USD' })}</p>
+                  <p><strong>Saldo Actual:</strong> <span className="font-bold text-destructive">{balance.toLocaleString(undefined, { style: 'currency', currency: 'USD' })}</span></p>
+              </div>
+              <Form {...form}>
+                  <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-4">
+                      <FormField
+                          control={form.control}
+                          name="amount"
+                          render={({ field }) => (
+                              <FormItem>
+                                  <FormLabel>Monto del Pago</FormLabel>
+                                  <FormControl>
+                                      <Input type="number" placeholder="Ingrese el monto a abonar" {...field} value={field.value ?? ''}/>
+                                  </FormControl>
+                                  <FormMessage />
+                              </FormItem>
+                          )}
+                      />
+                      <DialogFooter>
+                          <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
+                          <Button type="submit">Guardar Pago</Button>
+                      </DialogFooter>
+                  </form>
+              </Form>
+          </DialogContent>
+      </Dialog>
+  );
+};
+
+    
