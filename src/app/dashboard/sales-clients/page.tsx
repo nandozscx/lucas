@@ -30,7 +30,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -117,12 +117,12 @@ const SaleForm = ({ onSubmitSale, clients }: { onSubmitSale: (data: SaleFormData
     const handleSubmit = (data: SaleFormData) => {
         onSubmitSale(data);
         form.reset({
-            date: data.date,
+            date: new Date(),
             clientId: undefined,
             price: undefined,
             quantity: undefined,
             unit: 'unidades',
-            downPayment: undefined
+            downPayment: undefined,
         });
     };
 
@@ -143,7 +143,7 @@ const SaleForm = ({ onSubmitSale, clients }: { onSubmitSale: (data: SaleFormData
                             render={({ field }) => (
                                 <FormItem>
                                 <FormLabel className="font-semibold">Cliente</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <Select onValueChange={field.onChange} value={field.value ?? ''}>
                                     <FormControl>
                                     <SelectTrigger>
                                         <SelectValue placeholder="Seleccione un cliente" />
@@ -201,7 +201,7 @@ const SaleForm = ({ onSubmitSale, clients }: { onSubmitSale: (data: SaleFormData
                                 <FormItem>
                                     <FormLabel className="font-semibold">Precio de Venta (Unitario)</FormLabel>
                                     <FormControl>
-                                        <Input type="number" placeholder="Ej: 15.25" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))} />
+                                        <Input type="number" placeholder="Ej: 15.25" {...field} value={field.value ?? ''} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -214,7 +214,7 @@ const SaleForm = ({ onSubmitSale, clients }: { onSubmitSale: (data: SaleFormData
                                 <FormItem>
                                     <FormLabel className="font-semibold">Cantidad</FormLabel>
                                     <FormControl>
-                                        <Input type="number" placeholder="Ej: 10" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))} />
+                                        <Input type="number" placeholder="Ej: 10" {...field} value={field.value ?? ''} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -257,7 +257,7 @@ const SaleForm = ({ onSubmitSale, clients }: { onSubmitSale: (data: SaleFormData
                                 <FormItem>
                                     <FormLabel className="font-semibold">Abono (Acta)</FormLabel>
                                     <FormControl>
-                                        <Input type="number" placeholder="Opcional. Ej: 500" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))} />
+                                        <Input type="number" placeholder="Opcional. Ej: 500" {...field} value={field.value ?? ''} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -495,6 +495,7 @@ export default function SalesClientsPage() {
                                                 })}
                                             </TableBody>
                                         </Table>
+                                        <ScrollBar orientation="horizontal" />
                                     </ScrollArea>
                                 )}
                             </CardContent>
