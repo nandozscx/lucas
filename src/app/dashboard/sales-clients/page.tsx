@@ -44,6 +44,15 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format, parseISO } from "date-fns";
@@ -53,7 +62,7 @@ import ClientForm, { type ClientFormData } from '@/components/client-form';
 import type { Client, Sale } from '@/types';
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PlusCircle, Edit2, Trash2, Users, ArrowLeft, Info, ShoppingCart, DollarSign, CalendarIcon } from 'lucide-react';
+import { PlusCircle, Edit2, Trash2, Users, ArrowLeft, Info, ShoppingCart, DollarSign, CalendarIcon, Package, Bucket } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 
@@ -63,27 +72,58 @@ const SALES_STORAGE_KEY = 'dailySupplyTrackerSales';
 // Sales Form Schema
 const saleFormSchema = z.object({
   date: z.date({ required_error: "La fecha de la venta es obligatoria." }),
-  amount: z.coerce
-    .number({ invalid_type_error: "El monto debe ser un número." })
-    .positive({ message: "El monto debe ser un número positivo." })
-    .min(0.01, {message: "El monto debe ser mayor que cero."}),
+  clientId: z.string().min(1, { message: "Debe seleccionar un cliente." }),
+  price: z.coerce
+    .number({ invalid_type_error: "El precio debe ser un número." })
+    .positive({ message: "El precio debe ser un número positivo." })
+    .min(0.01, { message: "El precio debe ser mayor que cero." }),
+  quantity: z.coerce
+    .number({ invalid_type_error: "La cantidad debe ser un número." })
+    .positive({ message: "La cantidad debe ser un número positivo." }),
+  unit: z.enum(['baldes', 'unidades'], { required_error: "Debe seleccionar una unidad." }),
+  downPayment: z.coerce
+    .number({ invalid_type_error: "El abono debe ser un número." })
+    .min(0, "El abono no puede ser negativo.")
+    .optional(),
+}).refine((data) => {
+    // Ensure downPayment is not more than total amount
+    if (data.downPayment !== undefined && data.price > 0 && data.quantity > 0) {
+        const totalAmount = data.price * data.quantity * (data.unit === 'baldes' ? 100 : 1);
+        return data.downPayment <= totalAmount;
+    }
+    return true;
+}, {
+    message: "El abono no puede ser mayor que el monto total de la venta.",
+    path: ["downPayment"], // Point error to the downPayment field
 });
+
 type SaleFormData = z.infer<typeof saleFormSchema>;
 
 
 // Sales Form Component
-const SaleForm = ({ onSubmitSale }: { onSubmitSale: (data: SaleFormData) => void }) => {
+const SaleForm = ({ onSubmitSale, clients }: { onSubmitSale: (data: SaleFormData) => void, clients: Client[] }) => {
     const form = useForm<SaleFormData>({
         resolver: zodResolver(saleFormSchema),
         defaultValues: {
             date: new Date(),
-            amount: undefined,
+            clientId: undefined,
+            price: undefined,
+            quantity: undefined,
+            unit: 'unidades',
+            downPayment: undefined,
         },
     });
 
     const handleSubmit = (data: SaleFormData) => {
         onSubmitSale(data);
-        form.reset({ date: data.date, amount: undefined });
+        form.reset({
+            date: data.date,
+            clientId: undefined,
+            price: undefined,
+            quantity: undefined,
+            unit: 'unidades',
+            downPayment: undefined
+        });
     };
 
     return (
@@ -96,7 +136,31 @@ const SaleForm = ({ onSubmitSale }: { onSubmitSale: (data: SaleFormData) => void
             </CardHeader>
             <Form {...form}>
                 <form onSubmit={form.handleSubmit(handleSubmit)}>
-                    <CardContent className="space-y-6">
+                    <CardContent className="space-y-4">
+                        <FormField
+                            control={form.control}
+                            name="clientId"
+                            render={({ field }) => (
+                                <FormItem>
+                                <FormLabel className="font-semibold">Cliente</FormLabel>
+                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <FormControl>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Seleccione un cliente" />
+                                    </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                    {clients.map(client => (
+                                        <SelectItem key={client.id} value={client.id}>
+                                        {client.name}
+                                        </SelectItem>
+                                    ))}
+                                    </SelectContent>
+                                </Select>
+                                <FormMessage />
+                                </FormItem>
+                            )}
+                        />
                         <FormField
                             control={form.control}
                             name="date"
@@ -132,18 +196,68 @@ const SaleForm = ({ onSubmitSale }: { onSubmitSale: (data: SaleFormData) => void
                         />
                         <FormField
                             control={form.control}
-                            name="amount"
+                            name="price"
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel className="font-semibold">Monto Total</FormLabel>
+                                    <FormLabel className="font-semibold">Precio de Venta (Unitario)</FormLabel>
                                     <FormControl>
-                                        <Input
-                                            type="number"
-                                            placeholder="Ej: 1250.75"
-                                            {...field}
-                                            value={field.value === undefined ? '' : field.value}
-                                            onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))}
-                                        />
+                                        <Input type="number" placeholder="Ej: 15.25" {...field} onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                         <FormField
+                            control={form.control}
+                            name="quantity"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel className="font-semibold">Cantidad</FormLabel>
+                                    <FormControl>
+                                        <Input type="number" placeholder="Ej: 10" {...field} onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="unit"
+                            render={({ field }) => (
+                                <FormItem className="space-y-3">
+                                <FormLabel className="font-semibold">Unidad de Medida</FormLabel>
+                                <FormControl>
+                                    <RadioGroup
+                                    onValueChange={field.onChange}
+                                    defaultValue={field.value}
+                                    className="flex items-center space-x-4"
+                                    >
+                                    <FormItem className="flex items-center space-x-2 space-y-0">
+                                        <FormControl>
+                                            <RadioGroupItem value="baldes" />
+                                        </FormControl>
+                                        <FormLabel className="font-normal flex items-center"><Bucket className="mr-1 h-4 w-4"/> Baldes</FormLabel>
+                                    </FormItem>
+                                    <FormItem className="flex items-center space-x-2 space-y-0">
+                                        <FormControl>
+                                            <RadioGroupItem value="unidades" />
+                                        </FormControl>
+                                        <FormLabel className="font-normal flex items-center"><Package className="mr-1 h-4 w-4"/> Unidades</FormLabel>
+                                    </FormItem>
+                                    </RadioGroup>
+                                </FormControl>
+                                <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="downPayment"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel className="font-semibold">Abono (Acta)</FormLabel>
+                                    <FormControl>
+                                        <Input type="number" placeholder="Opcional. Ej: 500" {...field} onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -188,14 +302,21 @@ export default function SalesClientsPage() {
       }
       
       const storedSales = localStorage.getItem(SALES_STORAGE_KEY);
-      if (storedSales) {
-        try {
-          setSales(JSON.parse(storedSales));
-        } catch (error) {
-          console.error("Falló al parsear ventas desde localStorage", error);
-          localStorage.removeItem(SALES_STORAGE_KEY);
+        if (storedSales) {
+            try {
+                const parsedSales = JSON.parse(storedSales);
+                // Check for new structure to avoid loading incompatible old data
+                if (Array.isArray(parsedSales) && (parsedSales.length === 0 || 'totalAmount' in parsedSales[0])) {
+                    setSales(parsedSales);
+                } else {
+                    console.warn("Estructura de ventas antigua detectada. Se borrarán los datos antiguos.");
+                    localStorage.removeItem(SALES_STORAGE_KEY);
+                }
+            } catch (error) {
+                console.error("Falló al parsear ventas desde localStorage", error);
+                localStorage.removeItem(SALES_STORAGE_KEY);
+            }
         }
-      }
     }
   }, []);
 
@@ -256,14 +377,30 @@ export default function SalesClientsPage() {
 
   // Sale management handlers
   const handleAddSale = useCallback((data: SaleFormData) => {
+    const client = clients.find(c => c.id === data.clientId);
+    if (!client) {
+      toast({ title: "Error", description: "Cliente no encontrado.", variant: "destructive" });
+      return;
+    }
+
+    const totalAmount = data.price * data.quantity * (data.unit === 'baldes' ? 100 : 1);
+    const finalDownPayment = data.downPayment ?? 0;
+
     const newSale: Sale = {
       id: crypto.randomUUID(),
       date: format(data.date, "yyyy-MM-dd"),
-      amount: data.amount,
+      clientId: client.id,
+      clientName: client.name,
+      price: data.price,
+      quantity: data.quantity,
+      unit: data.unit,
+      totalAmount: totalAmount,
+      downPayment: finalDownPayment,
     };
+    
     setSales(prev => [...prev, newSale]);
-    toast({ title: "Venta Registrada", description: `Se ha registrado una venta de ${data.amount.toLocaleString(undefined, {style: 'currency', currency: 'USD'})} para el ${format(data.date, "PPP", { locale: es })}.` });
-  }, [toast]);
+    toast({ title: "Venta Registrada", description: `Se ha registrado una venta para ${client.name}.` });
+  }, [clients, toast]);
   
   const sortedSales = [...sales].sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime());
 
@@ -317,7 +454,7 @@ export default function SalesClientsPage() {
             <TabsContent value="sales" className="mt-6">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
                     <div className="md:col-span-1">
-                        <SaleForm onSubmitSale={handleAddSale} />
+                        <SaleForm onSubmitSale={handleAddSale} clients={clients} />
                     </div>
                     <div className="md:col-span-2">
                         <Card className="shadow-lg rounded-lg">
@@ -328,21 +465,34 @@ export default function SalesClientsPage() {
                                 {sortedSales.length === 0 ? (
                                     <EmptyState message="Las ventas que registres aparecerán aquí." />
                                 ) : (
-                                    <ScrollArea className="h-[400px] rounded-md border">
+                                    <ScrollArea className="h-[500px] rounded-md border whitespace-nowrap">
                                         <Table>
                                             <TableHeader>
                                                 <TableRow>
-                                                    <TableHead className="font-semibold">Fecha</TableHead>
-                                                    <TableHead className="text-right font-semibold">Monto</TableHead>
+                                                    <TableHead>Fecha</TableHead>
+                                                    <TableHead>Cliente</TableHead>
+                                                    <TableHead className="text-right">Cantidad</TableHead>
+                                                    <TableHead className="text-right">Precio Unit.</TableHead>
+                                                    <TableHead className="text-right">Monto Total</TableHead>
+                                                    <TableHead className="text-right">Abono</TableHead>
+                                                    <TableHead className="text-right">Saldo</TableHead>
                                                 </TableRow>
                                             </TableHeader>
                                             <TableBody>
-                                                {sortedSales.map(sale => (
+                                                {sortedSales.map(sale => {
+                                                  const balance = sale.totalAmount - sale.downPayment;
+                                                  return (
                                                     <TableRow key={sale.id}>
-                                                        <TableCell>{format(parseISO(sale.date), "PPP", { locale: es })}</TableCell>
-                                                        <TableCell className="text-right font-medium">{sale.amount.toLocaleString(undefined, {style: 'currency', currency: 'USD'})}</TableCell>
+                                                      <TableCell>{format(parseISO(sale.date), "PPP", { locale: es })}</TableCell>
+                                                      <TableCell>{sale.clientName}</TableCell>
+                                                      <TableCell className="text-right">{`${sale.quantity} ${sale.unit}`}</TableCell>
+                                                      <TableCell className="text-right">{sale.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                                                      <TableCell className="text-right">{sale.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                                                      <TableCell className="text-right">{sale.downPayment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                                                      <TableCell className={`text-right font-medium ${balance > 0 ? 'text-destructive' : ''}`}>{balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
                                                     </TableRow>
-                                                ))}
+                                                  );
+                                                })}
                                             </TableBody>
                                         </Table>
                                     </ScrollArea>

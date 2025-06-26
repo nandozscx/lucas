@@ -29,5 +29,11 @@ export interface Client {
 export interface Sale {
   id: string;
   date: string; // YYYY-MM-DD format
-  amount: number;
+  clientId: string;
+  clientName: string; // Denormalized for easier display
+  price: number;
+  quantity: number;
+  unit: 'baldes' | 'unidades';
+  totalAmount: number;
+  downPayment: number; // Abono
 }
