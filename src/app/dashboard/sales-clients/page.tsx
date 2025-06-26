@@ -29,10 +29,11 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  TableFooter,
 } from "@/components/ui/table";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -101,7 +102,7 @@ type SaleFormData = z.infer<typeof saleFormSchema>;
 
 
 // Sales Form Component
-const SaleForm = ({ onSubmitSale, clients }: { onSubmitSale: (data: SaleFormData) => void, clients: Client[] }) => {
+const SaleForm = ({ onSubmitSale, clients, onClientChange }: { onSubmitSale: (data: SaleFormData) => void, clients: Client[], onClientChange: (clientId: string) => void }) => {
     const form = useForm<SaleFormData>({
         resolver: zodResolver(saleFormSchema),
         defaultValues: {
@@ -143,7 +144,13 @@ const SaleForm = ({ onSubmitSale, clients }: { onSubmitSale: (data: SaleFormData
                             render={({ field }) => (
                                 <FormItem>
                                 <FormLabel className="font-semibold">Cliente</FormLabel>
-                                <Select onValueChange={field.onChange} value={field.value ?? ''}>
+                                <Select 
+                                  onValueChange={(value) => {
+                                    field.onChange(value);
+                                    if (value) onClientChange(value);
+                                  }} 
+                                  value={field.value ?? ''}
+                                >
                                     <FormControl>
                                     <SelectTrigger>
                                         <SelectValue placeholder="Seleccione un cliente" />
@@ -285,6 +292,7 @@ export default function SalesClientsPage() {
   const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
   const { toast } = useToast();
   const [currentYear, setCurrentYear] = useState('');
+  const [selectedClientIdForHistory, setSelectedClientIdForHistory] = useState<string | null>(null);
 
   // Load data from localStorage
   useEffect(() => {
@@ -402,7 +410,16 @@ export default function SalesClientsPage() {
     toast({ title: "Venta Registrada", description: `Se ha registrado una venta para ${client.name}.` });
   }, [clients, toast]);
   
-  const sortedSales = [...sales].sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime());
+  const allSortedSales = [...sales].sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime());
+
+  const salesForSelectedClient = selectedClientIdForHistory
+    ? allSortedSales.filter(sale => sale.clientId === selectedClientIdForHistory)
+    : [];
+    
+  const totalDebtForSelectedClient = salesForSelectedClient.reduce((total, sale) => {
+    const balance = sale.totalAmount - sale.downPayment;
+    return total + balance;
+  }, 0);
 
   if (!isClient) {
     return (
@@ -454,16 +471,27 @@ export default function SalesClientsPage() {
             <TabsContent value="sales" className="mt-6">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
                     <div className="md:col-span-1">
-                        <SaleForm onSubmitSale={handleAddSale} clients={clients} />
+                        <SaleForm onSubmitSale={handleAddSale} clients={clients} onClientChange={setSelectedClientIdForHistory} />
                     </div>
                     <div className="md:col-span-2">
                         <Card className="shadow-lg rounded-lg">
                             <CardHeader>
                                 <CardTitle>Historial de Ventas</CardTitle>
+                                {selectedClientIdForHistory ? (
+                                    <CardDescription>
+                                        Mostrando ventas para: {clients.find(c => c.id === selectedClientIdForHistory)?.name || 'Cliente desconocido'}
+                                    </CardDescription>
+                                ) : (
+                                    <CardDescription>
+                                        Seleccione un cliente para ver su historial.
+                                    </CardDescription>
+                                )}
                             </CardHeader>
                             <CardContent>
-                                {sortedSales.length === 0 ? (
-                                    <EmptyState message="Las ventas que registres aparecerán aquí." />
+                                {!selectedClientIdForHistory ? (
+                                    <EmptyState message="Seleccione un cliente en el formulario para ver sus ventas." icon={Users} />
+                                ) : salesForSelectedClient.length === 0 ? (
+                                    <EmptyState message="Este cliente aún no tiene ventas registradas." icon={ShoppingCart}/>
                                 ) : (
                                     <ScrollArea className="h-[500px] rounded-md border whitespace-nowrap">
                                         <Table>
@@ -479,7 +507,7 @@ export default function SalesClientsPage() {
                                                 </TableRow>
                                             </TableHeader>
                                             <TableBody>
-                                                {sortedSales.map(sale => {
+                                                {salesForSelectedClient.map(sale => {
                                                   const balance = sale.totalAmount - sale.downPayment;
                                                   return (
                                                     <TableRow key={sale.id}>
@@ -494,6 +522,14 @@ export default function SalesClientsPage() {
                                                   );
                                                 })}
                                             </TableBody>
+                                             <TableFooter>
+                                                <TableRow>
+                                                    <TableCell colSpan={6} className="text-right font-bold text-lg">Deuda Total:</TableCell>
+                                                    <TableCell className="text-right font-bold text-lg text-destructive">
+                                                        {totalDebtForSelectedClient.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                    </TableCell>
+                                                </TableRow>
+                                            </TableFooter>
                                         </Table>
                                         <ScrollBar orientation="horizontal" />
                                     </ScrollArea>
