@@ -667,7 +667,7 @@ export default function SalesClientsPage() {
                                 )}
                             </CardContent>
                              {salesForSelectedClient.length > 0 && (
-                                <CardFooter className="justify-end border-t pt-6 space-x-2">
+                                <CardFooter className="flex flex-col items-stretch sm:items-end border-t pt-6 gap-2">
                                      <Button onClick={() => setIsConsolidatedDialogOpen(true)} variant="outline">
                                         <Library className="mr-2 h-4 w-4" />
                                         Consolidado de Deuda
@@ -700,19 +700,19 @@ export default function SalesClientsPage() {
                             <Table>
                               <TableHeader>
                                 <TableRow>
-                                  <TableHead className="font-semibold w-[30%]">Nombre</TableHead>
+                                  <TableHead className="font-semibold w-[30%] pl-4">Nombre</TableHead>
                                   <TableHead className="font-semibold w-[40%]">Dirección</TableHead>
                                   <TableHead className="font-semibold w-[15%]">Teléfono</TableHead>
-                                  <TableHead className="text-right font-semibold w-[15%]">Acciones</TableHead>
+                                  <TableHead className="text-right font-semibold w-[15%] pr-4">Acciones</TableHead>
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
                                 {clients.map((client) => (
                                   <TableRow key={client.id}>
-                                    <TableCell className="font-medium py-3">{client.name}</TableCell>
-                                    <TableCell className="py-3 whitespace-normal">{client.address}</TableCell>
+                                    <TableCell className="font-medium py-3 pl-4">{client.name}</TableCell>
+                                    <TableCell className="py-3">{client.address}</TableCell>
                                     <TableCell className="py-3">{client.phone}</TableCell>
-                                    <TableCell className="text-right py-3">
+                                    <TableCell className="text-right py-3 pr-4">
                                       <Button variant="ghost" size="icon" onClick={() => handleOpenEditDialog(client)} aria-label={`Editar ${client.name}`}>
                                         <Edit2 className="h-4 w-4 text-blue-600 hover:text-blue-500" />
                                       </Button>
