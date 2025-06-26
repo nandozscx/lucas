@@ -62,7 +62,7 @@ import ClientForm, { type ClientFormData } from '@/components/client-form';
 import type { Client, Sale } from '@/types';
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PlusCircle, Edit2, Trash2, Users, ArrowLeft, Info, ShoppingCart, DollarSign, CalendarIcon, Package, Bucket } from 'lucide-react';
+import { PlusCircle, Edit2, Trash2, Users, ArrowLeft, Info, ShoppingCart, DollarSign, CalendarIcon, Package, Box } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 
@@ -236,7 +236,7 @@ const SaleForm = ({ onSubmitSale, clients }: { onSubmitSale: (data: SaleFormData
                                         <FormControl>
                                             <RadioGroupItem value="baldes" />
                                         </FormControl>
-                                        <FormLabel className="font-normal flex items-center"><Bucket className="mr-1 h-4 w-4"/> Baldes</FormLabel>
+                                        <FormLabel className="font-normal flex items-center"><Box className="mr-1 h-4 w-4"/> Baldes</FormLabel>
                                     </FormItem>
                                     <FormItem className="flex items-center space-x-2 space-y-0">
                                         <FormControl>
