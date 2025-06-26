@@ -18,3 +18,16 @@ export interface Provider {
   phone: string;
   price: number; // Precio unitario al que se le compra al proveedor
 }
+
+export interface Client {
+  id: string;
+  name: string;
+  address: string;
+  phone: string;
+}
+
+export interface Sale {
+  id: string;
+  date: string; // YYYY-MM-DD format
+  amount: number;
+}

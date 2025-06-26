@@ -3,12 +3,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import type { Delivery } from '@/types';
 import DashboardHeader from '@/components/dashboard-header';
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card } from "@/components/ui/card";
-import { ClipboardPenLine, Users, Download, HistoryIcon, FileCsv, Sheet, FileSpreadsheet, FileText as FileTextIcon } from 'lucide-react';
+import { ClipboardPenLine, Users, ShoppingCart, HistoryIcon } from 'lucide-react';
 
 export default function DashboardPage() {
   const { toast } = useToast();
@@ -21,53 +20,6 @@ export default function DashboardPage() {
     setCurrentYear(new Date().getFullYear().toString());
   }, []);
 
-  // Original exportToCSV logic is now moved to /dashboard/export/page.tsx
-  // It's kept here only for the DashboardHeader button, which might be refactored later.
-  const exportToCSVForHeader = () => {
-    const storedDeliveriesData = localStorage.getItem('dailySupplyTrackerDeliveries');
-    const currentDeliveries: Delivery[] = storedDeliveriesData ? JSON.parse(storedDeliveriesData) : [];
-
-    if (currentDeliveries.length === 0) {
-      toast({
-        title: "Sin Datos",
-        description: "No hay datos para exportar a CSV.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const headers = "Proveedor,Fecha,Cantidad\n";
-    const csvRows = currentDeliveries.map((d: Delivery) =>
-      `"${d.providerName.replace(/"/g, '""')}","${d.date}",${d.quantity}`
-    );
-    const csvContent = headers + csvRows.join("\n");
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement("a");
-
-    if (link.download !== undefined) {
-      const url = URL.createObjectURL(blob);
-      link.setAttribute("href", url);
-      link.setAttribute("download", "entregas_suministros.csv");
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      toast({
-        title: "Exportación CSV Exitosa",
-        description: "Las entregas se han exportado a CSV.",
-      });
-    } else {
-       toast({
-        title: "Exportación CSV Fallida",
-        description: "Tu navegador no soporta descargas directas.",
-        variant: "destructive",
-      });
-    }
-  };
-
-
   const handleCardClick = (cardTitle: string) => {
     if (cardTitle === "Proveedores") {
       router.push('/dashboard/providers');
@@ -75,8 +27,8 @@ export default function DashboardPage() {
       router.push('/dashboard/registry');
     } else if (cardTitle === "Historial") {
       router.push('/dashboard/history');
-    } else if (cardTitle === "Exportar") {
-      router.push('/dashboard/export');
+    } else if (cardTitle === "Ventas y Clientes") {
+      router.push('/dashboard/sales-clients');
     }
   };
 
@@ -85,10 +37,10 @@ export default function DashboardPage() {
       <div className="min-h-screen flex flex-col p-4 md:p-8 space-y-6 bg-background">
         <Skeleton className="h-20 w-full rounded-lg" /> {/* Header Placeholder */}
         <main className="flex-grow grid grid-cols-2 gap-6 md:gap-8 p-4 md:p-8 items-center">
-            <Skeleton className="w-full rounded-lg aspect-square" />
-            <Skeleton className="w-full rounded-lg aspect-square" />
-            <Skeleton className="w-full rounded-lg aspect-square" />
-            <Skeleton className="w-full rounded-lg aspect-square" />
+            <Skeleton className="w-full rounded-lg h-40 sm:h-auto sm:aspect-square" />
+            <Skeleton className="w-full rounded-lg h-40 sm:h-auto sm:aspect-square" />
+            <Skeleton className="w-full rounded-lg h-40 sm:h-auto sm:aspect-square" />
+            <Skeleton className="w-full rounded-lg h-40 sm:h-auto sm:aspect-square" />
         </main>
         <footer className="text-center text-sm text-muted-foreground py-4 mt-auto">
             <Skeleton className="h-6 w-1/2 mx-auto rounded-md" />
@@ -100,13 +52,13 @@ export default function DashboardPage() {
   const cardItems = [
     { title: "Registro", icon: ClipboardPenLine, action: () => handleCardClick("Registro") },
     { title: "Proveedores", icon: Users, action: () => handleCardClick("Proveedores") },
-    { title: "Exportar", icon: Download, action: () => handleCardClick("Exportar") },
+    { title: "Ventas y Clientes", icon: ShoppingCart, action: () => handleCardClick("Ventas y Clientes") },
     { title: "Historial", icon: HistoryIcon, action: () => handleCardClick("Historial") },
   ];
 
   return (
     <div className="min-h-screen flex flex-col p-4 md:p-8 space-y-6 bg-background">
-      <DashboardHeader onExportCSV={exportToCSVForHeader} />
+      <DashboardHeader />
       <main className="flex-grow grid grid-cols-2 gap-6 md:gap-8 p-4 md:p-8 items-center">
         {cardItems.map((item) => {
           const IconComponent = item.icon;
