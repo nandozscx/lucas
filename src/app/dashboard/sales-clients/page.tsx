@@ -864,19 +864,43 @@ const ConsolidatedDebtDialog = ({ isOpen, onClose, client, sales, toast }: { isO
   if (!isOpen) return null;
 
   const transactions = React.useMemo(() => {
-    const allTransactions = sales.flatMap(sale => ([
-      { date: sale.date, description: `Venta (${sale.quantity} ${sale.unit})`, debit: sale.totalAmount, credit: 0 },
-      ...sale.payments.map(p => ({ date: p.date, description: 'Abono', debit: 0, credit: p.amount }))
-    ])).sort((a, b) => {
+    const allTransactions = sales.flatMap(sale => {
+      // Find the initial payment made on the same day as the sale.
+      const initialPaymentAmount = sale.payments
+        .filter(p => p.date === sale.date)
+        .reduce((sum, p) => sum + p.amount, 0);
+
+      // Create the main sale transaction, including the initial payment as a credit.
+      const saleTransaction = {
+        date: sale.date,
+        description: `Venta (${sale.quantity} ${sale.unit})`,
+        debit: sale.totalAmount,
+        credit: initialPaymentAmount,
+      };
+      
+      // Get all subsequent payments (those made on a different day).
+      const subsequentPayments = sale.payments
+        .filter(p => p.date !== sale.date)
+        .map(p => ({
+          date: p.date,
+          description: 'Abono',
+          debit: 0,
+          credit: p.amount,
+        }));
+        
+      return [saleTransaction, ...subsequentPayments];
+    });
+
+    const sortedTransactions = allTransactions.sort((a, b) => {
         const dateA = parseISO(a.date).getTime();
         const dateB = parseISO(b.date).getTime();
         if (dateA !== dateB) return dateA - dateB;
-        // If dates are same, sales (debit) should come before payments (credit)
+        // If dates are same, sale (debit > 0) should come before payment (debit === 0).
         return b.debit - a.debit;
     });
 
     let runningBalance = 0;
-    return allTransactions.map(t => {
+    return sortedTransactions.map(t => {
       runningBalance += t.debit - t.credit;
       return { ...t, balance: runningBalance };
     });
