@@ -4,13 +4,11 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import DashboardHeader from '@/components/dashboard-header';
-import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card } from "@/components/ui/card";
 import { ClipboardPenLine, Users, ShoppingCart, HistoryIcon } from 'lucide-react';
 
 export default function DashboardPage() {
-  const { toast } = useToast();
   const [isClient, setIsClient] = useState(false);
   const [currentYear, setCurrentYear] = useState('');
   const router = useRouter();
