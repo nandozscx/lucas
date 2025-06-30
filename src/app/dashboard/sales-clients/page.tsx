@@ -65,7 +65,7 @@ import type { Client, Sale, Payment } from '@/types';
 import type jsPDF from 'jspdf';
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PlusCircle, Edit2, Trash2, Users, ArrowLeft, Info, ShoppingCart, DollarSign, CalendarIcon, Package, Box, Download, HandCoins, Library } from 'lucide-react';
+import { PlusCircle, Edit2, Trash2, Users, ArrowLeft, Info, ShoppingCart, DollarSign, CalendarIcon, Package, Box, Download, HandCoins, Library, Landmark } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 
@@ -299,9 +299,11 @@ export default function SalesClientsPage() {
   const [saleToDelete, setSaleToDelete] = useState<Sale | null>(null);
   const [saleForPayment, setSaleForPayment] = useState<Sale | null>(null);
   const [isConsolidatedDialogOpen, setIsConsolidatedDialogOpen] = useState(false);
+  const [isDebtPaymentDialogOpen, setIsDebtPaymentDialogOpen] = useState(false);
   const { toast } = useToast();
   const [currentYear, setCurrentYear] = useState('');
   const [selectedClientIdForHistory, setSelectedClientIdForHistory] = useState<string | null>(null);
+  const [selectedClientIdForDebts, setSelectedClientIdForDebts] = useState<string | null>(null);
 
   // Load data from localStorage
   useEffect(() => {
@@ -532,6 +534,57 @@ export default function SalesClientsPage() {
     });
   };
 
+  // Debt Tab Logic
+  const clientDebts = React.useMemo(() => {
+    if (!selectedClientIdForDebts) return [];
+    return sales
+      .filter(s => {
+        const totalPaid = s.payments.reduce((sum, p) => sum + p.amount, 0);
+        return s.clientId === selectedClientIdForDebts && s.totalAmount > totalPaid;
+      })
+      .sort((a, b) => parseISO(a.date).getTime() - parseISO(b.date).getTime());
+  }, [sales, selectedClientIdForDebts]);
+
+  const totalClientDebt = React.useMemo(() => {
+    return clientDebts.reduce((total, sale) => {
+      const totalPaid = sale.payments.reduce((sum, p) => sum + p.amount, 0);
+      return total + (sale.totalAmount - totalPaid);
+    }, 0);
+  }, [clientDebts]);
+
+  const handleTotalDebtPayment = (amountPaid: number) => {
+    if (!selectedClientIdForDebts) return;
+  
+    let remainingAmountToPay = amountPaid;
+    const today = format(new Date(), "yyyy-MM-dd");
+  
+    const updatedSales = [...sales];
+  
+    for (const debt of clientDebts) {
+      if (remainingAmountToPay <= 0) break;
+  
+      const saleInState = updatedSales.find(s => s.id === debt.id);
+      if (!saleInState) continue;
+  
+      const totalPaid = saleInState.payments.reduce((sum, p) => sum + p.amount, 0);
+      const balance = saleInState.totalAmount - totalPaid;
+      const paymentForThisSale = Math.min(remainingAmountToPay, balance);
+  
+      if (paymentForThisSale > 0) {
+        saleInState.payments.push({ date: today, amount: paymentForThisSale });
+        remainingAmountToPay -= paymentForThisSale;
+      }
+    }
+  
+    setSales(updatedSales);
+    toast({
+      title: "Abono Registrado",
+      description: `Se abonó ${amountPaid.toLocaleString('en-US', { style: 'currency', currency: 'USD' })} a la deuda total.`
+    });
+    setIsDebtPaymentDialogOpen(false);
+  };
+
+
   if (!isClient) {
     return (
       <div className="min-h-screen flex flex-col p-4 md:p-8 bg-background">
@@ -573,16 +626,24 @@ export default function SalesClientsPage() {
 
       <main className="flex-grow">
         <Tabs defaultValue="sales" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="sales">Ventas</TabsTrigger>
                 <TabsTrigger value="clients">Clientes</TabsTrigger>
+                <TabsTrigger value="debts">Deudas</TabsTrigger>
             </TabsList>
             
             {/* Sales Tab */}
             <TabsContent value="sales" className="mt-6">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
                     <div className="md:col-span-1">
-                        <SaleForm onSubmitSale={handleAddSale} clients={clients} onClientChange={setSelectedClientIdForHistory} />
+                        <SaleForm 
+                          onSubmitSale={handleAddSale} 
+                          clients={clients} 
+                          onClientChange={(clientId) => {
+                            setSelectedClientIdForHistory(clientId);
+                            setSelectedClientIdForDebts(clientId);
+                          }} 
+                        />
                     </div>
                     <div className="md:col-span-2">
                         <Card className="shadow-lg rounded-lg">
@@ -625,10 +686,10 @@ export default function SalesClientsPage() {
                                                     <TableRow key={sale.id}>
                                                       <TableCell>{format(parseISO(sale.date), "PPP", { locale: es })}</TableCell>
                                                       <TableCell>{`${sale.quantity} ${sale.unit}`}</TableCell>
-                                                      <TableCell className="text-right">{sale.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
-                                                      <TableCell className="text-right">{sale.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
-                                                      <TableCell className="text-right">{totalPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
-                                                      <TableCell className={`text-right font-medium ${balance > 0 ? 'text-destructive' : ''}`}>{balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                                                      <TableCell className="text-right">{sale.price.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</TableCell>
+                                                      <TableCell className="text-right">{sale.totalAmount.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</TableCell>
+                                                      <TableCell className="text-right">{totalPaid.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</TableCell>
+                                                      <TableCell className={`text-right font-medium ${balance > 0 ? 'text-destructive' : ''}`}>{balance.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</TableCell>
                                                       <TableCell className="text-center">
                                                           <Button
                                                               variant="ghost"
@@ -656,7 +717,7 @@ export default function SalesClientsPage() {
                                                 <TableRow>
                                                     <TableCell colSpan={5} className="text-right font-bold text-lg">Deuda Total:</TableCell>
                                                     <TableCell className="text-right font-bold text-lg text-destructive">
-                                                        {totalDebtForSelectedClient.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                        {totalDebtForSelectedClient.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
                                                     </TableCell>
                                                     <TableCell></TableCell>
                                                 </TableRow>
@@ -710,7 +771,7 @@ export default function SalesClientsPage() {
                                 {clients.map((client) => (
                                   <TableRow key={client.id}>
                                     <TableCell className="font-medium py-3 pl-4">{client.name}</TableCell>
-                                    <TableCell className="py-3">{client.address}</TableCell>
+                                    <TableCell className="py-3 whitespace-nowrap">{client.address}</TableCell>
                                     <TableCell className="py-3">{client.phone}</TableCell>
                                     <TableCell className="text-right py-3 pr-4">
                                       <Button variant="ghost" size="icon" onClick={() => handleOpenEditDialog(client)} aria-label={`Editar ${client.name}`}>
@@ -730,6 +791,80 @@ export default function SalesClientsPage() {
                     </CardContent>
                 </Card>
             </TabsContent>
+
+            {/* Debts Tab */}
+            <TabsContent value="debts" className="mt-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Gestión de Deudas de Clientes</CardTitle>
+                  <CardDescription>Seleccione un cliente para ver y gestionar sus deudas pendientes.</CardDescription>
+                  <div className="pt-4">
+                    <Select onValueChange={setSelectedClientIdForDebts} value={selectedClientIdForDebts ?? ''}>
+                      <SelectTrigger className="w-full sm:w-1/2">
+                        <SelectValue placeholder="Seleccione un cliente..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {clients.map(client => (
+                          <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {!selectedClientIdForDebts ? (
+                    <EmptyState message="Seleccione un cliente para ver su estado de deuda." icon={Users} />
+                  ) : clientDebts.length === 0 ? (
+                    <EmptyState message="Este cliente no tiene deudas pendientes." icon={HandCoins} />
+                  ) : (
+                    <ScrollArea className="h-full max-h-[500px] rounded-md border whitespace-nowrap">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Fecha Venta</TableHead>
+                            <TableHead>Descripción</TableHead>
+                            <TableHead className="text-right">Monto Total</TableHead>
+                            <TableHead className="text-right">Total Pagado</TableHead>
+                            <TableHead className="text-right">Saldo</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {clientDebts.map(sale => {
+                            const totalPaid = sale.payments.reduce((sum, p) => sum + p.amount, 0);
+                            const balance = sale.totalAmount - totalPaid;
+                            return (
+                              <TableRow key={sale.id}>
+                                <TableCell>{format(parseISO(sale.date), 'PPP', { locale: es })}</TableCell>
+                                <TableCell>{`Venta de ${sale.quantity} ${sale.unit}`}</TableCell>
+                                <TableCell className="text-right">{sale.totalAmount.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</TableCell>
+                                <TableCell className="text-right">{totalPaid.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</TableCell>
+                                <TableCell className="text-right font-medium text-destructive">{balance.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                        <TableFooter>
+                          <TableRow>
+                            <TableCell colSpan={4} className="text-right font-bold text-lg">Deuda Total Pendiente:</TableCell>
+                            <TableCell className="text-right font-bold text-lg text-destructive">
+                              {totalClientDebt.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
+                            </TableCell>
+                          </TableRow>
+                        </TableFooter>
+                      </Table>
+                      <ScrollBar orientation="horizontal" />
+                    </ScrollArea>
+                  )}
+                </CardContent>
+                {clientDebts.length > 0 && (
+                  <CardFooter className="justify-end border-t pt-6">
+                    <Button onClick={() => setIsDebtPaymentDialogOpen(true)}>
+                      <Landmark className="mr-2 h-4 w-4"/> Registrar Abono a la Deuda Total
+                    </Button>
+                  </CardFooter>
+                )}
+              </Card>
+            </TabsContent>
         </Tabs>
       </main>
 
@@ -742,6 +877,17 @@ export default function SalesClientsPage() {
         />
       )}
       
+      {/* Debt Payment Dialog */}
+      {selectedClientIdForDebts && (
+        <DebtPaymentDialog
+          isOpen={isDebtPaymentDialogOpen}
+          onClose={() => setIsDebtPaymentDialogOpen(false)}
+          onSubmit={handleTotalDebtPayment}
+          totalDebt={totalClientDebt}
+          clientName={clients.find(c => c.id === selectedClientIdForDebts)?.name || ''}
+        />
+      )}
+
       {/* Consolidated Debt Dialog */}
       {selectedClientIdForHistory && (
         <ConsolidatedDebtDialog
@@ -899,6 +1045,71 @@ const PaymentDialog = ({ sale, onClose, onSubmit }: { sale: Sale, onClose: () =>
 };
 
 
+// Debt Payment Dialog Component
+const DebtPaymentDialog = ({ isOpen, onClose, onSubmit, totalDebt, clientName }: { isOpen: boolean, onClose: () => void, onSubmit: (amount: number) => void, totalDebt: number, clientName: string }) => {
+  const debtPaymentFormSchema = z.object({
+    amount: z.coerce
+      .number({ invalid_type_error: "El monto debe ser un número." })
+      .positive({ message: "El monto debe ser un número positivo." })
+      .max(totalDebt, { message: `El pago no puede exceder la deuda total de ${totalDebt.toLocaleString()}` })
+  });
+
+  type DebtPaymentFormData = z.infer<typeof debtPaymentFormSchema>;
+
+  const form = useForm<DebtPaymentFormData>({
+    resolver: zodResolver(debtPaymentFormSchema),
+    defaultValues: { amount: undefined },
+  });
+  
+  useEffect(() => {
+    if (!isOpen) {
+      form.reset();
+    }
+  }, [isOpen, form]);
+
+  const handleFormSubmit = (data: DebtPaymentFormData) => {
+    onSubmit(data.amount);
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Registrar Abono a Deuda Total</DialogTitle>
+          <DialogDescription>
+            Abono para {clientName}. El pago se aplicará a las deudas más antiguas primero.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="text-sm">
+          <p><strong>Deuda Total Pendiente:</strong> <span className="font-bold text-destructive">{totalDebt.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</span></p>
+        </div>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="amount"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Monto a Abonar</FormLabel>
+                  <FormControl>
+                    <Input type="number" placeholder="Ingrese el monto del abono" {...field} value={field.value ?? ''} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
+              <Button type="submit">Guardar Abono</Button>
+            </DialogFooter>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+
 // Consolidated Debt Dialog Component
 const ConsolidatedDebtDialog = ({ isOpen, onClose, client, sales, toast }: { isOpen: boolean, onClose: () => void, client: Client, sales: Sale[], toast: any }) => {
   const [dateRange, setDateRange] = React.useState('all');
@@ -1004,15 +1215,15 @@ const ConsolidatedDebtDialog = ({ isOpen, onClose, client, sales, toast }: { isO
                 t.description,
                 '',
                 '',
-                t.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+                t.balance.toLocaleString('en-US', { style: 'currency', currency: 'USD' }),
             ];
         }
         return [
             format(parseISO(t.date), "PPP", { locale: es }),
             t.description,
-            t.debit > 0 ? t.debit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-',
-            t.credit > 0 ? t.credit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-',
-            t.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+            t.debit > 0 ? t.debit.toLocaleString('en-US', { style: 'currency', currency: 'USD' }) : '-',
+            t.credit > 0 ? t.credit.toLocaleString('en-US', { style: 'currency', currency: 'USD' }) : '-',
+            t.balance.toLocaleString('en-US', { style: 'currency', currency: 'USD' })
         ]
     });
 
@@ -1023,7 +1234,7 @@ const ConsolidatedDebtDialog = ({ isOpen, onClose, client, sales, toast }: { isO
       body: tableBody,
       startY: 28,
       foot: [
-        ['', '', '', 'Saldo Final:', finalBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })]
+        ['', '', '', 'Saldo Final:', finalBalance.toLocaleString('en-US', { style: 'currency', currency: 'USD' })]
       ],
       footStyles: { fontStyle: 'bold', halign: 'right' },
        columnStyles: {
@@ -1081,9 +1292,9 @@ const ConsolidatedDebtDialog = ({ isOpen, onClose, client, sales, toast }: { isO
                  <TableRow key={index} className={cn(t.isOpeningBalance && "bg-muted/50 font-semibold")}>
                     <TableCell>{format(parseISO(t.date), "PPP", { locale: es })}</TableCell>
                     <TableCell>{t.description}</TableCell>
-                    <TableCell className="text-right font-mono">{!t.isOpeningBalance && t.debit > 0 ? t.debit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
-                    <TableCell className="text-right font-mono text-green-500">{!t.isOpeningBalance && t.credit > 0 ? t.credit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
-                    <TableCell className="text-right font-mono font-medium">{t.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                    <TableCell className="text-right font-mono">{!t.isOpeningBalance && t.debit > 0 ? t.debit.toLocaleString('en-US', { style: 'currency', currency: 'USD' }) : '-'}</TableCell>
+                    <TableCell className="text-right font-mono text-green-500">{!t.isOpeningBalance && t.credit > 0 ? t.credit.toLocaleString('en-US', { style: 'currency', currency: 'USD' }) : '-'}</TableCell>
+                    <TableCell className="text-right font-mono font-medium">{t.balance.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</TableCell>
                  </TableRow>
               )) : (
                 <TableRow>
@@ -1105,3 +1316,4 @@ const ConsolidatedDebtDialog = ({ isOpen, onClose, client, sales, toast }: { isO
     </Dialog>
   );
 };
+
