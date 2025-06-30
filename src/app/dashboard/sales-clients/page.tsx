@@ -54,6 +54,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Badge } from "@/components/ui/badge";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -536,23 +537,21 @@ export default function SalesClientsPage() {
   };
 
   // Debt Tab Logic
-  const clientDebts = React.useMemo(() => {
+  const salesForDebtsTab = React.useMemo(() => {
     if (!selectedClientIdForDebts) return [];
     return sales
-      .filter(s => {
-        const totalPaid = s.payments.reduce((sum, p) => sum + p.amount, 0);
-        return s.clientId === selectedClientIdForDebts && s.totalAmount > totalPaid;
-      })
+      .filter(s => s.clientId === selectedClientIdForDebts)
       .sort((a, b) => parseISO(a.date).getTime() - parseISO(b.date).getTime());
   }, [sales, selectedClientIdForDebts]);
 
   const totalClientDebt = React.useMemo(() => {
-    return clientDebts.reduce((total, sale) => {
+    return salesForDebtsTab.reduce((total, sale) => {
       const totalPaid = sale.payments.reduce((sum, p) => sum + p.amount, 0);
-      return total + (sale.totalAmount - totalPaid);
+      const balance = sale.totalAmount - totalPaid;
+      return total + (balance > 0 ? balance : 0);
     }, 0);
-  }, [clientDebts]);
-
+  }, [salesForDebtsTab]);
+  
   const handleTotalDebtPayment = (amountPaid: number) => {
     if (!selectedClientIdForDebts) return;
   
@@ -560,8 +559,15 @@ export default function SalesClientsPage() {
     const today = format(new Date(), "yyyy-MM-dd");
   
     const updatedSales = [...sales];
+    
+    const debtsToPay = salesForDebtsTab
+      .filter(s => {
+        const totalPaid = s.payments.reduce((sum, p) => sum + p.amount, 0);
+        return s.totalAmount > totalPaid;
+      })
+      .sort((a, b) => parseISO(a.date).getTime() - parseISO(b.date).getTime());
   
-    for (const debt of clientDebts) {
+    for (const debt of debtsToPay) {
       if (remainingAmountToPay <= 0) break;
   
       const saleInState = updatedSales.find(s => s.id === debt.id);
@@ -847,8 +853,8 @@ export default function SalesClientsPage() {
                 <CardContent>
                   {!selectedClientIdForDebts ? (
                     <EmptyState message="Seleccione un cliente para ver su estado de deuda." icon={Users} />
-                  ) : clientDebts.length === 0 ? (
-                    <EmptyState message="Este cliente no tiene deudas pendientes." icon={HandCoins} />
+                  ) : salesForDebtsTab.length === 0 ? (
+                    <EmptyState message="Este cliente no tiene un historial de ventas." icon={ShoppingCart}/>
                   ) : (
                     <ScrollArea className="h-full max-h-[500px] rounded-md border whitespace-nowrap">
                       <Table>
@@ -859,26 +865,33 @@ export default function SalesClientsPage() {
                             <TableHead className="text-right">Monto Total</TableHead>
                             <TableHead className="text-right">Total Pagado</TableHead>
                             <TableHead className="text-right">Saldo</TableHead>
+                            <TableHead className="text-center">Estado</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {clientDebts.map(sale => {
+                          {salesForDebtsTab.map(sale => {
                             const totalPaid = sale.payments.reduce((sum, p) => sum + p.amount, 0);
                             const balance = sale.totalAmount - totalPaid;
+                            const isPaid = balance <= 0;
                             return (
-                              <TableRow key={sale.id}>
+                              <TableRow key={sale.id} className={cn(isPaid && "text-muted-foreground")}>
                                 <TableCell>{format(parseISO(sale.date), 'PPP', { locale: es })}</TableCell>
                                 <TableCell>{`Venta de ${sale.quantity} ${sale.unit}`}</TableCell>
                                 <TableCell className="text-right">{sale.totalAmount.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</TableCell>
                                 <TableCell className="text-right">{totalPaid.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</TableCell>
-                                <TableCell className="text-right font-medium text-destructive">{balance.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</TableCell>
+                                <TableCell className={cn("text-right font-medium", !isPaid && "text-destructive")}>{balance.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</TableCell>
+                                <TableCell className="text-center">
+                                    <Badge variant={isPaid ? "secondary" : "destructive"}>
+                                        {isPaid ? "Pagada" : "Pendiente"}
+                                    </Badge>
+                                </TableCell>
                               </TableRow>
                             );
                           })}
                         </TableBody>
                         <TableFooter>
                           <TableRow>
-                            <TableCell colSpan={4} className="text-right font-bold text-lg">Deuda Total Pendiente:</TableCell>
+                            <TableCell colSpan={5} className="text-right font-bold text-lg">Deuda Total Pendiente:</TableCell>
                             <TableCell className="text-right font-bold text-lg text-destructive">
                               {totalClientDebt.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
                             </TableCell>
@@ -889,7 +902,7 @@ export default function SalesClientsPage() {
                     </ScrollArea>
                   )}
                 </CardContent>
-                {clientDebts.length > 0 && (
+                {totalClientDebt > 0 && (
                   <CardFooter className="justify-end border-t pt-6 gap-2">
                     <Button variant="destructive" onClick={() => setIsCancelAccountDialogOpen(true)}>
                       <Ban className="mr-2 h-4 w-4"/> Cancelar Cuentas
@@ -1318,11 +1331,7 @@ const ConsolidatedDebtDialog = ({ isOpen, onClose, client, sales, toast }: { isO
 
   }, [sales, dateRange]);
   
-  if (!isOpen) {
-    return null;
-  }
-
-  const exportConsolidatedToPDF = async () => {
+  const handleExportConsolidatedToPDF = React.useCallback(async () => {
     const { default: jsPDFConstructor } = await import('jspdf');
     await import('jspdf-autotable');
 
@@ -1375,7 +1384,9 @@ const ConsolidatedDebtDialog = ({ isOpen, onClose, client, sales, toast }: { isO
       title: "Exportación PDF Exitosa",
       description: "El estado de cuenta consolidado se ha exportado a PDF.",
     });
-  };
+  }, [client, transactions, toast]);
+
+  if (!isOpen) return null;
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -1432,7 +1443,7 @@ const ConsolidatedDebtDialog = ({ isOpen, onClose, client, sales, toast }: { isO
           <ScrollBar orientation="horizontal" />
         </ScrollArea>
         <DialogFooter className="pt-4">
-           <Button onClick={exportConsolidatedToPDF} variant="outline" disabled={transactions.length === 0}>
+           <Button onClick={handleExportConsolidatedToPDF} variant="outline" disabled={transactions.length === 0}>
               <Download className="mr-2 h-4 w-4" />
               Exportar a PDF
             </Button>
