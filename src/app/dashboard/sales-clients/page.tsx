@@ -65,7 +65,7 @@ import type { Client, Sale, Payment } from '@/types';
 import type jsPDF from 'jspdf';
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PlusCircle, Edit2, Trash2, Users, ArrowLeft, Info, ShoppingCart, DollarSign, CalendarIcon, Package, Box, Download, HandCoins, Library, Landmark } from 'lucide-react';
+import { PlusCircle, Edit2, Trash2, Users, ArrowLeft, Info, ShoppingCart, DollarSign, CalendarIcon, Package, Box, Download, HandCoins, Library, Landmark, Ban } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 
@@ -300,6 +300,7 @@ export default function SalesClientsPage() {
   const [saleForPayment, setSaleForPayment] = useState<Sale | null>(null);
   const [isConsolidatedDialogOpen, setIsConsolidatedDialogOpen] = useState(false);
   const [isDebtPaymentDialogOpen, setIsDebtPaymentDialogOpen] = useState(false);
+  const [isCancelAccountDialogOpen, setIsCancelAccountDialogOpen] = useState(false);
   const { toast } = useToast();
   const [currentYear, setCurrentYear] = useState('');
   const [selectedClientIdForHistory, setSelectedClientIdForHistory] = useState<string | null>(null);
@@ -583,6 +584,38 @@ export default function SalesClientsPage() {
     });
     setIsDebtPaymentDialogOpen(false);
   };
+  
+  const handleCancelAccount = (cutoffDate: Date) => {
+    if (!selectedClientIdForDebts) return;
+
+    const updatedSales = sales.map(sale => {
+      // Check if the sale belongs to the selected client and is on or before the cutoff date
+      if (sale.clientId === selectedClientIdForDebts && parseISO(sale.date) <= cutoffDate) {
+        const totalPaid = sale.payments.reduce((sum, p) => sum + p.amount, 0);
+        const balance = sale.totalAmount - totalPaid;
+
+        if (balance > 0) {
+          // Add a new payment to clear the balance
+          const newPayment: Payment = {
+            date: format(cutoffDate, "yyyy-MM-dd"), // Use cutoff date for payment
+            amount: balance,
+          };
+          return {
+            ...sale,
+            payments: [...sale.payments, newPayment],
+          };
+        }
+      }
+      return sale; // Return sale unchanged if conditions are not met
+    });
+
+    setSales(updatedSales);
+    toast({
+      title: "Cuentas Saldadas",
+      description: `Todas las deudas para ${clients.find(c => c.id === selectedClientIdForDebts)?.name} hasta el ${format(cutoffDate, "PPP", { locale: es })} han sido marcadas como pagadas.`
+    });
+    setIsCancelAccountDialogOpen(false);
+  };
 
 
   if (!isClient) {
@@ -857,9 +890,12 @@ export default function SalesClientsPage() {
                   )}
                 </CardContent>
                 {clientDebts.length > 0 && (
-                  <CardFooter className="justify-end border-t pt-6">
+                  <CardFooter className="justify-end border-t pt-6 gap-2">
+                    <Button variant="destructive" onClick={() => setIsCancelAccountDialogOpen(true)}>
+                      <Ban className="mr-2 h-4 w-4"/> Cancelar Cuentas
+                    </Button>
                     <Button onClick={() => setIsDebtPaymentDialogOpen(true)}>
-                      <Landmark className="mr-2 h-4 w-4"/> Registrar Abono a la Deuda Total
+                      <Landmark className="mr-2 h-4 w-4"/> Registrar Abono
                     </Button>
                   </CardFooter>
                 )}
@@ -884,6 +920,16 @@ export default function SalesClientsPage() {
           onClose={() => setIsDebtPaymentDialogOpen(false)}
           onSubmit={handleTotalDebtPayment}
           totalDebt={totalClientDebt}
+          clientName={clients.find(c => c.id === selectedClientIdForDebts)?.name || ''}
+        />
+      )}
+      
+      {/* Cancel Account Dialog */}
+      {selectedClientIdForDebts && (
+        <CancelAccountDialog
+          isOpen={isCancelAccountDialogOpen}
+          onClose={() => setIsCancelAccountDialogOpen(false)}
+          onSubmit={handleCancelAccount}
           clientName={clients.find(c => c.id === selectedClientIdForDebts)?.name || ''}
         />
       )}
@@ -1109,6 +1155,84 @@ const DebtPaymentDialog = ({ isOpen, onClose, onSubmit, totalDebt, clientName }:
   );
 };
 
+// Cancel Account Dialog Component
+const CancelAccountDialog = ({ isOpen, onClose, onSubmit, clientName }: { isOpen: boolean, onClose: () => void, onSubmit: (date: Date) => void, clientName: string }) => {
+  const cancelFormSchema = z.object({
+    cutoffDate: z.date({ required_error: "Debe seleccionar una fecha de corte." }),
+  });
+
+  type CancelFormData = z.infer<typeof cancelFormSchema>;
+
+  const form = useForm<CancelFormData>({
+    resolver: zodResolver(cancelFormSchema),
+    defaultValues: { cutoffDate: new Date() },
+  });
+
+  useEffect(() => {
+    if (!isOpen) {
+      form.reset({ cutoffDate: new Date() });
+    }
+  }, [isOpen, form]);
+
+  const handleFormSubmit = (data: CancelFormData) => {
+    onSubmit(data.cutoffDate);
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Cancelar Cuentas Pendientes</DialogTitle>
+          <DialogDescription>
+            Esta acción marcará como pagadas todas las deudas pendientes para <strong>{clientName}</strong> hasta la fecha que selecciones. Esta acción no se puede deshacer.
+          </DialogDescription>
+        </DialogHeader>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-4 pt-4">
+            <FormField
+              control={form.control}
+              name="cutoffDate"
+              render={({ field }) => (
+                <FormItem className="flex flex-col">
+                  <FormLabel>Cancelar todas las deudas hasta:</FormLabel>
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <FormControl>
+                                <Button
+                                    variant={"outline"}
+                                    className={cn("w-full pl-3 text-left font-normal justify-start", !field.value && "text-muted-foreground")}
+                                >
+                                    {field.value ? format(field.value, "PPP", { locale: es }) : <span>Seleccione una fecha</span>}
+                                    <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                </Button>
+                            </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                                mode="single"
+                                selected={field.value}
+                                onSelect={field.onChange}
+                                disabled={(date) => date > new Date()}
+                                initialFocus
+                                locale={es}
+                            />
+                        </PopoverContent>
+                    </Popover>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
+              <Button type="submit" variant="destructive">Confirmar y Saldar Cuentas</Button>
+            </DialogFooter>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
 
 // Consolidated Debt Dialog Component
 const ConsolidatedDebtDialog = ({ isOpen, onClose, client, sales, toast }: { isOpen: boolean, onClose: () => void, client: Client, sales: Sale[], toast: any }) => {
@@ -1193,8 +1317,10 @@ const ConsolidatedDebtDialog = ({ isOpen, onClose, client, sales, toast }: { isO
     return [];
 
   }, [sales, dateRange]);
-
-  if (!isOpen) return null;
+  
+  if (!isOpen) {
+    return null;
+  }
 
   const exportConsolidatedToPDF = async () => {
     const { default: jsPDFConstructor } = await import('jspdf');
