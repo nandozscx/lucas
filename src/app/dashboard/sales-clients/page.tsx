@@ -55,6 +55,8 @@ import {
 } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -306,6 +308,7 @@ export default function SalesClientsPage() {
   const [currentYear, setCurrentYear] = useState('');
   const [selectedClientIdForHistory, setSelectedClientIdForHistory] = useState<string | null>(null);
   const [selectedClientIdForDebts, setSelectedClientIdForDebts] = useState<string | null>(null);
+  const [showPaidSales, setShowPaidSales] = useState(false);
 
   // Load data from localStorage
   useEffect(() => {
@@ -447,15 +450,27 @@ export default function SalesClientsPage() {
   
   const allSortedSales = [...sales].sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime());
 
-  const salesForSelectedClient = selectedClientIdForHistory
-    ? allSortedSales.filter(sale => sale.clientId === selectedClientIdForHistory)
-    : [];
+  const allSalesForSelectedClient = React.useMemo(() => {
+    if (!selectedClientIdForHistory) return [];
+    return allSortedSales.filter(sale => sale.clientId === selectedClientIdForHistory);
+  }, [selectedClientIdForHistory, allSortedSales]);
+
+  const salesForSelectedClient = React.useMemo(() => {
+    if (showPaidSales) {
+        return allSalesForSelectedClient;
+    }
+    return allSalesForSelectedClient.filter(sale => {
+        const totalPaid = sale.payments.reduce((sum, p) => sum + p.amount, 0);
+        const balance = sale.totalAmount - totalPaid;
+        return balance > 0;
+    });
+  }, [allSalesForSelectedClient, showPaidSales]);
     
-  const totalDebtForSelectedClient = salesForSelectedClient.reduce((total, sale) => {
+  const totalDebtForSelectedClient = React.useMemo(() => allSalesForSelectedClient.reduce((total, sale) => {
     const totalPaid = sale.payments.reduce((sum, p) => sum + p.amount, 0);
     const balance = sale.totalAmount - totalPaid;
-    return total + balance;
-  }, 0);
+    return total + (balance > 0 ? balance : 0);
+  }, 0), [allSalesForSelectedClient]);
 
   const handlePaymentSubmit = (data: { amount: number }) => {
     if (!saleForPayment) return;
@@ -488,7 +503,7 @@ export default function SalesClientsPage() {
     if (salesForSelectedClient.length === 0) {
       toast({
         title: "Sin Datos",
-        description: "El cliente seleccionado no tiene ventas para exportar.",
+        description: "No hay ventas en la vista actual para exportar.",
         variant: "destructive",
       });
       return;
@@ -687,22 +702,38 @@ export default function SalesClientsPage() {
                     <div className="md:col-span-2">
                         <Card className="shadow-lg rounded-lg">
                             <CardHeader>
-                                <CardTitle>Historial de Ventas</CardTitle>
-                                {selectedClientIdForHistory ? (
-                                    <CardDescription>
-                                        Mostrando ventas para: {clients.find(c => c.id === selectedClientIdForHistory)?.name || 'Cliente desconocido'}
-                                    </CardDescription>
-                                ) : (
-                                    <CardDescription>
-                                        Seleccione un cliente para ver su historial.
-                                    </CardDescription>
-                                )}
+                                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
+                                  <div>
+                                      <CardTitle>Historial de Ventas</CardTitle>
+                                      {selectedClientIdForHistory ? (
+                                          <CardDescription>
+                                              Mostrando ventas para: {clients.find(c => c.id === selectedClientIdForHistory)?.name || 'Cliente desconocido'}
+                                          </CardDescription>
+                                      ) : (
+                                          <CardDescription>
+                                              Seleccione un cliente para ver su historial.
+                                          </CardDescription>
+                                      )}
+                                  </div>
+                                  {selectedClientIdForHistory && (
+                                      <div className="flex items-center space-x-2 self-end sm:self-center">
+                                          <Checkbox
+                                              id="show-paid"
+                                              checked={showPaidSales}
+                                              onCheckedChange={(checked) => setShowPaidSales(Boolean(checked))}
+                                          />
+                                          <Label htmlFor="show-paid" className="text-sm font-medium leading-none whitespace-nowrap">
+                                              Mostrar Pagadas
+                                          </Label>
+                                      </div>
+                                  )}
+                                </div>
                             </CardHeader>
                             <CardContent>
                                 {!selectedClientIdForHistory ? (
                                     <EmptyState message="Seleccione un cliente en el formulario para ver sus ventas." icon={Users} />
                                 ) : salesForSelectedClient.length === 0 ? (
-                                    <EmptyState message="Este cliente aún no tiene ventas registradas." icon={ShoppingCart}/>
+                                    <EmptyState message={showPaidSales ? "Este cliente aún no tiene ventas registradas." : "Este cliente no tiene deudas pendientes."} icon={ShoppingCart}/>
                                 ) : (
                                     <ScrollArea className="h-[440px] rounded-md border whitespace-nowrap">
                                         <Table>
@@ -766,7 +797,7 @@ export default function SalesClientsPage() {
                                     </ScrollArea>
                                 )}
                             </CardContent>
-                             {salesForSelectedClient.length > 0 && (
+                             {allSalesForSelectedClient.length > 0 && (
                                 <CardFooter className="flex flex-col items-stretch sm:items-end border-t pt-6 gap-2">
                                      <Button onClick={() => setIsConsolidatedDialogOpen(true)} variant="outline">
                                         <Library className="mr-2 h-4 w-4" />
@@ -953,7 +984,7 @@ export default function SalesClientsPage() {
             isOpen={isConsolidatedDialogOpen}
             onClose={() => setIsConsolidatedDialogOpen(false)}
             client={clients.find(c => c.id === selectedClientIdForHistory)!}
-            sales={salesForSelectedClient}
+            sales={allSalesForSelectedClient}
             toast={toast}
         />
       )}
@@ -1357,7 +1388,7 @@ const ConsolidatedDebtDialog = ({ isOpen, onClose, client, sales, toast }: { isO
             format(parseISO(t.date), "PPP", { locale: es }),
             t.description,
             t.debit > 0 ? t.debit.toLocaleString('en-US', { style: 'currency', currency: 'USD' }) : '-',
-            t.credit > 0 ? t.credit.toLocaleString('en-US', { style: 'currency', currency: 'USD' }) : '-',
+            t.credit > 0 ? t.credit.toLocaleString('en-US', { style: 'currency', 'currency': 'USD' }) : '-',
             t.balance.toLocaleString('en-US', { style: 'currency', currency: 'USD' })
         ]
     });
@@ -1453,4 +1484,3 @@ const ConsolidatedDebtDialog = ({ isOpen, onClose, client, sales, toast }: { isO
     </Dialog>
   );
 };
-
