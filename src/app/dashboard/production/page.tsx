@@ -438,8 +438,8 @@ export default function ProductionPage() {
 
   if (!isClient || !currentWeekStart) {
     return (
-      <div className="min-h-screen flex flex-col p-4 md:p-8 bg-background">
-        <header className="flex items-center justify-between mb-6 md:mb-10 p-4 bg-card shadow-md rounded-lg">
+      <div className="min-h-screen flex flex-col p-4 sm:p-6 bg-background">
+        <header className="flex items-center justify-between mb-6 p-4 bg-card shadow-md rounded-lg">
           <Skeleton className="h-8 w-1/3" />
         </header>
         <main className="flex-grow space-y-6">
@@ -459,8 +459,8 @@ export default function ProductionPage() {
   );
 
   return (
-    <div className="min-h-screen flex flex-col p-4 md:p-8 bg-background">
-      <header className="flex flex-col sm:flex-row items-center justify-between mb-6 md:mb-10 p-4 bg-card shadow-md rounded-lg gap-4">
+    <div className="min-h-screen flex flex-col p-4 sm:p-6 bg-background">
+      <header className="flex flex-col sm:flex-row items-center justify-between mb-6 p-4 bg-card shadow-md rounded-lg gap-4">
         <Link href="/dashboard" className="flex items-center text-primary hover:underline text-sm mb-4 sm:mb-0 self-start sm:self-center">
           <ArrowLeft className="mr-1 h-4 w-4" />
           Volver al Panel
@@ -607,16 +607,18 @@ export default function ProductionPage() {
                                         <Button variant="outline" onClick={handlePreviousWeek}>
                                             <ChevronLeft className="h-4 w-4 mr-1 sm:mr-2" />
                                             <span className="hidden sm:inline">Semana Ant.</span>
+                                            <span className="sm:hidden">Ant.</span>
                                         </Button>
                                         <Button variant="outline" onClick={handleNextWeek}>
                                             <span className="hidden sm:inline">Semana Sig.</span>
+                                            <span className="sm:hidden">Sig.</span>
                                             <ChevronRight className="h-4 w-4 ml-1 sm:ml-2" />
                                         </Button>
                                     </div>
                                 </div>
                             </CardHeader>
                             <CardContent className="flex-1 flex flex-col">
-                                <ScrollArea className="h-[500px] rounded-md border">
+                                <ScrollArea className="h-[450px] md:h-[500px] rounded-md border">
                                     <Table>
                                         <TableHeader>
                                             <TableRow>
@@ -624,7 +626,7 @@ export default function ProductionPage() {
                                                 <TableHead className="text-right">Materia Prima Total</TableHead>
                                                 <TableHead className="text-right">Unidades Prod.</TableHead>
                                                 <TableHead className="text-right">Índice</TableHead>
-                                                <TableHead className="text-center w-[100px]">Acciones</TableHead>
+                                                <TableHead className="text-center">Acciones</TableHead>
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>

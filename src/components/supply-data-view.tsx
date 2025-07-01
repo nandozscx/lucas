@@ -202,18 +202,18 @@ const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals
                     {(weeklyTableData.length > 5 || daysOfWeekHeaders.length > 5) && <TableCaption>Desplázate para ver más proveedores o días.</TableCaption>}
                     <TableHeader className="sticky top-0 bg-card z-10">
                         <TableRow>
-                        <TableHead className="font-semibold sticky left-0 bg-card z-10 min-w-[150px] pl-4">Proveedor</TableHead>
+                        <TableHead className="font-semibold sticky left-0 bg-card z-10 min-w-[150px]">Proveedor</TableHead>
                         {daysOfWeekHeaders.map(day => (
-                            <TableHead key={day} className="text-right font-semibold min-w-[100px] capitalize pr-4">{day}</TableHead>
+                            <TableHead key={day} className="text-right font-semibold min-w-[100px] capitalize">{day}</TableHead>
                         ))}
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {weeklyTableData.map((row) => (
                         <TableRow key={row.providerName}>
-                            <TableCell className="font-medium sticky left-0 bg-card z-10 pl-4">{row.providerName}</TableCell>
+                            <TableCell className="font-medium sticky left-0 bg-card z-10">{row.providerName}</TableCell>
                             {row.quantities.map((quantity, index) => (
-                            <TableCell key={index} className="text-right pr-4">
+                            <TableCell key={index} className="text-right">
                                 {quantity !== undefined ? quantity.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2}) : "-"}
                             </TableCell>
                             ))}
@@ -235,15 +235,15 @@ const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals
                     {sortedDailyTotals.length > 5 && <TableCaption>Desplázate para ver más entradas.</TableCaption>}
                     <TableHeader>
                         <TableRow>
-                        <TableHead className="font-semibold pl-4">Fecha</TableHead>
-                        <TableHead className="text-right font-semibold pr-4">Cantidad Total</TableHead>
+                        <TableHead className="font-semibold">Fecha</TableHead>
+                        <TableHead className="text-right font-semibold">Cantidad Total</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {sortedDailyTotals.map(([date, total]) => (
                         <TableRow key={date}>
-                            <TableCell className="font-medium pl-4">{format(parseISO(date), "PPP", { locale: es })}</TableCell>
-                            <TableCell className="text-right pr-4">{total.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})}</TableCell>
+                            <TableCell className="font-medium">{format(parseISO(date), "PPP", { locale: es })}</TableCell>
+                            <TableCell className="text-right">{total.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})}</TableCell>
                         </TableRow>
                         ))}
                     </TableBody>
@@ -267,27 +267,27 @@ const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals
                     {enrichedVendorTotalsForCurrentWeek.length > 5 && <TableCaption>Desplázate para ver más entradas.</TableCaption>}
                     <TableHeader>
                         <TableRow>
-                        <TableHead className="font-semibold pl-4">Proveedor</TableHead>
+                        <TableHead className="font-semibold">Proveedor</TableHead>
                         <TableHead className="text-right font-semibold">Cantidad Total (Semanal)</TableHead>
                         <TableHead className="text-right font-semibold">Precio Unit.</TableHead>
-                        <TableHead className="text-right font-semibold pr-4">Total a Pagar (Semanal)</TableHead>
+                        <TableHead className="text-right font-semibold">Total a Pagar (Semanal)</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {enrichedVendorTotalsForCurrentWeek.map((vendor) => (
                         vendor.totalQuantity > 0 &&
                         <TableRow key={vendor.originalName}>
-                            <TableCell className="font-medium pl-4">{vendor.originalName}</TableCell>
+                            <TableCell className="font-medium">{vendor.originalName}</TableCell>
                             <TableCell className="text-right">{vendor.totalQuantity.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
                             <TableCell className="text-right">{vendor.price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
-                            <TableCell className="text-right pr-4">{vendor.totalToPay.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
+                            <TableCell className="text-right">{vendor.totalToPay.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
                         </TableRow>
                         ))}
                     </TableBody>
                     <TableFooter>
                         <TableRow>
                         <TableCell colSpan={3} className="text-right font-bold text-lg">Total General:</TableCell>
-                        <TableCell className="text-right font-bold text-lg pr-4">
+                        <TableCell className="text-right font-bold text-lg">
                             {grandTotalToPay.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                         </TableCell>
                         </TableRow>

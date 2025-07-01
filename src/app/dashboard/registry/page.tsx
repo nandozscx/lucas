@@ -196,8 +196,8 @@ export default function OperationsPage() {
 
   if (!isClient) {
     return (
-      <div className="min-h-screen flex flex-col p-4 md:p-8 bg-background">
-        <header className="flex items-center justify-between mb-6 md:mb-10 p-4 bg-card shadow-md rounded-lg">
+      <div className="min-h-screen flex flex-col p-4 sm:p-6 bg-background">
+        <header className="flex items-center justify-between mb-6 p-4 bg-card shadow-md rounded-lg">
           <Skeleton className="h-8 w-1/3" />
         </header>
         <main className="flex-grow">
@@ -209,8 +209,8 @@ export default function OperationsPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col p-4 md:p-8 bg-background">
-      <header className="flex flex-col sm:flex-row items-center justify-between mb-6 md:mb-10 p-4 bg-card shadow-md rounded-lg gap-4">
+    <div className="min-h-screen flex flex-col p-4 sm:p-6 bg-background">
+      <header className="flex flex-col sm:flex-row items-center justify-between mb-6 p-4 bg-card shadow-md rounded-lg gap-4">
         <Link href="/dashboard" className="flex items-center text-primary hover:underline text-sm mb-4 sm:mb-0 self-start sm:self-center">
           <ArrowLeft className="mr-1 h-4 w-4" />
           Volver al Panel
@@ -271,23 +271,23 @@ export default function OperationsPage() {
                             <Table>
                             <TableHeader className="sticky top-0 bg-card z-10">
                                 <TableRow>
-                                <TableHead className="font-semibold w-[25%] pl-4">Nombre</TableHead>
-                                <TableHead className="font-semibold w-[30%]">Dirección</TableHead>
-                                <TableHead className="font-semibold w-[15%]">Teléfono</TableHead>
-                                <TableHead className="font-semibold w-[15%] text-right">Precio Unit.</TableHead>
-                                <TableHead className="text-right font-semibold w-[15%] pr-4">Acciones</TableHead>
+                                <TableHead className="font-semibold">Nombre</TableHead>
+                                <TableHead className="font-semibold">Dirección</TableHead>
+                                <TableHead className="font-semibold">Teléfono</TableHead>
+                                <TableHead className="font-semibold text-right">Precio Unit.</TableHead>
+                                <TableHead className="text-right font-semibold">Acciones</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {providers.map((provider) => (
                                 <TableRow key={provider.id}>
-                                    <TableCell className="font-medium py-3 pl-4">{provider.name}</TableCell>
-                                    <TableCell className="py-3 whitespace-normal">{provider.address}</TableCell>
-                                    <TableCell className="py-3">{provider.phone}</TableCell>
-                                    <TableCell className="py-3 text-right">
+                                    <TableCell className="font-medium">{provider.name}</TableCell>
+                                    <TableCell className="whitespace-normal">{provider.address}</TableCell>
+                                    <TableCell>{provider.phone}</TableCell>
+                                    <TableCell className="text-right">
                                     {provider.price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                                     </TableCell>
-                                    <TableCell className="text-right py-3 pr-4">
+                                    <TableCell className="text-right">
                                     <Button variant="ghost" size="icon" onClick={() => handleOpenEditDialog(provider)} aria-label={`Editar ${provider.name}`}>
                                         <Edit2 className="h-4 w-4 text-blue-600 hover:text-blue-500" />
                                     </Button>

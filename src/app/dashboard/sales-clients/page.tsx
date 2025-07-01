@@ -641,8 +641,8 @@ export default function SalesClientsPage() {
 
   if (!isClient) {
     return (
-      <div className="min-h-screen flex flex-col p-4 md:p-8 bg-background">
-        <header className="flex items-center justify-between mb-6 md:mb-10 p-4 bg-card shadow-md rounded-lg">
+      <div className="min-h-screen flex flex-col p-4 sm:p-6 bg-background">
+        <header className="flex items-center justify-between mb-6 p-4 bg-card shadow-md rounded-lg">
           <Skeleton className="h-8 w-1/3" />
         </header>
         <main className="flex-grow space-y-6">
@@ -666,8 +666,8 @@ export default function SalesClientsPage() {
   );
 
   return (
-    <div className="min-h-screen flex flex-col p-4 md:p-8 bg-background">
-      <header className="flex flex-col sm:flex-row items-center justify-between mb-6 md:mb-10 p-4 bg-card shadow-md rounded-lg gap-4">
+    <div className="min-h-screen flex flex-col p-4 sm:p-6 bg-background">
+      <header className="flex flex-col sm:flex-row items-center justify-between mb-6 p-4 bg-card shadow-md rounded-lg gap-4">
          <Link href="/dashboard" className="flex items-center text-primary hover:underline text-sm mb-4 sm:mb-0 self-start sm:self-center">
             <ArrowLeft className="mr-1 h-4 w-4" />
             Volver al Panel
@@ -680,7 +680,7 @@ export default function SalesClientsPage() {
 
       <main className="flex-grow">
         <Tabs defaultValue="sales" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3">
                 <TabsTrigger value="sales">Ventas</TabsTrigger>
                 <TabsTrigger value="clients">Clientes</TabsTrigger>
                 <TabsTrigger value="debts">Deudas</TabsTrigger>
@@ -745,7 +745,7 @@ export default function SalesClientsPage() {
                                                     <TableHead className="text-right">Monto Total</TableHead>
                                                     <TableHead className="text-right">Abono</TableHead>
                                                     <TableHead className="text-right">Saldo</TableHead>
-                                                    <TableHead className="text-center w-[120px]">Acciones</TableHead>
+                                                    <TableHead className="text-center">Acciones</TableHead>
                                                 </TableRow>
                                             </TableHeader>
                                             <TableBody>
@@ -831,19 +831,19 @@ export default function SalesClientsPage() {
                             <Table>
                               <TableHeader>
                                 <TableRow>
-                                  <TableHead className="font-semibold w-[30%] pl-4">Nombre</TableHead>
-                                  <TableHead className="font-semibold w-[40%]">Dirección</TableHead>
-                                  <TableHead className="font-semibold w-[15%]">Teléfono</TableHead>
-                                  <TableHead className="text-right font-semibold w-[15%] pr-4">Acciones</TableHead>
+                                  <TableHead className="font-semibold">Nombre</TableHead>
+                                  <TableHead className="font-semibold">Dirección</TableHead>
+                                  <TableHead className="font-semibold">Teléfono</TableHead>
+                                  <TableHead className="text-right font-semibold">Acciones</TableHead>
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
                                 {clients.map((client) => (
                                   <TableRow key={client.id}>
-                                    <TableCell className="font-medium py-3 pl-4">{client.name}</TableCell>
-                                    <TableCell className="py-3 whitespace-nowrap">{client.address}</TableCell>
-                                    <TableCell className="py-3">{client.phone}</TableCell>
-                                    <TableCell className="text-right py-3 pr-4">
+                                    <TableCell className="font-medium">{client.name}</TableCell>
+                                    <TableCell className="whitespace-nowrap">{client.address}</TableCell>
+                                    <TableCell>{client.phone}</TableCell>
+                                    <TableCell className="text-right">
                                       <Button variant="ghost" size="icon" onClick={() => handleOpenEditDialog(client)} aria-label={`Editar ${client.name}`}>
                                         <Edit2 className="h-4 w-4 text-blue-600 hover:text-blue-500" />
                                       </Button>
@@ -1421,7 +1421,7 @@ const ConsolidatedDebtDialog = ({ isOpen, onClose, client, sales, toast }: { isO
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="w-[95vw] sm:max-w-3xl">
         <DialogHeader>
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <div className="text-left">

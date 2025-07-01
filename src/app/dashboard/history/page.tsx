@@ -77,8 +77,8 @@ export default function HistoryPage() {
 
   if (!isClient || !currentWeekStart) {
     return (
-      <div className="min-h-screen flex flex-col p-4 md:p-8 bg-background">
-        <header className="flex items-center justify-between mb-6 md:mb-10 p-4 bg-card shadow-md rounded-lg">
+      <div className="min-h-screen flex flex-col p-4 sm:p-6 bg-background">
+        <header className="flex items-center justify-between mb-6 p-4 bg-card shadow-md rounded-lg">
           <Skeleton className="h-8 w-1/3" />
           <Skeleton className="h-10 w-36" />
         </header>
@@ -229,8 +229,8 @@ export default function HistoryPage() {
   );
 
   return (
-    <div className="min-h-screen flex flex-col p-4 md:p-8 bg-background">
-      <header className="flex flex-col sm:flex-row items-center justify-between mb-6 md:mb-10 p-4 bg-card shadow-md rounded-lg gap-4">
+    <div className="min-h-screen flex flex-col p-4 sm:p-6 bg-background">
+      <header className="flex flex-col sm:flex-row items-center justify-between mb-6 p-4 bg-card shadow-md rounded-lg gap-4">
         <Link href="/dashboard" className="flex items-center text-primary hover:underline text-sm mb-4 sm:mb-0 self-start sm:self-center">
           <ArrowLeft className="mr-1 h-4 w-4" />
           Volver al Panel
@@ -291,26 +291,26 @@ export default function HistoryPage() {
                           <Table>
                               <TableHeader>
                                   <TableRow>
-                                      <TableHead className="font-semibold pl-4">Proveedor</TableHead>
+                                      <TableHead className="font-semibold">Proveedor</TableHead>
                                       <TableHead className="text-right font-semibold">Cantidad Total</TableHead>
                                       <TableHead className="text-right font-semibold">Precio Unit.</TableHead>
-                                      <TableHead className="text-right font-semibold pr-4">Total a Pagar</TableHead>
+                                      <TableHead className="text-right font-semibold">Total a Pagar</TableHead>
                                   </TableRow>
                               </TableHeader>
                               <TableBody>
                                   {vendorTotalsForWeek.map((vendor) => (
                                       <TableRow key={vendor.providerName}>
-                                          <TableCell className="font-medium pl-4">{vendor.providerName}</TableCell>
+                                          <TableCell className="font-medium">{vendor.providerName}</TableCell>
                                           <TableCell className="text-right">{vendor.totalQuantity.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
                                           <TableCell className="text-right">S/. {vendor.price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
-                                          <TableCell className="text-right pr-4 font-semibold">S/. {vendor.totalToPay.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
+                                          <TableCell className="text-right font-semibold">S/. {vendor.totalToPay.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
                                       </TableRow>
                                   ))}
                               </TableBody>
                               <TableFooter>
                                   <TableRow>
                                       <TableCell colSpan={3} className="text-right font-bold text-lg">Total General:</TableCell>
-                                      <TableCell className="text-right font-bold text-lg pr-4">S/. {grandTotalToPay.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
+                                      <TableCell className="text-right font-bold text-lg">S/. {grandTotalToPay.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
                                   </TableRow>
                               </TableFooter>
                           </Table>
@@ -333,14 +333,14 @@ export default function HistoryPage() {
                           <Table>
                               <TableHeader>
                                   <TableRow>
-                                      <TableHead className="font-semibold sticky left-0 bg-card z-10 min-w-[150px] pl-4">Proveedor</TableHead>
+                                      <TableHead className="font-semibold sticky left-0 bg-card z-10 min-w-[150px]">Proveedor</TableHead>
                                       {daysOfWeekHeaders.map((day) => <TableHead key={day} className="text-right font-semibold min-w-[100px] capitalize">{day}</TableHead>)}
                                   </TableRow>
                               </TableHeader>
                               <TableBody>
                                   {weeklySummaryData.map((row) => (
                                       <TableRow key={row.providerName}>
-                                          <TableCell className="font-medium sticky left-0 bg-card z-10 pl-4">{row.providerName}</TableCell>
+                                          <TableCell className="font-medium sticky left-0 bg-card z-10">{row.providerName}</TableCell>
                                           {row.quantities.map((quantity, index) => <TableCell key={index} className="text-right">{quantity !== undefined ? quantity.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2}) : "-"}</TableCell>)}
                                       </TableRow>
                                   ))}
@@ -364,15 +364,15 @@ export default function HistoryPage() {
                           <Table>
                               <TableHeader>
                                   <TableRow>
-                                      <TableHead className="font-semibold pl-4">Fecha</TableHead>
-                                      <TableHead className="text-right font-semibold pr-4">Cantidad Total</TableHead>
+                                      <TableHead className="font-semibold">Fecha</TableHead>
+                                      <TableHead className="text-right font-semibold">Cantidad Total</TableHead>
                                   </TableRow>
                               </TableHeader>
                               <TableBody>
                                   {dailyTotalsForWeek.map(({date, total}) => (
                                       <TableRow key={date.toString()}>
-                                          <TableCell className="font-medium pl-4">{format(date, "PPP", { locale: es })}</TableCell>
-                                          <TableCell className="text-right pr-4">{total.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})}</TableCell>
+                                          <TableCell className="font-medium">{format(date, "PPP", { locale: es })}</TableCell>
+                                          <TableCell className="text-right">{total.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})}</TableCell>
                                       </TableRow>
                                   ))}
                               </TableBody>

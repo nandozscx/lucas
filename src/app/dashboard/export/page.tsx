@@ -160,14 +160,14 @@ export default function ExportPage() {
 
   if (!isClient) {
     return (
-      <div className="min-h-screen flex flex-col p-4 md:p-8 space-y-6 bg-background">
-        <header className="flex items-center justify-between mb-6 md:mb-10 p-4 bg-card shadow-md rounded-lg">
+      <div className="min-h-screen flex flex-col p-4 sm:p-6 space-y-6 bg-background">
+        <header className="flex items-center justify-between mb-6 p-4 bg-card shadow-md rounded-lg">
           <Skeleton className="h-8 w-1/3" />
           <Skeleton className="h-10 w-36" />
         </header>
-        <main className="flex-grow grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-6 md:gap-8 p-4 md:p-8 items-center lg:max-w-4xl lg:mx-auto">
+        <main className="flex-grow grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-6 p-4 sm:p-6 items-center lg:max-w-4xl lg:mx-auto">
           {[...Array(4)].map((_, i) => (
-            <Skeleton key={i} className="w-full rounded-lg aspect-square" />
+            <Skeleton key={i} className="w-full rounded-lg h-48 sm:aspect-square" />
           ))}
         </main>
         <footer className="text-center text-sm text-muted-foreground py-4 mt-auto">
@@ -185,8 +185,8 @@ export default function ExportPage() {
   ];
 
   return (
-    <div className="min-h-screen flex flex-col p-4 md:p-8 bg-background">
-      <header className="flex flex-col sm:flex-row items-center justify-between mb-6 md:mb-10 p-4 bg-card shadow-md rounded-lg gap-4">
+    <div className="min-h-screen flex flex-col p-4 sm:p-6 bg-background">
+      <header className="flex flex-col sm:flex-row items-center justify-between mb-6 p-4 bg-card shadow-md rounded-lg gap-4">
         <Link href="/dashboard" className="flex items-center text-primary hover:underline text-sm mb-4 sm:mb-0 self-start sm:self-center">
           <ArrowLeft className="mr-1 h-4 w-4" />
           Volver al Panel
@@ -197,7 +197,7 @@ export default function ExportPage() {
         <div className="w-0 sm:w-auto"></div> {/* Spacer for alignment */}
       </header>
       
-      <main className="flex-grow grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-6 md:gap-8 p-4 md:p-8 items-center lg:max-w-4xl lg:mx-auto">
+      <main className="flex-grow grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-6 p-4 sm:p-6 items-center lg:max-w-4xl lg:mx-auto">
         {exportOptions.map((item) => {
           const IconComponent = item.icon;
           return (
@@ -210,8 +210,8 @@ export default function ExportPage() {
               className="flex flex-col items-center justify-center p-4 hover:shadow-xl transition-all duration-200 ease-in-out cursor-pointer aspect-square rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 shadow-md"
               aria-label={item.title}
             >
-              <IconComponent className="h-20 w-20 text-primary mb-3" strokeWidth={1.5} />
-              <p className="text-lg font-semibold text-center text-foreground">{item.title}</p>
+              <IconComponent className="h-16 w-16 sm:h-20 sm:w-20 text-primary mb-3" strokeWidth={1.5} />
+              <p className="text-base sm:text-lg font-semibold text-center text-foreground">{item.title}</p>
             </Card>
           );
         })}
