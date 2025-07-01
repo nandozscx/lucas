@@ -193,7 +193,7 @@ export default function ProductionPage() {
                                     <FormItem>
                                         <FormLabel>Unidades Producidas</FormLabel>
                                         <FormControl>
-                                            <Input type="number" placeholder="Ej: 240" {...field} />
+                                            <Input type="number" placeholder="Ej: 240" {...field} value={field.value ?? ''} />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
@@ -221,7 +221,7 @@ export default function ProductionPage() {
                                         <FormItem>
                                             <FormLabel>Kilos de Leche Entera</FormLabel>
                                             <FormControl>
-                                                <Input type="number" placeholder="Ej: 5" {...field} />
+                                                <Input type="number" placeholder="Ej: 5" {...field} value={field.value ?? ''} />
                                             </FormControl>
                                             <FormMessage />
                                         </FormItem>
