@@ -61,18 +61,20 @@ export const VoiceAssistantDialog: React.FC<VoiceAssistantDialogProps> = ({ isOp
 
     recognition.onend = () => {
       setIsListening(false);
-      // We check for transcript before setting to processing
-      // to avoid processing empty strings.
-      if (recognitionRef.current.finalTranscript?.trim()) {
-        setStatus('processing');
-      } else {
-        setStatus('idle');
-      }
+      setStatus('processing'); // Set to processing, the effect will check the transcript
     };
     
     recognition.onerror = (event) => {
-      console.error('Speech recognition error', event.error);
-      if (event.error !== 'no-speech') {
+      // Handle network errors gracefully by warning instead of throwing a hard error.
+      if (event.error === 'network') {
+        console.warn('Speech recognition network error:', event.error);
+        toast({
+          title: "Error de Red",
+          description: "No se pudo conectar al servicio de voz. Por favor, revisa tu conexión a internet.",
+          variant: "destructive",
+        });
+      } else if (event.error !== 'no-speech' && event.error !== 'aborted') {
+        console.error('Speech recognition error', event.error);
         setStatus('error');
         toast({
             title: "Error de Reconocimiento",
@@ -80,6 +82,7 @@ export const VoiceAssistantDialog: React.FC<VoiceAssistantDialogProps> = ({ isOp
             variant: "destructive",
         });
       }
+      
       setIsListening(false);
       setStatus('idle');
     };
@@ -91,8 +94,13 @@ export const VoiceAssistantDialog: React.FC<VoiceAssistantDialogProps> = ({ isOp
   }, [isOpen]);
 
   useEffect(() => {
-    if (status === 'processing' && transcript) {
+    // Only process when the status is 'processing' and we have a transcript.
+    // This is triggered by onend.
+    if (status === 'processing' && transcript.trim()) {
         handleProcessTranscript(transcript);
+    } else if (status === 'processing') {
+        // If there's no transcript, just go back to idle.
+        setStatus('idle');
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, transcript]);
@@ -103,7 +111,6 @@ export const VoiceAssistantDialog: React.FC<VoiceAssistantDialogProps> = ({ isOp
       recognitionRef.current?.stop();
     } else {
       setTranscript('');
-      recognitionRef.current.finalTranscript = ''; // Custom property to hold final result
       recognitionRef.current?.start();
     }
   };
@@ -150,10 +157,8 @@ export const VoiceAssistantDialog: React.FC<VoiceAssistantDialogProps> = ({ isOp
         variant: "destructive",
       });
     } finally {
-        // Only reset if it was processing
-        if (status === 'processing') {
-            setStatus('idle');
-        }
+        // Reset status to idle after processing is complete, successful or not.
+        setStatus('idle');
     }
   };
 
