@@ -5,17 +5,45 @@ import { useRouter } from 'next/navigation';
 import DashboardHeader from '@/components/dashboard-header';
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card } from "@/components/ui/card";
-import { ClipboardPenLine, ShoppingCart, HistoryIcon, Cpu } from 'lucide-react';
+import { ClipboardPenLine, ShoppingCart, HistoryIcon, Cpu, Truck } from 'lucide-react';
+import { useToast } from "@/hooks/use-toast";
+import type { Production, WholeMilkReplenishment } from '@/types';
+
 
 export default function DashboardPage() {
   const [isClient, setIsClient] = useState(false);
   const [currentYear, setCurrentYear] = useState('');
   const router = useRouter();
+  const { toast } = useToast();
 
   useEffect(() => {
     setIsClient(true);
     setCurrentYear(new Date().getFullYear().toString());
-  }, []);
+
+    if (typeof window !== 'undefined') {
+        const storedProduction = localStorage.getItem('dailySupplyTrackerProduction');
+        const storedReplenishments = localStorage.getItem('dailySupplyTrackerWholeMilkReplenishments');
+
+        const productionHistory: Production[] = storedProduction ? JSON.parse(storedProduction) : [];
+        const replenishmentHistory: WholeMilkReplenishment[] = storedReplenishments ? JSON.parse(storedReplenishments) : [];
+        
+        const totalReplenished = replenishmentHistory.reduce((sum, r) => sum + r.quantitySacos, 0);
+        const totalUsedInKilos = productionHistory.reduce((sum, p) => sum + (p.wholeMilkKilos || 0), 0);
+        const totalUsedInSacos = totalUsedInKilos / 25;
+        const currentStockSacos = totalReplenished - totalUsedInSacos;
+
+        const lowStockAlertShown = sessionStorage.getItem('lowStockAlertShown');
+
+        if (currentStockSacos <= 5 && !lowStockAlertShown) {
+            toast({
+                title: "Alerta de Stock Bajo",
+                description: `Quedan ${currentStockSacos.toLocaleString(undefined, {maximumFractionDigits:2})} sacos de leche entera. Es hora de reabastecer.`,
+                variant: "destructive",
+            });
+            sessionStorage.setItem('lowStockAlertShown', 'true');
+        }
+    }
+  }, [toast]);
 
   if (!isClient) {
     return (

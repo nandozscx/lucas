@@ -56,3 +56,10 @@ export interface WholeMilk {
   stockSacos: number;
   pricePerSaco: number;
 }
+
+export interface WholeMilkReplenishment {
+  id: string;
+  date: string; // YYYY-MM-DD
+  quantitySacos: number;
+  pricePerSaco: number;
+}

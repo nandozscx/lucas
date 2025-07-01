@@ -18,12 +18,13 @@ import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCaption, TableFooter } from "@/components/ui/table";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
-import type { Delivery, Production as ProductionType, WholeMilk } from '@/types';
-import { ArrowLeft, Cpu, CalendarIcon, Package, Milk, Scale, Percent, Save, Edit2, Trash2, ChevronLeft, ChevronRight, Download, ShoppingBag, Archive, Wallet, DollarSign, AlertCircle } from 'lucide-react';
+import type { Delivery, Production as ProductionType, WholeMilkReplenishment } from '@/types';
+import { ArrowLeft, Cpu, CalendarIcon, Package, Milk, Scale, Percent, Save, Edit2, Trash2, ChevronLeft, ChevronRight, Download, ShoppingBag, Archive, Wallet, DollarSign, AlertCircle, PlusCircle } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
 import type jsPDF from 'jspdf';
@@ -34,7 +35,8 @@ interface jsPDFWithAutoTable extends jsPDF {
 
 const DELIVERIES_STORAGE_KEY = 'dailySupplyTrackerDeliveries';
 const PRODUCTION_STORAGE_KEY = 'dailySupplyTrackerProduction';
-const WHOLE_MILK_STORAGE_KEY = 'dailySupplyTrackerWholeMilk';
+const WHOLE_MILK_STORAGE_KEY = 'dailySupplyTrackerWholeMilk'; // For migration
+const WHOLE_MILK_REPLENISHMENTS_STORAGE_KEY = 'dailySupplyTrackerWholeMilkReplenishments';
 
 const productionFormSchema = z.object({
   date: z.date({ required_error: "La fecha es obligatoria." }),
@@ -54,22 +56,24 @@ const productionFormSchema = z.object({
 
 type ProductionFormData = z.infer<typeof productionFormSchema>;
 
-const wholeMilkFormSchema = z.object({
-  stockSacos: z.coerce.number().min(0, "El stock no puede ser negativo."),
-  pricePerSaco: z.coerce.number().positive("El precio debe ser un número positivo.").min(0.01, "El precio debe ser mayor a cero."),
+const replenishmentFormSchema = z.object({
+  date: z.date({ required_error: "La fecha es obligatoria." }),
+  quantitySacos: z.coerce.number().positive("La cantidad debe ser un número positivo."),
+  pricePerSaco: z.coerce.number().positive("El precio debe ser un número positivo."),
 });
 
-type WholeMilkFormData = z.infer<typeof wholeMilkFormSchema>;
+type ReplenishmentFormData = z.infer<typeof replenishmentFormSchema>;
 
 export default function ProductionPage() {
   const [isClient, setIsClient] = useState(false);
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [productionHistory, setProductionHistory] = useState<ProductionType[]>([]);
-  const [wholeMilkData, setWholeMilkData] = useState<WholeMilk>({ stockSacos: 0, pricePerSaco: 0 });
+  const [replenishmentHistory, setReplenishmentHistory] = useState<WholeMilkReplenishment[]>([]);
   const [currentYear, setCurrentYear] = useState('');
   const [editingProduction, setEditingProduction] = useState<ProductionType | null>(null);
   const [productionToDelete, setProductionToDelete] = useState<ProductionType | null>(null);
   const [currentWeekStart, setCurrentWeekStart] = useState<Date | null>(null);
+  const [isReplenishmentDialogOpen, setIsReplenishmentDialogOpen] = useState(false);
   const { toast } = useToast();
 
   const form = useForm<ProductionFormData>({
@@ -80,14 +84,6 @@ export default function ProductionPage() {
       useWholeMilk: false,
       wholeMilkKilos: undefined,
     },
-  });
-
-  const wholeMilkForm = useForm<WholeMilkFormData>({
-    resolver: zodResolver(wholeMilkFormSchema),
-    defaultValues: {
-      stockSacos: 0,
-      pricePerSaco: 0,
-    }
   });
 
   const selectedDate = form.watch('date');
@@ -106,13 +102,24 @@ export default function ProductionPage() {
       const storedProduction = localStorage.getItem(PRODUCTION_STORAGE_KEY);
       if (storedProduction) setProductionHistory(JSON.parse(storedProduction));
       
-      const storedWholeMilk = localStorage.getItem(WHOLE_MILK_STORAGE_KEY);
-      if (storedWholeMilk) {
-        const parsedData = JSON.parse(storedWholeMilk);
-        // Basic check to see if data is in the new format
-        if ('stockSacos' in parsedData && 'pricePerSaco' in parsedData) {
-            setWholeMilkData(parsedData);
-        }
+      const storedReplenishments = localStorage.getItem(WHOLE_MILK_REPLENISHMENTS_STORAGE_KEY);
+      if (storedReplenishments) {
+          setReplenishmentHistory(JSON.parse(storedReplenishments));
+      } else {
+          // Migration from old system
+          const storedOldWholeMilkData = localStorage.getItem(WHOLE_MILK_STORAGE_KEY);
+          if (storedOldWholeMilkData) {
+              const oldData = JSON.parse(storedOldWholeMilkData);
+              if (oldData && oldData.stockSacos > 0) {
+                  const initialReplenishment: WholeMilkReplenishment = {
+                      id: crypto.randomUUID(),
+                      date: format(new Date(), "yyyy-MM-dd"), // Assume today's date for migration
+                      quantitySacos: oldData.stockSacos,
+                      pricePerSaco: oldData.pricePerSaco,
+                  };
+                  setReplenishmentHistory([initialReplenishment]);
+              }
+          }
       }
     }
   }, []);
@@ -122,18 +129,12 @@ export default function ProductionPage() {
       localStorage.setItem(PRODUCTION_STORAGE_KEY, JSON.stringify(productionHistory));
     }
   }, [productionHistory, isClient]);
-
+  
   useEffect(() => {
     if (isClient) {
-      localStorage.setItem(WHOLE_MILK_STORAGE_KEY, JSON.stringify(wholeMilkData));
+      localStorage.setItem(WHOLE_MILK_REPLENISHMENTS_STORAGE_KEY, JSON.stringify(replenishmentHistory));
     }
-  }, [wholeMilkData, isClient]);
-
-  useEffect(() => {
-    if (wholeMilkData) {
-      wholeMilkForm.reset(wholeMilkData);
-    }
-  }, [wholeMilkData, wholeMilkForm]);
+  }, [replenishmentHistory, isClient]);
   
   const dailyRawMaterial = React.useMemo(() => {
     if (!selectedDate) return 0;
@@ -160,13 +161,6 @@ export default function ProductionPage() {
     const newTransformationIndex = totalRawMaterial > 0 && data.producedUnits > 0 ? ((data.producedUnits / totalRawMaterial) - 1) * 100 : 0;
 
     if (editingProduction) {
-      const oldUsageInKilos = editingProduction.wholeMilkKilos || 0;
-      const differenceInKilos = newUsageInKilos - oldUsageInKilos;
-      if (differenceInKilos !== 0) {
-          const differenceInSacos = differenceInKilos / 25;
-          setWholeMilkData(prev => ({ ...prev, stockSacos: prev.stockSacos - differenceInSacos }));
-      }
-
       const updatedRecord: ProductionType = {
         ...editingProduction,
         date: dateStr,
@@ -196,11 +190,6 @@ export default function ProductionPage() {
           variant: "destructive",
         });
         return;
-      }
-      
-      if (newUsageInKilos > 0) {
-        const sacosUsed = newUsageInKilos / 25;
-        setWholeMilkData(prev => ({ ...prev, stockSacos: prev.stockSacos - sacosUsed }));
       }
 
       const newProductionRecord: ProductionType = {
@@ -253,12 +242,6 @@ export default function ProductionPage() {
 
   const confirmDeleteProduction = () => {
     if (!productionToDelete) return;
-
-    const deletedUsageInKilos = productionToDelete.wholeMilkKilos || 0;
-    if (deletedUsageInKilos > 0) {
-        const sacosToRestore = deletedUsageInKilos / 25;
-        setWholeMilkData(prev => ({ ...prev, stockSacos: prev.stockSacos + sacosToRestore }));
-    }
 
     setProductionHistory(prev => prev.filter(p => p.id !== productionToDelete.id));
     toast({
@@ -345,13 +328,29 @@ export default function ProductionPage() {
     doc.save(`produccion_semanal_${format(currentWeekStart!, "yyyy-MM-dd")}.pdf`);
     toast({ title: "Exportación PDF Exitosa", description: "El historial de producción semanal se ha exportado a PDF." });
   };
+  
+  const { currentStockSacos, latestPricePerSaco } = useMemo(() => {
+    const totalReplenished = replenishmentHistory.reduce((sum, r) => sum + r.quantitySacos, 0);
+    const totalUsedInKilos = productionHistory.reduce((sum, p) => sum + (p.wholeMilkKilos || 0), 0);
+    const totalUsedInSacos = totalUsedInKilos / 25;
+    const stock = totalReplenished - totalUsedInSacos;
 
-  const handleUpdateWholeMilk = (data: WholeMilkFormData) => {
-    setWholeMilkData(data);
-    toast({
-      title: "Datos Actualizados",
-      description: "El stock y precio de la leche entera han sido actualizados.",
-    });
+    const sortedHistory = [...replenishmentHistory].sort((a,b) => parseISO(b.date).getTime() - parseISO(a.date).getTime());
+    const price = sortedHistory.length > 0 ? sortedHistory[0].pricePerSaco : 0;
+
+    return { currentStockSacos: stock, latestPricePerSaco: price };
+  }, [replenishmentHistory, productionHistory]);
+  
+  const handleReplenishmentSubmit = (data: ReplenishmentFormData) => {
+    const newReplenishment: WholeMilkReplenishment = {
+      id: crypto.randomUUID(),
+      date: format(data.date, "yyyy-MM-dd"),
+      quantitySacos: data.quantitySacos,
+      pricePerSaco: data.pricePerSaco,
+    };
+    setReplenishmentHistory(prev => [...prev, newReplenishment].sort((a,b) => parseISO(b.date).getTime() - parseISO(a.date).getTime()));
+    toast({ title: "Reabastecimiento Registrado", description: `Se agregaron ${data.quantitySacos} sacos al stock.` });
+    setIsReplenishmentDialogOpen(false);
   };
 
   const { kilosUsedToday, costToReplaceToday } = useMemo(() => {
@@ -359,9 +358,9 @@ export default function ProductionPage() {
     const todaysProduction = productionHistory.find(p => p.date === todayStr);
     const usedInKilos = todaysProduction?.wholeMilkKilos || 0;
     const usedInSacos = usedInKilos / 25;
-    const cost = usedInSacos * (wholeMilkData.pricePerSaco || 0);
+    const cost = usedInSacos * (latestPricePerSaco || 0);
     return { kilosUsedToday: usedInKilos, costToReplaceToday: cost };
-  }, [productionHistory, wholeMilkData.pricePerSaco]);
+  }, [productionHistory, latestPricePerSaco]);
 
   if (!isClient || !currentWeekStart) {
     return (
@@ -605,74 +604,42 @@ export default function ProductionPage() {
             </TabsContent>
             
             <TabsContent value="wholeMilk" className="mt-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Gestionar Inventario</CardTitle>
-                            <CardDescription>Actualiza el stock y el precio de compra de la leche entera.</CardDescription>
-                        </CardHeader>
-                        <Form {...wholeMilkForm}>
-                            <form onSubmit={wholeMilkForm.handleSubmit(handleUpdateWholeMilk)}>
-                                <CardContent className="space-y-4">
-                                     <FormField
-                                        control={wholeMilkForm.control}
-                                        name="stockSacos"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>Stock Actual (Sacos de 25kg)</FormLabel>
-                                                <FormControl>
-                                                    <Input type="number" placeholder="Ej: 4" {...field} value={field.value ?? ''} />
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-                                    <FormField
-                                        control={wholeMilkForm.control}
-                                        name="pricePerSaco"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>Precio de Compra (por Saco)</FormLabel>
-                                                <FormControl>
-                                                    <Input type="number" placeholder="Ej: 60.00" {...field} value={field.value ?? ''} />
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-                                </CardContent>
-                                <CardFooter>
-                                    <Button type="submit" className="w-full">
-                                    <Save className="mr-2 h-4 w-4"/>
-                                    Actualizar Inventario
-                                    </Button>
-                                </CardFooter>
-                            </form>
-                        </Form>
-                    </Card>
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div className="space-y-8">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Reabastecer Stock</CardTitle>
+                                <CardDescription>Agrega nuevas compras de leche entera a tu inventario.</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <Button onClick={() => setIsReplenishmentDialogOpen(true)} className="w-full">
+                                    <PlusCircle className="mr-2 h-4 w-4" />
+                                    Agregar Compra de Stock
+                                </Button>
+                            </CardContent>
+                        </Card>
                         <Card>
                             <CardHeader>
                                 <CardTitle>Métricas Clave</CardTitle>
                                 <CardDescription>Información sobre tu inventario y uso.</CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
-                                {wholeMilkData.stockSacos < 0 && (
+                                {currentStockSacos < 0 && (
                                     <Alert variant="destructive">
                                     <AlertCircle className="h-4 w-4" />
                                     <AlertTitle>Stock Negativo</AlertTitle>
                                     <AlertDescription>
-                                        Tu inventario de leche entera es negativo. Por favor, actualiza tu stock.
+                                        Has consumido más leche de la que tienes registrada. Por favor, actualiza tu inventario.
                                     </AlertDescription>
                                     </Alert>
                                 )}
                                 <div className="flex justify-between items-center">
                                     <span className="text-muted-foreground flex items-center"><Archive className="mr-2 h-4 w-4"/> Stock Actual</span>
-                                    <span className={`font-bold ${wholeMilkData.stockSacos < 0 ? 'text-destructive' : ''}`}>{wholeMilkData.stockSacos.toLocaleString()} sacos</span>
+                                    <span className={`font-bold ${currentStockSacos < 0 ? 'text-destructive' : ''}`}>{currentStockSacos.toLocaleString(undefined, { maximumFractionDigits: 2 })} sacos</span>
                                 </div>
                                 <div className="flex justify-between items-center">
-                                    <span className="text-muted-foreground flex items-center"><DollarSign className="mr-2 h-4 w-4"/> Precio por Saco</span>
-                                    <span className="font-bold">S/. {wholeMilkData.pricePerSaco.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                    <span className="text-muted-foreground flex items-center"><DollarSign className="mr-2 h-4 w-4"/> Precio Última Compra (p/Saco)</span>
+                                    <span className="font-bold">S/. {latestPricePerSaco.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                 </div>
                                 <div className="flex justify-between items-center">
                                     <span className="text-muted-foreground flex items-center"><Milk className="mr-2 h-4 w-4"/> Uso de Hoy</span>
@@ -685,6 +652,43 @@ export default function ProductionPage() {
                             </CardContent>
                         </Card>
                     </div>
+                     <Card>
+                        <CardHeader>
+                            <CardTitle>Historial de Reabastecimiento</CardTitle>
+                            <CardDescription>Registro de todas las compras de leche entera.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                             <ScrollArea className="h-[400px] rounded-md border">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Fecha</TableHead>
+                                            <TableHead className="text-right">Sacos</TableHead>
+                                            <TableHead className="text-right">Precio p/Saco</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {replenishmentHistory.length > 0 ? (
+                                            replenishmentHistory.map(r => (
+                                                <TableRow key={r.id}>
+                                                    <TableCell>{format(parseISO(r.date), 'PPP', { locale: es })}</TableCell>
+                                                    <TableCell className="text-right">{r.quantitySacos.toLocaleString()}</TableCell>
+                                                    <TableCell className="text-right">S/. {r.pricePerSaco.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                                                </TableRow>
+                                            ))
+                                        ) : (
+                                            <TableRow>
+                                                <TableCell colSpan={3} className="h-24 text-center">
+                                                    No hay historial de compras.
+                                                </TableCell>
+                                            </TableRow>
+                                        )}
+                                    </TableBody>
+                                </Table>
+                                <ScrollBar orientation="vertical" />
+                            </ScrollArea>
+                        </CardContent>
+                    </Card>
                 </div>
             </TabsContent>
         </Tabs>
@@ -707,9 +711,110 @@ export default function ProductionPage() {
         </AlertDialogContent>
       </AlertDialog>
 
+      <ReplenishmentDialog
+        isOpen={isReplenishmentDialogOpen}
+        onClose={() => setIsReplenishmentDialogOpen(false)}
+        onSubmit={handleReplenishmentSubmit}
+      />
+
       <footer className="text-center text-sm text-muted-foreground py-4 mt-auto">
         <p>&copy; {currentYear} acopiapp. Todos los derechos reservados.</p>
       </footer>
     </div>
   );
 }
+
+const ReplenishmentDialog = ({ isOpen, onClose, onSubmit }: { isOpen: boolean, onClose: () => void, onSubmit: (data: ReplenishmentFormData) => void }) => {
+    const form = useForm<ReplenishmentFormData>({
+        resolver: zodResolver(replenishmentFormSchema),
+        defaultValues: {
+            date: new Date(),
+            quantitySacos: undefined,
+            pricePerSaco: undefined,
+        },
+    });
+
+    useEffect(() => {
+        if (!isOpen) {
+            form.reset({
+                date: new Date(),
+                quantitySacos: undefined,
+                pricePerSaco: undefined,
+            });
+        }
+    }, [isOpen, form]);
+
+    const handleFormSubmit = (data: ReplenishmentFormData) => {
+        onSubmit(data);
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Agregar Compra de Stock</DialogTitle>
+                    <DialogDescription>
+                        Registra una nueva compra de leche entera en sacos.
+                    </DialogDescription>
+                </DialogHeader>
+                <Form {...form}>
+                    <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-4 py-4">
+                        <FormField
+                            control={form.control}
+                            name="date"
+                            render={({ field }) => (
+                                <FormItem className="flex flex-col">
+                                    <FormLabel>Fecha de Compra</FormLabel>
+                                    <Popover>
+                                        <PopoverTrigger asChild>
+                                            <FormControl>
+                                                <Button variant="outline" className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
+                                                    {field.value ? format(field.value, "PPP", { locale: es }) : <span>Seleccione una fecha</span>}
+                                                    <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                                </Button>
+                                            </FormControl>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-auto p-0" align="start">
+                                            <Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date > new Date()} initialFocus locale={es}/>
+                                        </PopoverContent>
+                                    </Popover>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="quantitySacos"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Cantidad (Sacos de 25kg)</FormLabel>
+                                    <FormControl>
+                                        <Input type="number" placeholder="Ej: 10" {...field} value={field.value ?? ''} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="pricePerSaco"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Precio por Saco</FormLabel>
+                                    <FormControl>
+                                        <Input type="number" placeholder="Ej: 65.50" {...field} value={field.value ?? ''} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <DialogFooter>
+                            <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
+                            <Button type="submit">Guardar Compra</Button>
+                        </DialogFooter>
+                    </form>
+                </Form>
+            </DialogContent>
+        </Dialog>
+    );
+};
