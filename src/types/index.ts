@@ -51,3 +51,8 @@ export interface Production {
   rawMaterialLiters: number; // Base liters from deliveries on that day
   transformationIndex: number; // Percentage
 }
+
+export interface WholeMilk {
+  stockKilos: number;
+  pricePerKilo: number;
+}

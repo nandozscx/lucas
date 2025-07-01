@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -18,9 +19,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCaption, TableFooter } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
-import type { Delivery, Production as ProductionType } from '@/types';
-import { ArrowLeft, Cpu, CalendarIcon, Package, Milk, Scale, Percent, Save, Edit2, Trash2, ChevronLeft, ChevronRight, Download, ShoppingBag } from 'lucide-react';
+import type { Delivery, Production as ProductionType, WholeMilk } from '@/types';
+import { ArrowLeft, Cpu, CalendarIcon, Package, Milk, Scale, Percent, Save, Edit2, Trash2, ChevronLeft, ChevronRight, Download, ShoppingBag, Archive, Wallet, DollarSign, AlertCircle } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
 import type jsPDF from 'jspdf';
@@ -31,6 +34,7 @@ interface jsPDFWithAutoTable extends jsPDF {
 
 const DELIVERIES_STORAGE_KEY = 'dailySupplyTrackerDeliveries';
 const PRODUCTION_STORAGE_KEY = 'dailySupplyTrackerProduction';
+const WHOLE_MILK_STORAGE_KEY = 'dailySupplyTrackerWholeMilk';
 
 const productionFormSchema = z.object({
   date: z.date({ required_error: "La fecha es obligatoria." }),
@@ -50,10 +54,18 @@ const productionFormSchema = z.object({
 
 type ProductionFormData = z.infer<typeof productionFormSchema>;
 
+const wholeMilkFormSchema = z.object({
+  stockKilos: z.coerce.number().min(0, "El stock no puede ser negativo."),
+  pricePerKilo: z.coerce.number().positive("El precio debe ser un número positivo.").min(0.01, "El precio debe ser mayor a cero."),
+});
+
+type WholeMilkFormData = z.infer<typeof wholeMilkFormSchema>;
+
 export default function ProductionPage() {
   const [isClient, setIsClient] = useState(false);
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [productionHistory, setProductionHistory] = useState<ProductionType[]>([]);
+  const [wholeMilkData, setWholeMilkData] = useState<WholeMilk>({ stockKilos: 0, pricePerKilo: 0 });
   const [currentYear, setCurrentYear] = useState('');
   const [editingProduction, setEditingProduction] = useState<ProductionType | null>(null);
   const [productionToDelete, setProductionToDelete] = useState<ProductionType | null>(null);
@@ -68,6 +80,14 @@ export default function ProductionPage() {
       useWholeMilk: false,
       wholeMilkKilos: undefined,
     },
+  });
+
+  const wholeMilkForm = useForm<WholeMilkFormData>({
+    resolver: zodResolver(wholeMilkFormSchema),
+    defaultValues: {
+      stockKilos: 0,
+      pricePerKilo: 0,
+    }
   });
 
   const selectedDate = form.watch('date');
@@ -85,6 +105,9 @@ export default function ProductionPage() {
 
       const storedProduction = localStorage.getItem(PRODUCTION_STORAGE_KEY);
       if (storedProduction) setProductionHistory(JSON.parse(storedProduction));
+      
+      const storedWholeMilk = localStorage.getItem(WHOLE_MILK_STORAGE_KEY);
+      if (storedWholeMilk) setWholeMilkData(JSON.parse(storedWholeMilk));
     }
   }, []);
   
@@ -93,6 +116,18 @@ export default function ProductionPage() {
       localStorage.setItem(PRODUCTION_STORAGE_KEY, JSON.stringify(productionHistory));
     }
   }, [productionHistory, isClient]);
+
+  useEffect(() => {
+    if (isClient) {
+      localStorage.setItem(WHOLE_MILK_STORAGE_KEY, JSON.stringify(wholeMilkData));
+    }
+  }, [wholeMilkData, isClient]);
+
+  useEffect(() => {
+    if (wholeMilkData) {
+      wholeMilkForm.reset(wholeMilkData);
+    }
+  }, [wholeMilkData, wholeMilkForm]);
   
   const dailyRawMaterial = React.useMemo(() => {
     if (!selectedDate) return 0;
@@ -113,7 +148,15 @@ export default function ProductionPage() {
     const totalAdjustedRawMaterial = dailyRawMaterial + additionalLitersFromMilk;
     const newTransformationIndex = totalAdjustedRawMaterial > 0 && data.producedUnits > 0 ? ((data.producedUnits / totalAdjustedRawMaterial) - 1) * 100 : 0;
 
+    const newUsage = data.useWholeMilk && data.wholeMilkKilos ? data.wholeMilkKilos : 0;
+
     if (editingProduction) {
+      const oldUsage = editingProduction.wholeMilkKilos || 0;
+      const difference = newUsage - oldUsage;
+      if (difference !== 0) {
+        setWholeMilkData(prev => ({ ...prev, stockKilos: prev.stockKilos - difference }));
+      }
+
       const updatedRecord: ProductionType = {
         ...editingProduction,
         date: dateStr,
@@ -145,11 +188,15 @@ export default function ProductionPage() {
         return;
       }
       
+      if (newUsage > 0) {
+        setWholeMilkData(prev => ({ ...prev, stockKilos: prev.stockKilos - newUsage }));
+      }
+
       const newProductionRecord: ProductionType = {
         id: crypto.randomUUID(),
         date: dateStr,
         producedUnits: data.producedUnits,
-        wholeMilkKilos: data.useWholeMilk ? data.wholeMilkKilos! : 0,
+        wholeMilkKilos: newUsage,
         rawMaterialLiters: dailyRawMaterial,
         transformationIndex: newTransformationIndex,
       };
@@ -195,6 +242,12 @@ export default function ProductionPage() {
 
   const confirmDeleteProduction = () => {
     if (!productionToDelete) return;
+
+    const deletedUsage = productionToDelete.wholeMilkKilos || 0;
+    if (deletedUsage > 0) {
+      setWholeMilkData(prev => ({ ...prev, stockKilos: prev.stockKilos + deletedUsage }));
+    }
+
     setProductionHistory(prev => prev.filter(p => p.id !== productionToDelete.id));
     toast({
       title: "Registro Eliminado",
@@ -281,6 +334,21 @@ export default function ProductionPage() {
     toast({ title: "Exportación PDF Exitosa", description: "El historial de producción semanal se ha exportado a PDF." });
   };
 
+  const handleUpdateWholeMilk = (data: WholeMilkFormData) => {
+    setWholeMilkData(data);
+    toast({
+      title: "Datos Actualizados",
+      description: "El stock y precio de la leche entera han sido actualizados.",
+    });
+  };
+
+  const { kilosUsedToday, costToReplaceToday } = useMemo(() => {
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
+    const todaysProduction = productionHistory.find(p => p.date === todayStr);
+    const used = todaysProduction?.wholeMilkKilos || 0;
+    const cost = used * (wholeMilkData.pricePerKilo || 0);
+    return { kilosUsedToday: used, costToReplaceToday: cost };
+  }, [productionHistory, wholeMilkData.pricePerKilo]);
 
   if (!isClient || !currentWeekStart) {
     return (
@@ -288,9 +356,9 @@ export default function ProductionPage() {
         <header className="flex items-center justify-between mb-6 md:mb-10 p-4 bg-card shadow-md rounded-lg">
           <Skeleton className="h-8 w-1/3" />
         </header>
-        <main className="flex-grow grid md:grid-cols-3 gap-8">
-            <Skeleton className="md:col-span-1 h-96"/>
-            <Skeleton className="md:col-span-2 h-96"/>
+        <main className="flex-grow space-y-6">
+          <Skeleton className="h-12 w-full rounded-lg" />
+          <Skeleton className="h-96 w-full rounded-lg" />
         </main>
       </div>
     );
@@ -313,205 +381,300 @@ export default function ProductionPage() {
         </Link>
         <h1 className="text-2xl md:text-3xl font-bold text-primary flex items-center order-first sm:order-none mx-auto sm:mx-0">
           <Cpu className="mr-3 h-8 w-8" />
-          Registro de Producción
+          Producción
         </h1>
         <div className="w-0 sm:w-auto"></div>
       </header>
+      
+      <main className="flex-grow">
+        <Tabs defaultValue="production" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="production">Registro de Producción</TabsTrigger>
+                <TabsTrigger value="wholeMilk">Gestión de Leche Entera</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="production" className="mt-6">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div className="lg:col-span-1 space-y-8">
+                        <Card>
+                            <Form {...form}>
+                                <form onSubmit={form.handleSubmit(handleFormSubmit)}>
+                                    <CardHeader>
+                                        <CardTitle>{editingProduction ? 'Editar Registro' : 'Registrar Producción Diaria'}</CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="space-y-4">
+                                        <FormField
+                                            control={form.control}
+                                            name="date"
+                                            render={({ field }) => (
+                                                <FormItem className="flex flex-col">
+                                                    <FormLabel>Fecha de Producción</FormLabel>
+                                                    <Popover>
+                                                        <PopoverTrigger asChild>
+                                                            <FormControl>
+                                                                <Button variant="outline" className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
+                                                                    {field.value ? format(field.value, "PPP", { locale: es }) : <span>Seleccione una fecha</span>}
+                                                                    <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                                                </Button>
+                                                            </FormControl>
+                                                        </PopoverTrigger>
+                                                        <PopoverContent className="w-auto p-0" align="start">
+                                                            <Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date > new Date()} initialFocus locale={es}/>
+                                                        </PopoverContent>
+                                                    </Popover>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                        <FormField
+                                            control={form.control}
+                                            name="producedUnits"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>Unidades Producidas</FormLabel>
+                                                    <FormControl>
+                                                        <Input type="number" placeholder="Ej: 240" {...field} value={field.value ?? ''} />
+                                                    </FormControl>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                        <FormField
+                                            control={form.control}
+                                            name="useWholeMilk"
+                                            render={({ field }) => (
+                                                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                                                    <div className="space-y-0.5">
+                                                        <FormLabel>¿Usó leche entera?</FormLabel>
+                                                    </div>
+                                                    <FormControl>
+                                                        <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                                                    </FormControl>
+                                                </FormItem>
+                                            )}
+                                        />
+                                        {useWholeMilk && (
+                                            <FormField
+                                                control={form.control}
+                                                name="wholeMilkKilos"
+                                                render={({ field }) => (
+                                                    <FormItem>
+                                                        <FormLabel>Kilos de Leche Entera</FormLabel>
+                                                        <FormControl>
+                                                            <Input type="number" placeholder="Ej: 5" {...field} value={field.value ?? ''} />
+                                                        </FormControl>
+                                                        <FormMessage />
+                                                    </FormItem>
+                                                )}
+                                            />
+                                        )}
+                                    </CardContent>
+                                    <CardFooter className="flex flex-col gap-2">
+                                        <Button type="submit" className="w-full">
+                                            <Save className="mr-2 h-4 w-4"/>
+                                            {editingProduction ? 'Actualizar Registro' : 'Guardar Registro'}
+                                        </Button>
+                                        {editingProduction && (
+                                            <Button variant="outline" onClick={handleCancelEdit} className="w-full">
+                                                Cancelar Edición
+                                            </Button>
+                                        )}
+                                    </CardFooter>
+                                </form>
+                            </Form>
+                        </Card>
 
-      <main className="flex-grow grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-1 space-y-8">
-            <Card>
-                <Form {...form}>
-                    <form onSubmit={form.handleSubmit(handleFormSubmit)}>
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Cálculos del Día</CardTitle>
+                                <CardDescription>{format(selectedDate, "PPP", { locale: es })}</CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-muted-foreground flex items-center"><Milk className="mr-2 h-4 w-4"/> Materia Prima (Entregas)</span>
+                                    <span className="font-bold">{dailyRawMaterial.toLocaleString()} L</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-muted-foreground flex items-center"><Scale className="mr-2 h-4 w-4"/> Leche Entera Adicional</span>
+                                    <span className="font-bold">{additionalLitersFromMilk.toLocaleString()} L</span>
+                                </div>
+                                <div className="flex justify-between items-center text-lg">
+                                    <span className="text-foreground font-semibold flex items-center"><Package className="mr-2 h-5 w-5"/> Total Materia Prima</span>
+                                    <span className="font-extrabold text-primary">{totalAdjustedRawMaterial.toLocaleString()} L</span>
+                                </div>
+                                <div className="flex justify-between items-center text-lg">
+                                    <span className="text-foreground font-semibold flex items-center"><Percent className="mr-2 h-5 w-5"/> Índice de Transformación</span>
+                                    <span className={`font-extrabold ${transformationIndex >= 0 ? 'text-green-500' : 'text-destructive'}`}>{transformationIndex.toFixed(2)} %</span>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+                    <div className="lg:col-span-2">
+                        <Card className="h-full flex flex-col">
+                            <CardHeader>
+                                <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+                                    <div className="text-center sm:text-left">
+                                        <CardTitle>Historial de Producción</CardTitle>
+                                        <CardDescription>{weekTitle}</CardDescription>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <Button variant="outline" onClick={handlePreviousWeek}>
+                                            <ChevronLeft className="h-4 w-4 mr-1 sm:mr-2" />
+                                            <span className="hidden sm:inline">Semana Ant.</span>
+                                        </Button>
+                                        <Button variant="outline" onClick={handleNextWeek}>
+                                            <span className="hidden sm:inline">Semana Sig.</span>
+                                            <ChevronRight className="h-4 w-4 ml-1 sm:ml-2" />
+                                        </Button>
+                                    </div>
+                                </div>
+                            </CardHeader>
+                            <CardContent className="flex-1 flex flex-col">
+                                <ScrollArea className="h-[500px] rounded-md border">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Fecha</TableHead>
+                                                <TableHead className="text-right">Materia Prima Total</TableHead>
+                                                <TableHead className="text-right">Unidades Prod.</TableHead>
+                                                <TableHead className="text-right">Índice</TableHead>
+                                                <TableHead className="text-center w-[100px]">Acciones</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {productionForCurrentWeek.length > 0 ? (
+                                                productionForCurrentWeek.map(p => (
+                                                    <TableRow key={p.id}>
+                                                        <TableCell>{format(parseISO(p.date), 'PPP', { locale: es })}</TableCell>
+                                                        <TableCell className="text-right">{(p.rawMaterialLiters + (p.wholeMilkKilos * 10)).toLocaleString()} L</TableCell>
+                                                        <TableCell className="text-right">{p.producedUnits.toLocaleString()}</TableCell>
+                                                        <TableCell className={`text-right font-medium ${p.transformationIndex >= 0 ? 'text-green-500' : 'text-red-500'}`}>{p.transformationIndex.toFixed(2)}%</TableCell>
+                                                        <TableCell className="text-center">
+                                                            <Button variant="ghost" size="icon" onClick={() => handleOpenEditDialog(p)} aria-label="Editar registro">
+                                                                <Edit2 className="h-4 w-4 text-blue-600" />
+                                                            </Button>
+                                                            <Button variant="ghost" size="icon" onClick={() => setProductionToDelete(p)} aria-label="Eliminar registro">
+                                                                <Trash2 className="h-4 w-4 text-destructive" />
+                                                            </Button>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))
+                                            ) : (
+                                                <TableRow>
+                                                    <TableCell colSpan={5} className="h-24 text-center">
+                                                    <EmptyState message="No hay registros de producción para esta semana."/>
+                                                    </TableCell>
+                                                </TableRow>
+                                            )}
+                                        </TableBody>
+                                        {productionForCurrentWeek.length > 0 && (
+                                        <TableFooter>
+                                                <TableRow>
+                                                    <TableCell colSpan={2} className="text-right font-bold">Totales de la Semana:</TableCell>
+                                                    <TableCell className="text-right font-bold">{totalWeeklyUnits.toLocaleString()}</TableCell>
+                                                    <TableCell className="text-right font-bold">{averageWeeklyIndex.toFixed(2)}% (Prom.)</TableCell>
+                                                    <TableCell />
+                                                </TableRow>
+                                            </TableFooter>
+                                        )}
+                                    </Table>
+                                </ScrollArea>
+                            </CardContent>
+                            <CardFooter className="justify-end border-t pt-4">
+                            <Button onClick={exportHistoryToPDF} disabled={productionForCurrentWeek.length === 0}>
+                                <Download className="mr-2 h-4 w-4"/>
+                                Exportar PDF de la Semana
+                            </Button>
+                            </CardFooter>
+                        </Card>
+                    </div>
+                </div>
+            </TabsContent>
+            
+            <TabsContent value="wholeMilk" className="mt-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <Card>
                         <CardHeader>
-                            <CardTitle>{editingProduction ? 'Editar Registro de Producción' : 'Registrar Producción Diaria'}</CardTitle>
+                            <CardTitle>Gestionar Inventario</CardTitle>
+                            <CardDescription>Actualiza el stock y el precio de compra de la leche entera.</CardDescription>
                         </CardHeader>
-                        <CardContent className="space-y-4">
-                            <FormField
-                                control={form.control}
-                                name="date"
-                                render={({ field }) => (
-                                    <FormItem className="flex flex-col">
-                                        <FormLabel>Fecha de Producción</FormLabel>
-                                        <Popover>
-                                            <PopoverTrigger asChild>
+                        <Form {...wholeMilkForm}>
+                            <form onSubmit={wholeMilkForm.handleSubmit(handleUpdateWholeMilk)}>
+                                <CardContent className="space-y-4">
+                                     <FormField
+                                        control={wholeMilkForm.control}
+                                        name="stockKilos"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Stock Actual (kg)</FormLabel>
                                                 <FormControl>
-                                                    <Button variant="outline" className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
-                                                        {field.value ? format(field.value, "PPP", { locale: es }) : <span>Seleccione una fecha</span>}
-                                                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                                    </Button>
+                                                    <Input type="number" placeholder="Ej: 100" {...field} value={field.value ?? ''} />
                                                 </FormControl>
-                                            </PopoverTrigger>
-                                            <PopoverContent className="w-auto p-0" align="start">
-                                                <Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date > new Date()} initialFocus locale={es}/>
-                                            </PopoverContent>
-                                        </Popover>
-                                        <FormMessage />
-                                    </FormItem>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <FormField
+                                        control={wholeMilkForm.control}
+                                        name="pricePerKilo"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Precio de Compra (por kg)</FormLabel>
+                                                <FormControl>
+                                                    <Input type="number" placeholder="Ej: 2.50" {...field} value={field.value ?? ''} />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                </CardContent>
+                                <CardFooter>
+                                    <Button type="submit" className="w-full">
+                                    <Save className="mr-2 h-4 w-4"/>
+                                    Actualizar Inventario
+                                    </Button>
+                                </CardFooter>
+                            </form>
+                        </Form>
+                    </Card>
+                    <div className="space-y-8">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Métricas Clave</CardTitle>
+                                <CardDescription>Información sobre tu inventario y uso.</CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                {wholeMilkData.stockKilos < 0 && (
+                                    <Alert variant="destructive">
+                                    <AlertCircle className="h-4 w-4" />
+                                    <AlertTitle>Stock Negativo</AlertTitle>
+                                    <AlertDescription>
+                                        Tu inventario de leche entera es negativo. Por favor, actualiza tu stock.
+                                    </AlertDescription>
+                                    </Alert>
                                 )}
-                            />
-                             <FormField
-                                control={form.control}
-                                name="producedUnits"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Unidades Producidas</FormLabel>
-                                        <FormControl>
-                                            <Input type="number" placeholder="Ej: 240" {...field} value={field.value ?? ''} />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                            <FormField
-                                control={form.control}
-                                name="useWholeMilk"
-                                render={({ field }) => (
-                                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
-                                        <div className="space-y-0.5">
-                                            <FormLabel>¿Usó leche entera?</FormLabel>
-                                        </div>
-                                        <FormControl>
-                                            <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-                                        </FormControl>
-                                    </FormItem>
-                                )}
-                            />
-                            {useWholeMilk && (
-                                <FormField
-                                    control={form.control}
-                                    name="wholeMilkKilos"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Kilos de Leche Entera</FormLabel>
-                                            <FormControl>
-                                                <Input type="number" placeholder="Ej: 5" {...field} value={field.value ?? ''} />
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-                            )}
-                        </CardContent>
-                        <CardFooter className="flex flex-col gap-2">
-                            <Button type="submit" className="w-full">
-                                <Save className="mr-2 h-4 w-4"/>
-                                {editingProduction ? 'Actualizar Registro' : 'Guardar Registro'}
-                            </Button>
-                            {editingProduction && (
-                                <Button variant="outline" onClick={handleCancelEdit} className="w-full">
-                                    Cancelar Edición
-                                </Button>
-                            )}
-                        </CardFooter>
-                    </form>
-                </Form>
-            </Card>
-
-            <Card>
-                <CardHeader>
-                    <CardTitle>Cálculos del Día</CardTitle>
-                    <CardDescription>{format(selectedDate, "PPP", { locale: es })}</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="flex justify-between items-center">
-                        <span className="text-muted-foreground flex items-center"><Milk className="mr-2 h-4 w-4"/> Materia Prima (Entregas)</span>
-                        <span className="font-bold">{dailyRawMaterial.toLocaleString()} L</span>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-muted-foreground flex items-center"><Archive className="mr-2 h-4 w-4"/> Stock Actual</span>
+                                    <span className={`font-bold ${wholeMilkData.stockKilos < 0 ? 'text-destructive' : ''}`}>{wholeMilkData.stockKilos.toLocaleString()} kg</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-muted-foreground flex items-center"><DollarSign className="mr-2 h-4 w-4"/> Precio por Kilo</span>
+                                    <span className="font-bold">{wholeMilkData.pricePerKilo.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-muted-foreground flex items-center"><Milk className="mr-2 h-4 w-4"/> Uso de Hoy</span>
+                                    <span className="font-bold">{kilosUsedToday.toLocaleString()} kg</span>
+                                </div>
+                                <div className="flex justify-between items-center text-lg">
+                                    <span className="text-foreground font-semibold flex items-center"><Wallet className="mr-2 h-5 w-5"/> Costo de Reposición (Hoy)</span>
+                                    <span className="font-extrabold text-primary">{costToReplaceToday.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</span>
+                                </div>
+                            </CardContent>
+                        </Card>
                     </div>
-                     <div className="flex justify-between items-center">
-                        <span className="text-muted-foreground flex items-center"><Scale className="mr-2 h-4 w-4"/> Leche Entera Adicional</span>
-                        <span className="font-bold">{additionalLitersFromMilk.toLocaleString()} L</span>
-                    </div>
-                     <div className="flex justify-between items-center text-lg">
-                        <span className="text-foreground font-semibold flex items-center"><Package className="mr-2 h-5 w-5"/> Total Materia Prima</span>
-                        <span className="font-extrabold text-primary">{totalAdjustedRawMaterial.toLocaleString()} L</span>
-                    </div>
-                    <div className="flex justify-between items-center text-lg">
-                        <span className="text-foreground font-semibold flex items-center"><Percent className="mr-2 h-5 w-5"/> Índice de Transformación</span>
-                        <span className={`font-extrabold ${transformationIndex >= 0 ? 'text-green-500' : 'text-destructive'}`}>{transformationIndex.toFixed(2)} %</span>
-                    </div>
-                </CardContent>
-            </Card>
-        </div>
-        <div className="lg:col-span-2">
-            <Card className="h-full flex flex-col">
-                <CardHeader>
-                    <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-                        <div className="text-center sm:text-left">
-                            <CardTitle>Historial de Producción</CardTitle>
-                            <CardDescription>{weekTitle}</CardDescription>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <Button variant="outline" onClick={handlePreviousWeek}>
-                                <ChevronLeft className="h-4 w-4 mr-1 sm:mr-2" />
-                                <span className="hidden sm:inline">Semana Ant.</span>
-                            </Button>
-                            <Button variant="outline" onClick={handleNextWeek}>
-                                <span className="hidden sm:inline">Semana Sig.</span>
-                                <ChevronRight className="h-4 w-4 ml-1 sm:ml-2" />
-                            </Button>
-                        </div>
-                    </div>
-                </CardHeader>
-                <CardContent className="flex-1 flex flex-col">
-                    <ScrollArea className="h-[500px] rounded-md border">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Fecha</TableHead>
-                                    <TableHead className="text-right">Materia Prima Total</TableHead>
-                                    <TableHead className="text-right">Unidades Prod.</TableHead>
-                                    <TableHead className="text-right">Índice</TableHead>
-                                    <TableHead className="text-center w-[100px]">Acciones</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {productionForCurrentWeek.length > 0 ? (
-                                    productionForCurrentWeek.map(p => (
-                                        <TableRow key={p.id}>
-                                            <TableCell>{format(parseISO(p.date), 'PPP', { locale: es })}</TableCell>
-                                            <TableCell className="text-right">{(p.rawMaterialLiters + (p.wholeMilkKilos * 10)).toLocaleString()} L</TableCell>
-                                            <TableCell className="text-right">{p.producedUnits.toLocaleString()}</TableCell>
-                                            <TableCell className={`text-right font-medium ${p.transformationIndex >= 0 ? 'text-green-500' : 'text-red-500'}`}>{p.transformationIndex.toFixed(2)}%</TableCell>
-                                            <TableCell className="text-center">
-                                                <Button variant="ghost" size="icon" onClick={() => handleOpenEditDialog(p)} aria-label="Editar registro">
-                                                    <Edit2 className="h-4 w-4 text-blue-600" />
-                                                </Button>
-                                                <Button variant="ghost" size="icon" onClick={() => setProductionToDelete(p)} aria-label="Eliminar registro">
-                                                    <Trash2 className="h-4 w-4 text-destructive" />
-                                                </Button>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))
-                                ) : (
-                                    <TableRow>
-                                        <TableCell colSpan={5} className="h-24 text-center">
-                                          <EmptyState message="No hay registros de producción para esta semana."/>
-                                        </TableCell>
-                                    </TableRow>
-                                )}
-                            </TableBody>
-                            {productionForCurrentWeek.length > 0 && (
-                               <TableFooter>
-                                    <TableRow>
-                                        <TableCell colSpan={2} className="text-right font-bold">Totales de la Semana:</TableCell>
-                                        <TableCell className="text-right font-bold">{totalWeeklyUnits.toLocaleString()}</TableCell>
-                                        <TableCell className="text-right font-bold">{averageWeeklyIndex.toFixed(2)}% (Prom.)</TableCell>
-                                        <TableCell />
-                                    </TableRow>
-                                </TableFooter>
-                            )}
-                        </Table>
-                    </ScrollArea>
-                </CardContent>
-                <CardFooter className="justify-end border-t pt-4">
-                  <Button onClick={exportHistoryToPDF} disabled={productionForCurrentWeek.length === 0}>
-                    <Download className="mr-2 h-4 w-4"/>
-                    Exportar PDF de la Semana
-                  </Button>
-                </CardFooter>
-            </Card>
-        </div>
+                </div>
+            </TabsContent>
+        </Tabs>
       </main>
       
       <AlertDialog open={!!productionToDelete} onOpenChange={(open) => !open && setProductionToDelete(null)}>
@@ -537,5 +700,3 @@ export default function ProductionPage() {
     </div>
   );
 }
-
-    
