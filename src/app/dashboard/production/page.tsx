@@ -266,24 +266,24 @@ export default function ProductionPage() {
     }
   };
 
-  const { weekTitle, productionForCurrentWeek, totalWeeklyUnits, averageWeeklyIndex } = useMemo(() => {
+  const { weekTitle, productionForCurrentWeek, totalWeeklyUnits, averageWeeklyIndex, currentWeekEnd } = useMemo(() => {
     if (!currentWeekStart) {
-      return { weekTitle: '', productionForCurrentWeek: [], totalWeeklyUnits: 0, averageWeeklyIndex: 0 };
+      return { weekTitle: '', productionForCurrentWeek: [], totalWeeklyUnits: 0, averageWeeklyIndex: 0, currentWeekEnd: null };
     }
 
-    const currentWeekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 0, locale: es });
-    const title = `Semana del ${format(currentWeekStart, "dd 'de' MMMM", { locale: es })} al ${format(currentWeekEnd, "dd 'de' MMMM 'de' yyyy", { locale: es })}`;
+    const weekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 0, locale: es });
+    const title = `Semana del ${format(currentWeekStart, "dd 'de' MMMM", { locale: es })} al ${format(weekEnd, "dd 'de' MMMM 'de' yyyy", { locale: es })}`;
 
     const filtered = productionHistory.filter(p => {
       const productionDate = parseISO(p.date);
-      return isWithinInterval(productionDate, { start: currentWeekStart, end: currentWeekEnd });
+      return isWithinInterval(productionDate, { start: currentWeekStart, end: weekEnd });
     }).sort((a, b) => parseISO(a.date).getTime() - parseISO(b.date).getTime());
 
     const units = filtered.reduce((sum, p) => sum + p.producedUnits, 0);
     const indicesSum = filtered.reduce((sum, p) => sum + p.transformationIndex, 0);
     const avgIndex = filtered.length > 0 ? indicesSum / filtered.length : 0;
 
-    return { weekTitle: title, productionForCurrentWeek: filtered, totalWeeklyUnits: units, averageWeeklyIndex: avgIndex };
+    return { weekTitle: title, productionForCurrentWeek: filtered, totalWeeklyUnits: units, averageWeeklyIndex: avgIndex, currentWeekEnd: weekEnd };
   }, [currentWeekStart, productionHistory]);
   
   const exportHistoryToPDF = async () => {
@@ -396,15 +396,45 @@ export default function ProductionPage() {
   }, [productionHistory, latestPricePerSaco]);
   
   const stockUsageHistory = useMemo(() => {
+    const getPriceOnDate = (usageDateStr: string): number => {
+        const usageDate = parseISO(usageDateStr);
+        const sortedReplenishments = [...replenishmentHistory]
+            .filter(r => parseISO(r.date) <= usageDate)
+            .sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime());
+        
+        return sortedReplenishments.length > 0 ? sortedReplenishments[0].pricePerSaco : (latestPricePerSaco || 0);
+    };
+    
     return productionHistory
       .filter(p => p.wholeMilkKilos > 0)
-      .map(p => ({
-        date: p.date,
-        kilosUsed: p.wholeMilkKilos,
-        id: p.id,
-      }))
-      .sort((a,b) => parseISO(b.date).getTime() - parseISO(a.date).getTime());
-  }, [productionHistory]);
+      .map(p => {
+          const pricePerSaco = getPriceOnDate(p.date);
+          const cost = (p.wholeMilkKilos / 25) * pricePerSaco;
+          return {
+              date: p.date,
+              kilosUsed: p.wholeMilkKilos,
+              id: p.id,
+              costToReplace: cost,
+          }
+      })
+      .sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime());
+  }, [productionHistory, replenishmentHistory, latestPricePerSaco]);
+
+  const stockUsageForCurrentWeek = useMemo(() => {
+      if (!currentWeekStart || !currentWeekEnd) return [];
+      return stockUsageHistory.filter(usage => {
+          const usageDate = parseISO(usage.date);
+          return isWithinInterval(usageDate, { start: currentWeekStart, end: currentWeekEnd });
+      });
+  }, [stockUsageHistory, currentWeekStart, currentWeekEnd]);
+  
+  const weeklyUsageTotals = useMemo(() => {
+      return stockUsageForCurrentWeek.reduce((totals, usage) => {
+          totals.kilos += usage.kilosUsed;
+          totals.cost += usage.costToReplace;
+          return totals;
+      }, { kilos: 0, cost: 0 });
+  }, [stockUsageForCurrentWeek]);
 
   if (!isClient || !currentWeekStart) {
     return (
@@ -698,7 +728,7 @@ export default function ProductionPage() {
                         <Card>
                             <CardHeader>
                                 <CardTitle>Historial de Salidas de Stock</CardTitle>
-                                <CardDescription>Consumo de leche entera en producción.</CardDescription>
+                                <CardDescription>Consumo de leche entera para la semana seleccionada.</CardDescription>
                             </CardHeader>
                             <CardContent>
                                 <ScrollArea className="h-[200px] rounded-md border">
@@ -707,24 +737,35 @@ export default function ProductionPage() {
                                             <TableRow>
                                                 <TableHead>Fecha de Uso</TableHead>
                                                 <TableHead className="text-right">Kilos Usados</TableHead>
+                                                <TableHead className="text-right">Costo Reposición</TableHead>
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
-                                            {stockUsageHistory.length > 0 ? (
-                                                stockUsageHistory.map(usage => (
+                                            {stockUsageForCurrentWeek.length > 0 ? (
+                                                stockUsageForCurrentWeek.map(usage => (
                                                     <TableRow key={usage.id}>
                                                         <TableCell>{format(parseISO(usage.date), 'PPP', { locale: es })}</TableCell>
                                                         <TableCell className="text-right">{usage.kilosUsed.toLocaleString()} kg</TableCell>
+                                                        <TableCell className="text-right">S/. {usage.costToReplace.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
                                                     </TableRow>
                                                 ))
                                             ) : (
                                                 <TableRow>
-                                                    <TableCell colSpan={2} className="h-24 text-center">
-                                                        No se ha registrado uso de leche entera.
+                                                    <TableCell colSpan={3} className="h-24 text-center">
+                                                        No se ha registrado uso de leche entera para esta semana.
                                                     </TableCell>
                                                 </TableRow>
                                             )}
                                         </TableBody>
+                                        {stockUsageForCurrentWeek.length > 0 && (
+                                            <TableFooter>
+                                                <TableRow>
+                                                    <TableCell className="text-right font-bold">Totales:</TableCell>
+                                                    <TableCell className="text-right font-bold">{weeklyUsageTotals.kilos.toLocaleString()} kg</TableCell>
+                                                    <TableCell className="text-right font-bold">S/. {weeklyUsageTotals.cost.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
+                                                </TableRow>
+                                            </TableFooter>
+                                        )}
                                     </Table>
                                     <ScrollBar orientation="vertical" />
                                 </ScrollArea>
