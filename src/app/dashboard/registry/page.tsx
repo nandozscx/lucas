@@ -1,107 +1,113 @@
-
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import type { Delivery as DeliveryType, Provider } from '@/types'; // Removed VendorTotal, as it's no longer passed to SupplyDataView
-import SupplyEntryForm, { type DailyRegistryFormData } from '@/components/supply-entry-form';
-import SupplyDataView from '@/components/supply-data-view';
-import { useToast } from "@/hooks/use-toast";
-import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, ClipboardList, AlertTriangle } from 'lucide-react';
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+
+import type { Delivery as DeliveryType, Provider } from '@/types';
+import SupplyEntryForm, { type DailyRegistryFormData } from '@/components/supply-entry-form';
+import SupplyDataView from '@/components/supply-data-view';
+import ProviderForm, { type ProviderFormData } from '@/components/provider-form';
+import { useToast } from "@/hooks/use-toast";
+
+import { Skeleton } from "@/components/ui/skeleton";
+import { ArrowLeft, ClipboardList, Users as UsersIcon, PlusCircle, Edit2, Trash2, Info } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+  TableCaption
+} from "@/components/ui/table";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+
 
 const DELIVERIES_STORAGE_KEY = 'dailySupplyTrackerDeliveries';
 const PROVIDERS_STORAGE_KEY = 'dailySupplyTrackerProviders';
 
-export default function RegistryPage() {
+export default function OperationsPage() {
   const [deliveries, setDeliveries] = useState<DeliveryType[]>([]);
   const [providers, setProviders] = useState<Provider[]>([]);
   const [dailyTotals, setDailyTotals] = useState<Record<string, number>>({});
-  // const [vendorTotals, setVendorTotals] = useState<VendorTotal[]>([]); // Kept for now if RegistryPage itself needs it, but not passed down.
   const [isClient, setIsClient] = useState(false);
   const [currentYear, setCurrentYear] = useState('');
   const { toast } = useToast();
+
+  // State for provider dialogs
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingProvider, setEditingProvider] = useState<Provider | null>(null);
+  const [providerToDelete, setProviderToDelete] = useState<Provider | null>(null);
 
   useEffect(() => {
     setIsClient(true);
     setCurrentYear(new Date().getFullYear().toString());
     if (typeof window !== 'undefined') {
+      // Load Deliveries
       const storedDeliveries = localStorage.getItem(DELIVERIES_STORAGE_KEY);
       if (storedDeliveries) {
         try {
           const parsedDeliveries = JSON.parse(storedDeliveries);
-          if (Array.isArray(parsedDeliveries) && parsedDeliveries.every(d => 'id' in d && 'providerName' in d && 'date' in d && 'quantity' in d)) {
-            setDeliveries(parsedDeliveries);
-          } else {
-            console.warn("Estructura de datos inválida en localStorage para entregas, limpiando.");
-            localStorage.removeItem(DELIVERIES_STORAGE_KEY);
-          }
-        } catch (error) {
-          console.error("Falló al parsear entregas desde localStorage", error);
-          localStorage.removeItem(DELIVERIES_STORAGE_KEY);
-        }
+          if (Array.isArray(parsedDeliveries)) setDeliveries(parsedDeliveries);
+        } catch (error) { console.error("Error parsing deliveries", error); }
       }
 
+      // Load Providers
       const storedProviders = localStorage.getItem(PROVIDERS_STORAGE_KEY);
       if (storedProviders) {
         try {
           const parsedProviders = JSON.parse(storedProviders);
-           if (Array.isArray(parsedProviders) && parsedProviders.every(p => 'id' in p && 'name' in p && 'address' in p && 'phone' in p && 'price' in p && typeof p.price === 'number')) {
-            setProviders(parsedProviders);
-          } else {
-            console.warn("Estructura de datos inválida en localStorage para proveedores, limpiando lista de proveedores.");
-            localStorage.removeItem(PROVIDERS_STORAGE_KEY);
-            setProviders([]); 
-          }
-        } catch (error) {
-          console.error("Falló al parsear proveedores desde localStorage", error);
-          localStorage.removeItem(PROVIDERS_STORAGE_KEY);
-          setProviders([]); 
-        }
+          if (Array.isArray(parsedProviders)) setProviders(parsedProviders);
+        } catch (error) { console.error("Error parsing providers", error); }
       }
     }
   }, []);
 
+  // Effect for saving deliveries and calculating daily totals
   useEffect(() => {
     if (isClient) {
       localStorage.setItem(DELIVERIES_STORAGE_KEY, JSON.stringify(deliveries));
-
       const newDailyTotals: Record<string, number> = {};
       deliveries.forEach(delivery => {
         newDailyTotals[delivery.date] = (newDailyTotals[delivery.date] || 0) + delivery.quantity;
       });
       setDailyTotals(newDailyTotals);
-
-      // The following vendorTotals calculation is for the RegistryPage's own state,
-      // but it's not passed to SupplyDataView anymore for the weekly vendor totals tab.
-      // SupplyDataView calculates its weekly vendor totals internally.
-      // This can be removed if RegistryPage itself has no other use for all-time vendor totals.
-      // const newVendorTotalsMap: Record<string, { totalQuantity: number }> = {};
-      // deliveries.forEach(delivery => {
-      //   if (!newVendorTotalsMap[delivery.providerName]) {
-      //     newVendorTotalsMap[delivery.providerName] = { totalQuantity: 0 };
-      //   }
-      //   newVendorTotalsMap[delivery.providerName].totalQuantity += delivery.quantity;
-      // });
-      
-      // const newVendorTotalsArray = Object.entries(newVendorTotalsMap)
-      //   .map(([name, data]) => ({
-      //     originalName: name,
-      //     totalQuantity: data.totalQuantity,
-      //   }))
-      //   .sort((a, b) => a.originalName.localeCompare(b.originalName));
-      // setVendorTotals(newVendorTotalsArray);
     }
   }, [deliveries, isClient]);
+  
+  // Effect for saving providers
+  useEffect(() => {
+    if (isClient) {
+      localStorage.setItem(PROVIDERS_STORAGE_KEY, JSON.stringify(providers));
+    }
+  }, [providers, isClient]);
 
+  // Handler for adding/updating deliveries
   const handleAddDeliveries = useCallback((data: DailyRegistryFormData) => {
     const dateStr = format(data.date, "yyyy-MM-dd");
-
-    // Obtiene solo las entradas del formulario que tienen una cantidad válida.
     const submittedEntries = data.entries.filter(
       (entry) => entry.quantity !== undefined && entry.quantity !== null && entry.quantity >= 0
     );
@@ -109,31 +115,24 @@ export default function RegistryPage() {
     if (submittedEntries.length === 0) {
       toast({
         title: "Sin Entregas para Registrar",
-        description: "No se ingresaron cantidades para la fecha seleccionada.",
+        description: "No se ingresaron cantidades.",
         variant: "default",
       });
       return;
     }
     
-    // Crea un conjunto con los nombres de los proveedores que se están enviando.
     const submittedProviderNames = new Set(submittedEntries.map(e => e.providerName));
 
     setDeliveries(prevDeliveries => {
-      // Filtra las entregas para eliminar cualquier entrada existente para el mismo proveedor en la misma fecha.
-      // Esto previene la duplicación y asegura que el nuevo valor reemplace al antiguo.
       const otherDeliveries = prevDeliveries.filter(delivery => {
         return delivery.date !== dateStr || !submittedProviderNames.has(delivery.providerName);
       });
-
-      // Crea los nuevos registros de entrega a partir del formulario.
       const newDeliveriesForDate: DeliveryType[] = submittedEntries.map(entry => ({
         id: crypto.randomUUID(),
         providerName: entry.providerName,
         date: dateStr,
-        quantity: entry.quantity!, // Ya se filtró para no ser nulo/indefinido.
+        quantity: entry.quantity!,
       }));
-      
-      // Combina las entregas filtradas (las antiguas de otras fechas/proveedores) con las nuevas.
       return [...otherDeliveries, ...newDeliveriesForDate];
     });
 
@@ -142,26 +141,69 @@ export default function RegistryPage() {
       description: `${submittedEntries.length} entrega(s) para el ${format(data.date, "PPP", { locale: es })} han sido registradas/actualizadas.`,
     });
   }, [toast]);
+
+  // Handlers for Provider management
+  const handleOpenAddDialog = () => {
+    setEditingProvider(null);
+    setIsDialogOpen(true);
+  };
+
+  const handleOpenEditDialog = (provider: Provider) => {
+    setEditingProvider(provider);
+    setIsDialogOpen(true);
+  };
+
+  const handleCloseDialog = useCallback(() => {
+    setIsDialogOpen(false);
+    setEditingProvider(null);
+  }, []);
+
+  const handleProviderFormSubmit = useCallback((data: ProviderFormData) => {
+    if (editingProvider) {
+      setProviders(prev => prev.map(p => p.id === editingProvider.id ? { ...p, ...data } : p));
+      toast({ title: "Proveedor Actualizado", description: `El proveedor "${data.name}" ha sido actualizado.` });
+    } else {
+      const newProvider: Provider = { ...data, id: crypto.randomUUID() };
+      setProviders(prev => [...prev, newProvider]);
+      toast({ title: "Proveedor Agregado", description: `El proveedor "${data.name}" ha sido agregado.` });
+    }
+    handleCloseDialog();
+  }, [editingProvider, toast, handleCloseDialog]);
+
+  const handleDeleteProviderClick = (provider: Provider) => {
+    setProviderToDelete(provider);
+  };
   
+  const confirmDeleteProvider = () => {
+    if (providerToDelete) {
+      setProviders(prev => prev.filter(p => p.id !== providerToDelete.id));
+      toast({ title: "Proveedor Eliminado", description: `El proveedor "${providerToDelete.name}" ha sido eliminado.`, variant: "destructive" });
+      setProviderToDelete(null);
+    }
+  };
+
+  const EmptyProvidersState: React.FC<{ message: string; onAddClick: () => void }> = ({ message, onAddClick }) => (
+    <div className="flex flex-col items-center justify-center text-center text-muted-foreground py-10 border border-dashed rounded-md min-h-[400px]">
+      <Info className="h-12 w-12 mb-3 opacity-50" />
+      <p className="text-lg font-medium">No Hay Proveedores</p>
+      <p className="text-sm mb-4">{message}</p>
+      <Button onClick={onAddClick} variant="outline">
+        <PlusCircle className="mr-2 h-4 w-4" /> Agregar Primer Proveedor
+      </Button>
+    </div>
+  );
+
 
   if (!isClient) {
     return (
       <div className="min-h-screen flex flex-col p-4 md:p-8 bg-background">
         <header className="flex items-center justify-between mb-6 md:mb-10 p-4 bg-card shadow-md rounded-lg">
           <Skeleton className="h-8 w-1/3" />
-          <Skeleton className="h-10 w-36" />
         </header>
-        <main className="flex-grow grid md:grid-cols-3 gap-6 md:gap-8">
-          <div className="md:col-span-1 space-y-6">
-            <Skeleton className="h-96 w-full rounded-lg" />
-          </div>
-          <div className="md:col-span-2 space-y-6">
-            <Skeleton className="h-[600px] w-full rounded-lg" />
-          </div>
+        <main className="flex-grow">
+            <Skeleton className="h-12 w-1/3 mb-4"/>
+            <Skeleton className="h-[600px] w-full"/>
         </main>
-        <footer className="text-center text-sm text-muted-foreground py-4 mt-auto">
-          <Skeleton className="h-6 w-1/2 mx-auto rounded-md" />
-        </footer>
       </div>
     );
   }
@@ -175,39 +217,135 @@ export default function RegistryPage() {
         </Link>
         <div className="text-center order-first sm:order-none mx-auto sm:mx-0">
           <h1 className="text-2xl md:text-3xl font-bold text-primary flex items-center justify-center">
-            <ClipboardList className="mr-3 h-8 w-8" /> Registro de Entregas
+            <ClipboardList className="mr-3 h-8 w-8" /> Operaciones
           </h1>
-          <p className="text-sm text-muted-foreground">Registro Semanal</p>
         </div>
         <div className="w-0 sm:w-auto"></div> 
       </header>
 
-      <main className="flex-grow grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
-        <div className="md:col-span-1 space-y-6">
-          {providers.length === 0 ? (
-             <Alert variant="destructive" className="shadow-md">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>No hay proveedores registrados</AlertTitle>
-              <AlertDescription>
-                Por favor, añade proveedores en la sección "Proveedores" antes de registrar entregas.
-                <Button asChild variant="link" className="p-0 h-auto ml-1 text-destructive hover:underline">
-                  <Link href="/dashboard/providers">Ir a Proveedores</Link>
-                </Button>
-              </AlertDescription>
-            </Alert>
-          ) : (
-            <SupplyEntryForm onSubmitDeliveries={handleAddDeliveries} providers={providers} />
-          )}
-        </div>
-        <div className="md:col-span-2 space-y-6">
-          <SupplyDataView
-            deliveries={deliveries}
-            dailyTotals={dailyTotals}
-            // vendorTotals prop removed
-            providers={providers} 
-          />
-        </div>
+      <main className="flex-grow">
+        <Tabs defaultValue="deliveries" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="deliveries">Entregas</TabsTrigger>
+                <TabsTrigger value="providers">Proveedores</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="deliveries" className="mt-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
+                    <div className="md:col-span-1 space-y-6">
+                    {providers.length === 0 ? (
+                        <Alert variant="destructive" className="shadow-md">
+                            <UsersIcon className="h-4 w-4" />
+                            <AlertTitle>No hay proveedores registrados</AlertTitle>
+                            <AlertDescription>
+                                Por favor, ve a la pestaña "Proveedores" para agregar al menos uno antes de registrar entregas.
+                            </AlertDescription>
+                        </Alert>
+                    ) : (
+                        <SupplyEntryForm onSubmitDeliveries={handleAddDeliveries} providers={providers} />
+                    )}
+                    </div>
+                    <div className="md:col-span-2 space-y-6">
+                    <SupplyDataView
+                        deliveries={deliveries}
+                        dailyTotals={dailyTotals}
+                        providers={providers} 
+                    />
+                    </div>
+                </div>
+            </TabsContent>
+
+            <TabsContent value="providers" className="mt-6">
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between">
+                        <CardTitle>Gestionar Proveedores</CardTitle>
+                        <Button onClick={handleOpenAddDialog} className="bg-primary hover:bg-primary/90">
+                            <PlusCircle className="mr-2 h-5 w-5" /> Agregar Proveedor
+                        </Button>
+                    </CardHeader>
+                    <CardContent>
+                        {providers.length === 0 ? (
+                            <EmptyProvidersState message="Agrega tu primer proveedor para poder registrar entregas." onAddClick={handleOpenAddDialog}/>
+                        ) : (
+                        <ScrollArea className="flex-1 min-h-0 rounded-md border shadow-md whitespace-nowrap">
+                            <Table>
+                            <TableHeader className="sticky top-0 bg-card z-10">
+                                <TableRow>
+                                <TableHead className="font-semibold w-[25%] pl-4">Nombre</TableHead>
+                                <TableHead className="font-semibold w-[30%]">Dirección</TableHead>
+                                <TableHead className="font-semibold w-[15%]">Teléfono</TableHead>
+                                <TableHead className="font-semibold w-[15%] text-right">Precio Unit.</TableHead>
+                                <TableHead className="text-right font-semibold w-[15%] pr-4">Acciones</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {providers.map((provider) => (
+                                <TableRow key={provider.id}>
+                                    <TableCell className="font-medium py-3 pl-4">{provider.name}</TableCell>
+                                    <TableCell className="py-3 whitespace-normal">{provider.address}</TableCell>
+                                    <TableCell className="py-3">{provider.phone}</TableCell>
+                                    <TableCell className="py-3 text-right">
+                                    {provider.price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                                    </TableCell>
+                                    <TableCell className="text-right py-3 pr-4">
+                                    <Button variant="ghost" size="icon" onClick={() => handleOpenEditDialog(provider)} aria-label={`Editar ${provider.name}`}>
+                                        <Edit2 className="h-4 w-4 text-blue-600 hover:text-blue-500" />
+                                    </Button>
+                                    <Button variant="ghost" size="icon" onClick={() => handleDeleteProviderClick(provider)} aria-label={`Eliminar ${provider.name}`}>
+                                        <Trash2 className="h-4 w-4 text-destructive hover:text-destructive/80" />
+                                    </Button>
+                                    </TableCell>
+                                </TableRow>
+                                ))}
+                            </TableBody>
+                            {providers.length > 8 && <TableCaption>Desplázate para ver más proveedores.</TableCaption>}
+                            </Table>
+                            <ScrollBar orientation="horizontal" />
+                        </ScrollArea>
+                        )}
+                    </CardContent>
+                </Card>
+            </TabsContent>
+        </Tabs>
       </main>
+
+       {/* Dialogs for Provider Management */}
+      <Dialog open={isDialogOpen} onOpenChange={(open) => { if (!open) handleCloseDialog(); else setIsDialogOpen(true);}}>
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center text-xl">
+              {editingProvider ? <Edit2 className="mr-2 h-5 w-5" /> : <PlusCircle className="mr-2 h-5 w-5" />}
+              {editingProvider ? 'Editar Proveedor' : 'Agregar Nuevo Proveedor'}
+            </DialogTitle>
+            <DialogDescription>
+              {editingProvider ? 'Actualiza los detalles de este proveedor.' : 'Completa el formulario para agregar un nuevo proveedor.'}
+            </DialogDescription>
+          </DialogHeader>
+          <ProviderForm
+            onSubmit={handleProviderFormSubmit}
+            onCancel={handleCloseDialog}
+            initialData={editingProvider ? { name: editingProvider.name, address: editingProvider.address, phone: editingProvider.phone, price: editingProvider.price } : undefined}
+            isEditing={!!editingProvider}
+          />
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={!!providerToDelete} onOpenChange={(open) => { if (!open) setProviderToDelete(null);}}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. Esto eliminará permanentemente al proveedor "{providerToDelete?.name}".
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setProviderToDelete(null)}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteProvider} className="bg-destructive hover:bg-destructive/90">
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       
       <footer className="text-center text-sm text-muted-foreground py-4 mt-auto">
         <p>&copy; {currentYear} acopiapp. Todos los derechos reservados.</p>

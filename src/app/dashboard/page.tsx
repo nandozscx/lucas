@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -6,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import DashboardHeader from '@/components/dashboard-header';
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card } from "@/components/ui/card";
-import { ClipboardPenLine, Users, ShoppingCart, HistoryIcon } from 'lucide-react';
+import { ClipboardPenLine, ShoppingCart, HistoryIcon, Cpu } from 'lucide-react';
 
 export default function DashboardPage() {
   const [isClient, setIsClient] = useState(false);
@@ -17,18 +16,6 @@ export default function DashboardPage() {
     setIsClient(true);
     setCurrentYear(new Date().getFullYear().toString());
   }, []);
-
-  const handleCardClick = (cardTitle: string) => {
-    if (cardTitle === "Proveedores") {
-      router.push('/dashboard/providers');
-    } else if (cardTitle === "Registro") {
-      router.push('/dashboard/registry');
-    } else if (cardTitle === "Historial") {
-      router.push('/dashboard/history');
-    } else if (cardTitle === "Ventas y Clientes") {
-      router.push('/dashboard/sales-clients');
-    }
-  };
 
   if (!isClient) {
     return (
@@ -48,10 +35,10 @@ export default function DashboardPage() {
   }
 
   const cardItems = [
-    { title: "Registro", icon: ClipboardPenLine, action: () => handleCardClick("Registro") },
-    { title: "Proveedores", icon: Users, action: () => handleCardClick("Proveedores") },
-    { title: "Ventas y Clientes", icon: ShoppingCart, action: () => handleCardClick("Ventas y Clientes") },
-    { title: "Historial", icon: HistoryIcon, action: () => handleCardClick("Historial") },
+    { title: "Operaciones", icon: ClipboardPenLine, action: () => router.push('/dashboard/registry') },
+    { title: "Producción", icon: Cpu, action: () => router.push('/dashboard/production') },
+    { title: "Ventas y Clientes", icon: ShoppingCart, action: () => router.push('/dashboard/sales-clients') },
+    { title: "Historial", icon: HistoryIcon, action: () => router.push('/dashboard/history') },
   ];
 
   return (

@@ -1,10 +1,9 @@
 
 import type { Metadata } from 'next';
-import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
-  title: 'Gestionar Proveedores - Daily Supply Tracker',
-  description: 'Añade, edita y elimina información de proveedores, incluyendo precios.',
+  title: 'Redirigiendo...',
+  description: 'Esta sección ha sido movida a Operaciones.',
 };
 
 export default function ProvidersLayout({
@@ -15,7 +14,6 @@ export default function ProvidersLayout({
   return (
     <>
       {children}
-      <Toaster />
     </>
   );
 }

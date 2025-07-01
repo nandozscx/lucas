@@ -3,11 +3,11 @@ import type { Metadata } from 'next';
 import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
-  title: 'Operaciones - acopiapp',
-  description: 'Gestiona las entregas de proveedores y la información de los mismos.',
+  title: 'Registro de Producción - acopiapp',
+  description: 'Registra la producción diaria y calcula el índice de transformación.',
 };
 
-export default function RegistryLayout({
+export default function ProductionLayout({
   children,
 }: {
   children: React.ReactNode;

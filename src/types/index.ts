@@ -42,3 +42,12 @@ export interface Sale {
   totalAmount: number;
   payments: Payment[];
 }
+
+export interface Production {
+  id: string;
+  date: string; // YYYY-MM-DD
+  producedUnits: number;
+  wholeMilkKilos: number; // Stored as kilos, can be 0
+  rawMaterialLiters: number; // Base liters from deliveries on that day
+  transformationIndex: number; // Percentage
+}
