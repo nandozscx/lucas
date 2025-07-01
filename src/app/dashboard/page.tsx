@@ -31,13 +31,14 @@ export default function DashboardPage() {
         const totalUsedInKilos = productionHistory.reduce((sum, p) => sum + (p.wholeMilkKilos || 0), 0);
         const totalUsedInSacos = totalUsedInKilos / 25;
         const currentStockSacos = totalReplenished - totalUsedInSacos;
+        const currentStockKilos = currentStockSacos * 25;
 
         const lowStockAlertShown = sessionStorage.getItem('lowStockAlertShown');
 
-        if (currentStockSacos <= 5 && !lowStockAlertShown) {
+        if (currentStockKilos <= 5 && !lowStockAlertShown) {
             toast({
                 title: "Alerta de Stock Bajo",
-                description: `Quedan ${currentStockSacos.toLocaleString(undefined, {maximumFractionDigits:2})} sacos de leche entera. Es hora de reabastecer.`,
+                description: `Quedan ${currentStockKilos.toLocaleString(undefined, {maximumFractionDigits:2})} kg de leche entera. Es hora de reabastecer.`,
                 variant: "destructive",
             });
             sessionStorage.setItem('lowStockAlertShown', 'true');
