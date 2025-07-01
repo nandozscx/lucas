@@ -20,7 +20,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCap
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import type { Delivery, Production as ProductionType } from '@/types';
-import { ArrowLeft, Cpu, CalendarIcon, Package, Milk, Scale, Percent, Save } from 'lucide-react';
+import { ArrowLeft, Cpu, CalendarIcon, Package, Milk, Scale, Percent, Save, Edit2, Trash2 } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
 
 const DELIVERIES_STORAGE_KEY = 'dailySupplyTrackerDeliveries';
@@ -49,6 +50,8 @@ export default function ProductionPage() {
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [productionHistory, setProductionHistory] = useState<ProductionType[]>([]);
   const [currentYear, setCurrentYear] = useState('');
+  const [editingProduction, setEditingProduction] = useState<ProductionType | null>(null);
+  const [productionToDelete, setProductionToDelete] = useState<ProductionType | null>(null);
   const { toast } = useToast();
 
   const form = useForm<ProductionFormData>({
@@ -94,29 +97,65 @@ export default function ProductionPage() {
 
   const additionalLitersFromMilk = useWholeMilk && wholeMilkKilos ? wholeMilkKilos * 10 : 0;
   const totalAdjustedRawMaterial = dailyRawMaterial + additionalLitersFromMilk;
-  const transformationIndex = totalAdjustedRawMaterial > 0 && producedUnits > 0 ? (producedUnits / totalAdjustedRawMaterial) * 100 : 0;
+  const transformationIndex = totalAdjustedRawMaterial > 0 && producedUnits > 0 ? ((producedUnits / totalAdjustedRawMaterial) - 1) * 100 : 0;
   
   const handleFormSubmit = (data: ProductionFormData) => {
     const dateStr = format(data.date, 'yyyy-MM-dd');
     
-    const newProductionRecord: ProductionType = {
-      id: crypto.randomUUID(),
-      date: dateStr,
-      producedUnits: data.producedUnits,
-      wholeMilkKilos: data.useWholeMilk ? data.wholeMilkKilos! : 0,
-      rawMaterialLiters: dailyRawMaterial, // Storing the base for historical accuracy
-      transformationIndex: transformationIndex,
-    };
+    const additionalLitersFromMilk = data.useWholeMilk && data.wholeMilkKilos ? data.wholeMilkKilos * 10 : 0;
+    const totalAdjustedRawMaterial = dailyRawMaterial + additionalLitersFromMilk;
+    const newTransformationIndex = totalAdjustedRawMaterial > 0 && data.producedUnits > 0 ? ((data.producedUnits / totalAdjustedRawMaterial) - 1) * 100 : 0;
 
-    setProductionHistory(prev => {
-        const otherDays = prev.filter(p => p.date !== dateStr);
-        return [...otherDays, newProductionRecord].sort((a,b) => parseISO(b.date).getTime() - parseISO(a.date).getTime());
-    });
+    if (editingProduction) {
+      const updatedRecord: ProductionType = {
+        ...editingProduction,
+        date: dateStr,
+        producedUnits: data.producedUnits,
+        wholeMilkKilos: data.useWholeMilk ? data.wholeMilkKilos! : 0,
+        rawMaterialLiters: dailyRawMaterial,
+        transformationIndex: newTransformationIndex,
+      };
 
-    toast({
-      title: "Producción Registrada",
-      description: `Se guardó el registro para el ${format(data.date, "PPP", { locale: es })}.`,
-    });
+      setProductionHistory(prev => 
+        prev.map(p => p.id === editingProduction.id ? updatedRecord : p)
+           .sort((a,b) => parseISO(b.date).getTime() - parseISO(a.date).getTime())
+      );
+
+      toast({
+        title: "Registro Actualizado",
+        description: `Se actualizó el registro del ${format(data.date, "PPP", { locale: es })}.`,
+      });
+      setEditingProduction(null);
+
+    } else {
+      const existingRecord = productionHistory.find(p => p.date === dateStr);
+      if (existingRecord) {
+        toast({
+          title: "Registro Duplicado",
+          description: `Ya existe un registro para esta fecha. Puede editar el registro existente desde el historial.`,
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      const newProductionRecord: ProductionType = {
+        id: crypto.randomUUID(),
+        date: dateStr,
+        producedUnits: data.producedUnits,
+        wholeMilkKilos: data.useWholeMilk ? data.wholeMilkKilos! : 0,
+        rawMaterialLiters: dailyRawMaterial,
+        transformationIndex: newTransformationIndex,
+      };
+
+      setProductionHistory(prev => 
+        [...prev, newProductionRecord].sort((a,b) => parseISO(b.date).getTime() - parseISO(a.date).getTime())
+      );
+
+      toast({
+        title: "Producción Registrada",
+        description: `Se guardó el registro para el ${format(data.date, "PPP", { locale: es })}.`,
+      });
+    }
     
     form.reset({
         date: new Date(),
@@ -124,6 +163,38 @@ export default function ProductionPage() {
         useWholeMilk: false,
         wholeMilkKilos: undefined,
     });
+  };
+
+  const handleOpenEditDialog = (productionRecord: ProductionType) => {
+    setEditingProduction(productionRecord);
+    form.reset({
+      date: parseISO(productionRecord.date),
+      producedUnits: productionRecord.producedUnits,
+      useWholeMilk: productionRecord.wholeMilkKilos > 0,
+      wholeMilkKilos: productionRecord.wholeMilkKilos > 0 ? productionRecord.wholeMilkKilos : undefined,
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleCancelEdit = () => {
+      setEditingProduction(null);
+      form.reset({
+          date: new Date(),
+          producedUnits: undefined,
+          useWholeMilk: false,
+          wholeMilkKilos: undefined,
+      });
+  };
+
+  const confirmDeleteProduction = () => {
+    if (!productionToDelete) return;
+    setProductionHistory(prev => prev.filter(p => p.id !== productionToDelete.id));
+    toast({
+      title: "Registro Eliminado",
+      description: "El registro de producción ha sido eliminado.",
+      variant: "destructive",
+    });
+    setProductionToDelete(null);
   };
 
   if (!isClient) {
@@ -160,7 +231,7 @@ export default function ProductionPage() {
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(handleFormSubmit)}>
                         <CardHeader>
-                            <CardTitle>Registrar Producción Diaria</CardTitle>
+                            <CardTitle>{editingProduction ? 'Editar Registro de Producción' : 'Registrar Producción Diaria'}</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <FormField
@@ -229,8 +300,16 @@ export default function ProductionPage() {
                                 />
                             )}
                         </CardContent>
-                        <CardFooter>
-                            <Button type="submit" className="w-full"><Save className="mr-2 h-4 w-4"/> Guardar Registro</Button>
+                        <CardFooter className="flex flex-col gap-2">
+                            <Button type="submit" className="w-full">
+                                <Save className="mr-2 h-4 w-4"/>
+                                {editingProduction ? 'Actualizar Registro' : 'Guardar Registro'}
+                            </Button>
+                            {editingProduction && (
+                                <Button variant="outline" onClick={handleCancelEdit} className="w-full">
+                                    Cancelar Edición
+                                </Button>
+                            )}
                         </CardFooter>
                     </form>
                 </Form>
@@ -256,7 +335,7 @@ export default function ProductionPage() {
                     </div>
                     <div className="flex justify-between items-center text-lg">
                         <span className="text-foreground font-semibold flex items-center"><Percent className="mr-2 h-5 w-5"/> Índice de Transformación</span>
-                        <span className={`font-extrabold ${transformationIndex > 100 ? 'text-green-500' : 'text-destructive'}`}>{transformationIndex.toFixed(2)} %</span>
+                        <span className={`font-extrabold ${transformationIndex > 0 ? 'text-green-500' : 'text-destructive'}`}>{transformationIndex.toFixed(2)} %</span>
                     </div>
                 </CardContent>
             </Card>
@@ -275,6 +354,7 @@ export default function ProductionPage() {
                                     <TableHead className="text-right">Materia Prima</TableHead>
                                     <TableHead className="text-right">Unidades Prod.</TableHead>
                                     <TableHead className="text-right">Índice</TableHead>
+                                    <TableHead className="text-center w-[100px]">Acciones</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -284,12 +364,20 @@ export default function ProductionPage() {
                                             <TableCell>{format(parseISO(p.date), 'PPP', { locale: es })}</TableCell>
                                             <TableCell className="text-right">{(p.rawMaterialLiters + (p.wholeMilkKilos * 10)).toLocaleString()} L</TableCell>
                                             <TableCell className="text-right">{p.producedUnits.toLocaleString()}</TableCell>
-                                            <TableCell className={`text-right font-medium ${p.transformationIndex > 100 ? 'text-green-500' : 'text-red-500'}`}>{p.transformationIndex.toFixed(2)}%</TableCell>
+                                            <TableCell className={`text-right font-medium ${p.transformationIndex > 0 ? 'text-green-500' : 'text-red-500'}`}>{p.transformationIndex.toFixed(2)}%</TableCell>
+                                            <TableCell className="text-center">
+                                                <Button variant="ghost" size="icon" onClick={() => handleOpenEditDialog(p)} aria-label="Editar registro">
+                                                    <Edit2 className="h-4 w-4 text-blue-600" />
+                                                </Button>
+                                                <Button variant="ghost" size="icon" onClick={() => setProductionToDelete(p)} aria-label="Eliminar registro">
+                                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                                </Button>
+                                            </TableCell>
                                         </TableRow>
                                     ))
                                 ) : (
                                     <TableRow>
-                                        <TableCell colSpan={4} className="h-24 text-center">No hay registros de producción.</TableCell>
+                                        <TableCell colSpan={5} className="h-24 text-center">No hay registros de producción.</TableCell>
                                     </TableRow>
                                 )}
                             </TableBody>
@@ -300,6 +388,24 @@ export default function ProductionPage() {
             </Card>
         </div>
       </main>
+      
+      <AlertDialog open={!!productionToDelete} onOpenChange={(open) => !open && setProductionToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. Esto eliminará permanentemente el registro de producción del {productionToDelete ? format(parseISO(productionToDelete.date), 'PPP', { locale: es }) : ''}.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setProductionToDelete(null)}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteProduction} className="bg-destructive hover:bg-destructive/90">
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <footer className="text-center text-sm text-muted-foreground py-4 mt-auto">
         <p>&copy; {currentYear} acopiapp. Todos los derechos reservados.</p>
       </footer>
