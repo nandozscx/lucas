@@ -23,7 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import type { Delivery, Production as ProductionType, WholeMilkReplenishment } from '@/types';
-import { ArrowLeft, Cpu, CalendarIcon, Package, Milk, Scale, Percent, Save, Edit2, Trash2, ChevronLeft, ChevronRight, Download, ShoppingBag, Archive, Wallet, DollarSign, AlertCircle, PlusCircle } from 'lucide-react';
+import { ArrowLeft, Cpu, CalendarIcon, Package, Milk, Scale, Percent, Save, Edit2, Trash2, ChevronLeft, ChevronRight, Download, ShoppingBag, Archive, Wallet, DollarSign, AlertCircle, PlusCircle, History } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
@@ -74,6 +74,8 @@ export default function ProductionPage() {
   const [productionToDelete, setProductionToDelete] = useState<ProductionType | null>(null);
   const [currentWeekStart, setCurrentWeekStart] = useState<Date | null>(null);
   const [isReplenishmentDialogOpen, setIsReplenishmentDialogOpen] = useState(false);
+  const [editingReplenishment, setEditingReplenishment] = useState<WholeMilkReplenishment | null>(null);
+  const [replenishmentToDelete, setReplenishmentToDelete] = useState<WholeMilkReplenishment | null>(null);
   const { toast } = useToast();
 
   const form = useForm<ProductionFormData>({
@@ -341,16 +343,47 @@ export default function ProductionPage() {
     return { currentStockSacos: stock, latestPricePerSaco: price };
   }, [replenishmentHistory, productionHistory]);
   
+  const handleOpenEditReplenishmentDialog = (replenishment: WholeMilkReplenishment) => {
+    setEditingReplenishment(replenishment);
+    setIsReplenishmentDialogOpen(true);
+  };
+
   const handleReplenishmentSubmit = (data: ReplenishmentFormData) => {
-    const newReplenishment: WholeMilkReplenishment = {
-      id: crypto.randomUUID(),
-      date: format(data.date, "yyyy-MM-dd"),
-      quantitySacos: data.quantitySacos,
-      pricePerSaco: data.pricePerSaco,
-    };
-    setReplenishmentHistory(prev => [...prev, newReplenishment].sort((a,b) => parseISO(b.date).getTime() - parseISO(a.date).getTime()));
-    toast({ title: "Reabastecimiento Registrado", description: `Se agregaron ${data.quantitySacos} sacos al stock.` });
+    if (editingReplenishment) {
+      const updatedReplenishment: WholeMilkReplenishment = {
+        ...editingReplenishment,
+        ...data,
+        date: format(data.date, "yyyy-MM-dd"),
+      };
+      setReplenishmentHistory(prev =>
+        prev.map(r => (r.id === editingReplenishment.id ? updatedReplenishment : r))
+            .sort((a,b) => parseISO(b.date).getTime() - parseISO(a.date).getTime())
+      );
+      toast({ title: "Reabastecimiento Actualizado", description: `Se actualizó la entrada del ${format(data.date, "PPP", { locale: es })}.` });
+    } else {
+      const newReplenishment: WholeMilkReplenishment = {
+        id: crypto.randomUUID(),
+        date: format(data.date, "yyyy-MM-dd"),
+        quantitySacos: data.quantitySacos,
+        pricePerSaco: data.pricePerSaco,
+      };
+      setReplenishmentHistory(prev => [...prev, newReplenishment].sort((a,b) => parseISO(b.date).getTime() - parseISO(a.date).getTime()));
+      toast({ title: "Reabastecimiento Registrado", description: `Se agregaron ${data.quantitySacos} sacos al stock.` });
+    }
+    
     setIsReplenishmentDialogOpen(false);
+    setEditingReplenishment(null);
+  };
+
+  const confirmDeleteReplenishment = () => {
+    if (!replenishmentToDelete) return;
+    setReplenishmentHistory(prev => prev.filter(r => r.id !== replenishmentToDelete.id));
+    toast({
+      title: "Registro Eliminado",
+      description: "El registro de reabastecimiento ha sido eliminado.",
+      variant: "destructive",
+    });
+    setReplenishmentToDelete(null);
   };
 
   const { kilosUsedToday, costToReplaceToday } = useMemo(() => {
@@ -361,6 +394,17 @@ export default function ProductionPage() {
     const cost = usedInSacos * (latestPricePerSaco || 0);
     return { kilosUsedToday: usedInKilos, costToReplaceToday: cost };
   }, [productionHistory, latestPricePerSaco]);
+  
+  const stockUsageHistory = useMemo(() => {
+    return productionHistory
+      .filter(p => p.wholeMilkKilos > 0)
+      .map(p => ({
+        date: p.date,
+        kilosUsed: p.wholeMilkKilos,
+        id: p.id,
+      }))
+      .sort((a,b) => parseISO(b.date).getTime() - parseISO(a.date).getTime());
+  }, [productionHistory]);
 
   if (!isClient || !currentWeekStart) {
     return (
@@ -604,8 +648,8 @@ export default function ProductionPage() {
             </TabsContent>
             
             <TabsContent value="wholeMilk" className="mt-6">
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div className="space-y-8">
+                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    <div className="space-y-8 md:col-span-1 lg:col-span-1">
                         <Card>
                             <CardHeader>
                                 <CardTitle>Reabastecer Stock</CardTitle>
@@ -651,20 +695,56 @@ export default function ProductionPage() {
                                 </div>
                             </CardContent>
                         </Card>
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Historial de Salidas de Stock</CardTitle>
+                                <CardDescription>Consumo de leche entera en producción.</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <ScrollArea className="h-[200px] rounded-md border">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Fecha de Uso</TableHead>
+                                                <TableHead className="text-right">Kilos Usados</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {stockUsageHistory.length > 0 ? (
+                                                stockUsageHistory.map(usage => (
+                                                    <TableRow key={usage.id}>
+                                                        <TableCell>{format(parseISO(usage.date), 'PPP', { locale: es })}</TableCell>
+                                                        <TableCell className="text-right">{usage.kilosUsed.toLocaleString()} kg</TableCell>
+                                                    </TableRow>
+                                                ))
+                                            ) : (
+                                                <TableRow>
+                                                    <TableCell colSpan={2} className="h-24 text-center">
+                                                        No se ha registrado uso de leche entera.
+                                                    </TableCell>
+                                                </TableRow>
+                                            )}
+                                        </TableBody>
+                                    </Table>
+                                    <ScrollBar orientation="vertical" />
+                                </ScrollArea>
+                            </CardContent>
+                        </Card>
                     </div>
-                     <Card>
+                     <Card className="md:col-span-1 lg:col-span-2">
                         <CardHeader>
                             <CardTitle>Historial de Reabastecimiento</CardTitle>
                             <CardDescription>Registro de todas las compras de leche entera.</CardDescription>
                         </CardHeader>
                         <CardContent>
-                             <ScrollArea className="h-[400px] rounded-md border">
+                             <ScrollArea className="h-full max-h-[600px] rounded-md border">
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
                                             <TableHead>Fecha</TableHead>
                                             <TableHead className="text-right">Sacos</TableHead>
                                             <TableHead className="text-right">Precio p/Saco</TableHead>
+                                            <TableHead className="text-center">Acciones</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -674,11 +754,19 @@ export default function ProductionPage() {
                                                     <TableCell>{format(parseISO(r.date), 'PPP', { locale: es })}</TableCell>
                                                     <TableCell className="text-right">{r.quantitySacos.toLocaleString()}</TableCell>
                                                     <TableCell className="text-right">S/. {r.pricePerSaco.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                                                    <TableCell className="text-center">
+                                                        <Button variant="ghost" size="icon" onClick={() => handleOpenEditReplenishmentDialog(r)} aria-label="Editar reabastecimiento">
+                                                            <Edit2 className="h-4 w-4 text-blue-600" />
+                                                        </Button>
+                                                        <Button variant="ghost" size="icon" onClick={() => setReplenishmentToDelete(r)} aria-label="Eliminar reabastecimiento">
+                                                            <Trash2 className="h-4 w-4 text-destructive" />
+                                                        </Button>
+                                                    </TableCell>
                                                 </TableRow>
                                             ))
                                         ) : (
                                             <TableRow>
-                                                <TableCell colSpan={3} className="h-24 text-center">
+                                                <TableCell colSpan={4} className="h-24 text-center">
                                                     No hay historial de compras.
                                                 </TableCell>
                                             </TableRow>
@@ -713,9 +801,30 @@ export default function ProductionPage() {
 
       <ReplenishmentDialog
         isOpen={isReplenishmentDialogOpen}
-        onClose={() => setIsReplenishmentDialogOpen(false)}
+        onClose={() => {
+            setIsReplenishmentDialogOpen(false);
+            setEditingReplenishment(null);
+        }}
         onSubmit={handleReplenishmentSubmit}
+        initialData={editingReplenishment}
       />
+      
+      <AlertDialog open={!!replenishmentToDelete} onOpenChange={(open) => !open && setReplenishmentToDelete(null)}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+                <AlertDialogDescription>
+                Esta acción no se puede deshacer. Esto eliminará permanentemente el registro de reabastecimiento del {replenishmentToDelete ? format(parseISO(replenishmentToDelete.date), 'PPP', { locale: es }) : ''}.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel onClick={() => setReplenishmentToDelete(null)}>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={confirmDeleteReplenishment} className="bg-destructive hover:bg-destructive/90">
+                    Eliminar
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <footer className="text-center text-sm text-muted-foreground py-4 mt-auto">
         <p>&copy; {currentYear} acopiapp. Todos los derechos reservados.</p>
@@ -724,7 +833,7 @@ export default function ProductionPage() {
   );
 }
 
-const ReplenishmentDialog = ({ isOpen, onClose, onSubmit }: { isOpen: boolean, onClose: () => void, onSubmit: (data: ReplenishmentFormData) => void }) => {
+const ReplenishmentDialog = ({ isOpen, onClose, onSubmit, initialData }: { isOpen: boolean, onClose: () => void, onSubmit: (data: ReplenishmentFormData) => void, initialData?: WholeMilkReplenishment | null }) => {
     const form = useForm<ReplenishmentFormData>({
         resolver: zodResolver(replenishmentFormSchema),
         defaultValues: {
@@ -735,14 +844,22 @@ const ReplenishmentDialog = ({ isOpen, onClose, onSubmit }: { isOpen: boolean, o
     });
 
     useEffect(() => {
-        if (!isOpen) {
-            form.reset({
-                date: new Date(),
-                quantitySacos: undefined,
-                pricePerSaco: undefined,
-            });
+        if (isOpen) {
+            if (initialData) {
+                form.reset({
+                    date: parseISO(initialData.date),
+                    quantitySacos: initialData.quantitySacos,
+                    pricePerSaco: initialData.pricePerSaco,
+                });
+            } else {
+                 form.reset({
+                    date: new Date(),
+                    quantitySacos: undefined,
+                    pricePerSaco: undefined,
+                });
+            }
         }
-    }, [isOpen, form]);
+    }, [isOpen, initialData, form]);
 
     const handleFormSubmit = (data: ReplenishmentFormData) => {
         onSubmit(data);
@@ -752,9 +869,9 @@ const ReplenishmentDialog = ({ isOpen, onClose, onSubmit }: { isOpen: boolean, o
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Agregar Compra de Stock</DialogTitle>
+                    <DialogTitle>{initialData ? 'Editar Compra' : 'Agregar Compra de Stock'}</DialogTitle>
                     <DialogDescription>
-                        Registra una nueva compra de leche entera en sacos.
+                       {initialData ? 'Actualiza los detalles de esta compra.' : 'Registra una nueva compra de leche entera en sacos.'}
                     </DialogDescription>
                 </DialogHeader>
                 <Form {...form}>
@@ -810,7 +927,7 @@ const ReplenishmentDialog = ({ isOpen, onClose, onSubmit }: { isOpen: boolean, o
                         />
                         <DialogFooter>
                             <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
-                            <Button type="submit">Guardar Compra</Button>
+                            <Button type="submit">{initialData ? 'Guardar Cambios' : 'Guardar Compra'}</Button>
                         </DialogFooter>
                     </form>
                 </Form>
