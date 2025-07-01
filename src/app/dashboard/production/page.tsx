@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, startOfWeek, endOfWeek, isWithinInterval, addDays, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 import { Button } from "@/components/ui/button";
@@ -16,13 +16,18 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCaption } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCaption, TableFooter } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import type { Delivery, Production as ProductionType } from '@/types';
-import { ArrowLeft, Cpu, CalendarIcon, Package, Milk, Scale, Percent, Save, Edit2, Trash2 } from 'lucide-react';
+import { ArrowLeft, Cpu, CalendarIcon, Package, Milk, Scale, Percent, Save, Edit2, Trash2, ChevronLeft, ChevronRight, Download, ShoppingBag } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
+import type jsPDF from 'jspdf';
+
+interface jsPDFWithAutoTable extends jsPDF {
+  autoTable: (options: any) => jsPDF;
+}
 
 const DELIVERIES_STORAGE_KEY = 'dailySupplyTrackerDeliveries';
 const PRODUCTION_STORAGE_KEY = 'dailySupplyTrackerProduction';
@@ -52,6 +57,7 @@ export default function ProductionPage() {
   const [currentYear, setCurrentYear] = useState('');
   const [editingProduction, setEditingProduction] = useState<ProductionType | null>(null);
   const [productionToDelete, setProductionToDelete] = useState<ProductionType | null>(null);
+  const [currentWeekStart, setCurrentWeekStart] = useState<Date | null>(null);
   const { toast } = useToast();
 
   const form = useForm<ProductionFormData>({
@@ -72,6 +78,7 @@ export default function ProductionPage() {
   useEffect(() => {
     setIsClient(true);
     setCurrentYear(new Date().getFullYear().toString());
+    setCurrentWeekStart(startOfWeek(new Date(), { weekStartsOn: 0, locale: es }));
     if (typeof window !== 'undefined') {
       const storedDeliveries = localStorage.getItem(DELIVERIES_STORAGE_KEY);
       if (storedDeliveries) setDeliveries(JSON.parse(storedDeliveries));
@@ -196,8 +203,86 @@ export default function ProductionPage() {
     });
     setProductionToDelete(null);
   };
+  
+  const handlePreviousWeek = () => {
+    if (currentWeekStart) {
+      setCurrentWeekStart(prev => subDays(prev!, 7));
+    }
+  };
 
-  if (!isClient) {
+  const handleNextWeek = () => {
+    if (currentWeekStart) {
+      setCurrentWeekStart(prev => addDays(prev!, 7));
+    }
+  };
+
+  const { weekTitle, productionForCurrentWeek, totalWeeklyUnits, averageWeeklyIndex } = useMemo(() => {
+    if (!currentWeekStart) {
+      return { weekTitle: '', productionForCurrentWeek: [], totalWeeklyUnits: 0, averageWeeklyIndex: 0 };
+    }
+
+    const currentWeekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 0, locale: es });
+    const title = `Semana del ${format(currentWeekStart, "dd 'de' MMMM", { locale: es })} al ${format(currentWeekEnd, "dd 'de' MMMM 'de' yyyy", { locale: es })}`;
+
+    const filtered = productionHistory.filter(p => {
+      const productionDate = parseISO(p.date);
+      return isWithinInterval(productionDate, { start: currentWeekStart, end: currentWeekEnd });
+    }).sort((a, b) => parseISO(a.date).getTime() - parseISO(b.date).getTime());
+
+    const units = filtered.reduce((sum, p) => sum + p.producedUnits, 0);
+    const indicesSum = filtered.reduce((sum, p) => sum + p.transformationIndex, 0);
+    const avgIndex = filtered.length > 0 ? indicesSum / filtered.length : 0;
+
+    return { weekTitle: title, productionForCurrentWeek: filtered, totalWeeklyUnits: units, averageWeeklyIndex: avgIndex };
+  }, [currentWeekStart, productionHistory]);
+  
+  const exportHistoryToPDF = async () => {
+    if (productionForCurrentWeek.length === 0) {
+      toast({ title: "Sin Datos", description: "No hay datos de producción en la semana actual para exportar.", variant: "destructive" });
+      return;
+    }
+
+    const { default: jsPDFConstructor } = await import('jspdf');
+    await import('jspdf-autotable');
+    const doc = new jsPDFConstructor() as jsPDFWithAutoTable;
+
+    const tableHeaders = ['Fecha', 'Materia Prima Total', 'Unidades Prod.', 'Índice de Transf.'];
+    const tableBody = productionForCurrentWeek.map(p => [
+      format(parseISO(p.date), 'PPP', { locale: es }),
+      `${(p.rawMaterialLiters + (p.wholeMilkKilos * 10)).toLocaleString()} L`,
+      p.producedUnits.toLocaleString(),
+      `${p.transformationIndex.toFixed(2)}%`
+    ]);
+
+    doc.setFontSize(18);
+    doc.text('Historial de Producción Semanal', 14, 15);
+    doc.setFontSize(12);
+    doc.text(weekTitle, 14, 22);
+
+    doc.autoTable({
+      head: [tableHeaders],
+      body: tableBody,
+      startY: 28,
+      foot: [
+        ['Total Semanal', '', totalWeeklyUnits.toLocaleString(), `${averageWeeklyIndex.toFixed(2)}% (Promedio)`]
+      ],
+      footStyles: { fontStyle: 'bold' },
+      didDrawPage: (data) => {
+        if (data.pageNumber === 1) {
+          doc.setFontSize(18);
+          doc.text('Historial de Producción Semanal', data.settings.margin.left, 15);
+          doc.setFontSize(12);
+          doc.text(weekTitle, data.settings.margin.left, 22);
+        }
+      }
+    });
+
+    doc.save(`produccion_semanal_${format(currentWeekStart!, "yyyy-MM-dd")}.pdf`);
+    toast({ title: "Exportación PDF Exitosa", description: "El historial de producción semanal se ha exportado a PDF." });
+  };
+
+
+  if (!isClient || !currentWeekStart) {
     return (
       <div className="min-h-screen flex flex-col p-4 md:p-8 bg-background">
         <header className="flex items-center justify-between mb-6 md:mb-10 p-4 bg-card shadow-md rounded-lg">
@@ -210,6 +295,14 @@ export default function ProductionPage() {
       </div>
     );
   }
+
+  const EmptyState: React.FC<{ message: string; icon?: React.ElementType }> = ({ message, icon: Icon = ShoppingBag }) => (
+    <div className="flex flex-col items-center justify-center text-center text-muted-foreground py-10 border border-dashed rounded-md min-h-[300px]">
+      <Icon className="h-12 w-12 mb-3 opacity-50" />
+      <p className="text-lg font-medium">No Hay Datos Disponibles</p>
+      <p className="text-sm">{message}</p>
+    </div>
+  );
 
   return (
     <div className="min-h-screen flex flex-col p-4 md:p-8 bg-background">
@@ -335,36 +428,51 @@ export default function ProductionPage() {
                     </div>
                     <div className="flex justify-between items-center text-lg">
                         <span className="text-foreground font-semibold flex items-center"><Percent className="mr-2 h-5 w-5"/> Índice de Transformación</span>
-                        <span className={`font-extrabold ${transformationIndex > 0 ? 'text-green-500' : 'text-destructive'}`}>{transformationIndex.toFixed(2)} %</span>
+                        <span className={`font-extrabold ${transformationIndex >= 0 ? 'text-green-500' : 'text-destructive'}`}>{transformationIndex.toFixed(2)} %</span>
                     </div>
                 </CardContent>
             </Card>
         </div>
         <div className="lg:col-span-2">
-            <Card className="h-full">
+            <Card className="h-full flex flex-col">
                 <CardHeader>
-                    <CardTitle>Historial de Producción</CardTitle>
+                    <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+                        <div className="text-center sm:text-left">
+                            <CardTitle>Historial de Producción</CardTitle>
+                            <CardDescription>{weekTitle}</CardDescription>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Button variant="outline" onClick={handlePreviousWeek}>
+                                <ChevronLeft className="h-4 w-4 mr-1 sm:mr-2" />
+                                <span className="hidden sm:inline">Semana Ant.</span>
+                            </Button>
+                            <Button variant="outline" onClick={handleNextWeek}>
+                                <span className="hidden sm:inline">Semana Sig.</span>
+                                <ChevronRight className="h-4 w-4 ml-1 sm:ml-2" />
+                            </Button>
+                        </div>
+                    </div>
                 </CardHeader>
-                <CardContent>
-                    <ScrollArea className="h-[600px] rounded-md border">
+                <CardContent className="flex-1 flex flex-col">
+                    <ScrollArea className="h-[500px] rounded-md border">
                         <Table>
                             <TableHeader>
                                 <TableRow>
                                     <TableHead>Fecha</TableHead>
-                                    <TableHead className="text-right">Materia Prima</TableHead>
+                                    <TableHead className="text-right">Materia Prima Total</TableHead>
                                     <TableHead className="text-right">Unidades Prod.</TableHead>
                                     <TableHead className="text-right">Índice</TableHead>
                                     <TableHead className="text-center w-[100px]">Acciones</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {productionHistory.length > 0 ? (
-                                    productionHistory.map(p => (
+                                {productionForCurrentWeek.length > 0 ? (
+                                    productionForCurrentWeek.map(p => (
                                         <TableRow key={p.id}>
                                             <TableCell>{format(parseISO(p.date), 'PPP', { locale: es })}</TableCell>
                                             <TableCell className="text-right">{(p.rawMaterialLiters + (p.wholeMilkKilos * 10)).toLocaleString()} L</TableCell>
                                             <TableCell className="text-right">{p.producedUnits.toLocaleString()}</TableCell>
-                                            <TableCell className={`text-right font-medium ${p.transformationIndex > 0 ? 'text-green-500' : 'text-red-500'}`}>{p.transformationIndex.toFixed(2)}%</TableCell>
+                                            <TableCell className={`text-right font-medium ${p.transformationIndex >= 0 ? 'text-green-500' : 'text-red-500'}`}>{p.transformationIndex.toFixed(2)}%</TableCell>
                                             <TableCell className="text-center">
                                                 <Button variant="ghost" size="icon" onClick={() => handleOpenEditDialog(p)} aria-label="Editar registro">
                                                     <Edit2 className="h-4 w-4 text-blue-600" />
@@ -377,14 +485,31 @@ export default function ProductionPage() {
                                     ))
                                 ) : (
                                     <TableRow>
-                                        <TableCell colSpan={5} className="h-24 text-center">No hay registros de producción.</TableCell>
+                                        <TableCell colSpan={5} className="h-24 text-center">
+                                          <EmptyState message="No hay registros de producción para esta semana."/>
+                                        </TableCell>
                                     </TableRow>
                                 )}
                             </TableBody>
-                            {productionHistory.length > 8 && <TableCaption>Desplázate para ver más registros.</TableCaption>}
+                            {productionForCurrentWeek.length > 0 && (
+                               <TableFooter>
+                                    <TableRow>
+                                        <TableCell colSpan={2} className="text-right font-bold">Totales de la Semana:</TableCell>
+                                        <TableCell className="text-right font-bold">{totalWeeklyUnits.toLocaleString()}</TableCell>
+                                        <TableCell className="text-right font-bold">{averageWeeklyIndex.toFixed(2)}% (Prom.)</TableCell>
+                                        <TableCell />
+                                    </TableRow>
+                                </TableFooter>
+                            )}
                         </Table>
                     </ScrollArea>
                 </CardContent>
+                <CardFooter className="justify-end border-t pt-4">
+                  <Button onClick={exportHistoryToPDF} disabled={productionForCurrentWeek.length === 0}>
+                    <Download className="mr-2 h-4 w-4"/>
+                    Exportar PDF de la Semana
+                  </Button>
+                </CardFooter>
             </Card>
         </div>
       </main>
@@ -412,3 +537,5 @@ export default function ProductionPage() {
     </div>
   );
 }
+
+    
