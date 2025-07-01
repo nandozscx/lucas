@@ -55,8 +55,8 @@ const productionFormSchema = z.object({
 type ProductionFormData = z.infer<typeof productionFormSchema>;
 
 const wholeMilkFormSchema = z.object({
-  stockKilos: z.coerce.number().min(0, "El stock no puede ser negativo."),
-  pricePerKilo: z.coerce.number().positive("El precio debe ser un número positivo.").min(0.01, "El precio debe ser mayor a cero."),
+  stockSacos: z.coerce.number().min(0, "El stock no puede ser negativo."),
+  pricePerSaco: z.coerce.number().positive("El precio debe ser un número positivo.").min(0.01, "El precio debe ser mayor a cero."),
 });
 
 type WholeMilkFormData = z.infer<typeof wholeMilkFormSchema>;
@@ -65,7 +65,7 @@ export default function ProductionPage() {
   const [isClient, setIsClient] = useState(false);
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [productionHistory, setProductionHistory] = useState<ProductionType[]>([]);
-  const [wholeMilkData, setWholeMilkData] = useState<WholeMilk>({ stockKilos: 0, pricePerKilo: 0 });
+  const [wholeMilkData, setWholeMilkData] = useState<WholeMilk>({ stockSacos: 0, pricePerSaco: 0 });
   const [currentYear, setCurrentYear] = useState('');
   const [editingProduction, setEditingProduction] = useState<ProductionType | null>(null);
   const [productionToDelete, setProductionToDelete] = useState<ProductionType | null>(null);
@@ -85,8 +85,8 @@ export default function ProductionPage() {
   const wholeMilkForm = useForm<WholeMilkFormData>({
     resolver: zodResolver(wholeMilkFormSchema),
     defaultValues: {
-      stockKilos: 0,
-      pricePerKilo: 0,
+      stockSacos: 0,
+      pricePerSaco: 0,
     }
   });
 
@@ -107,7 +107,13 @@ export default function ProductionPage() {
       if (storedProduction) setProductionHistory(JSON.parse(storedProduction));
       
       const storedWholeMilk = localStorage.getItem(WHOLE_MILK_STORAGE_KEY);
-      if (storedWholeMilk) setWholeMilkData(JSON.parse(storedWholeMilk));
+      if (storedWholeMilk) {
+        const parsedData = JSON.parse(storedWholeMilk);
+        // Basic check to see if data is in the new format
+        if ('stockSacos' in parsedData && 'pricePerSaco' in parsedData) {
+            setWholeMilkData(parsedData);
+        }
+      }
     }
   }, []);
   
@@ -144,25 +150,29 @@ export default function ProductionPage() {
   const handleFormSubmit = (data: ProductionFormData) => {
     const dateStr = format(data.date, 'yyyy-MM-dd');
     
-    const additionalLitersFromMilk = data.useWholeMilk && data.wholeMilkKilos ? data.wholeMilkKilos * 10 : 0;
-    const totalAdjustedRawMaterial = dailyRawMaterial + additionalLitersFromMilk;
-    const newTransformationIndex = totalAdjustedRawMaterial > 0 && data.producedUnits > 0 ? ((data.producedUnits / totalAdjustedRawMaterial) - 1) * 100 : 0;
+    const rawMaterialForDay = deliveries
+      .filter(d => d.date === dateStr)
+      .reduce((sum, d) => sum + d.quantity, 0);
 
-    const newUsage = data.useWholeMilk && data.wholeMilkKilos ? data.wholeMilkKilos : 0;
+    const newUsageInKilos = data.useWholeMilk && data.wholeMilkKilos ? data.wholeMilkKilos : 0;
+    const additionalLiters = newUsageInKilos * 10;
+    const totalRawMaterial = rawMaterialForDay + additionalLiters;
+    const newTransformationIndex = totalRawMaterial > 0 && data.producedUnits > 0 ? ((data.producedUnits / totalRawMaterial) - 1) * 100 : 0;
 
     if (editingProduction) {
-      const oldUsage = editingProduction.wholeMilkKilos || 0;
-      const difference = newUsage - oldUsage;
-      if (difference !== 0) {
-        setWholeMilkData(prev => ({ ...prev, stockKilos: prev.stockKilos - difference }));
+      const oldUsageInKilos = editingProduction.wholeMilkKilos || 0;
+      const differenceInKilos = newUsageInKilos - oldUsageInKilos;
+      if (differenceInKilos !== 0) {
+          const differenceInSacos = differenceInKilos / 25;
+          setWholeMilkData(prev => ({ ...prev, stockSacos: prev.stockSacos - differenceInSacos }));
       }
 
       const updatedRecord: ProductionType = {
         ...editingProduction,
         date: dateStr,
         producedUnits: data.producedUnits,
-        wholeMilkKilos: data.useWholeMilk ? data.wholeMilkKilos! : 0,
-        rawMaterialLiters: dailyRawMaterial,
+        wholeMilkKilos: newUsageInKilos,
+        rawMaterialLiters: rawMaterialForDay,
         transformationIndex: newTransformationIndex,
       };
 
@@ -188,16 +198,17 @@ export default function ProductionPage() {
         return;
       }
       
-      if (newUsage > 0) {
-        setWholeMilkData(prev => ({ ...prev, stockKilos: prev.stockKilos - newUsage }));
+      if (newUsageInKilos > 0) {
+        const sacosUsed = newUsageInKilos / 25;
+        setWholeMilkData(prev => ({ ...prev, stockSacos: prev.stockSacos - sacosUsed }));
       }
 
       const newProductionRecord: ProductionType = {
         id: crypto.randomUUID(),
         date: dateStr,
         producedUnits: data.producedUnits,
-        wholeMilkKilos: newUsage,
-        rawMaterialLiters: dailyRawMaterial,
+        wholeMilkKilos: newUsageInKilos,
+        rawMaterialLiters: rawMaterialForDay,
         transformationIndex: newTransformationIndex,
       };
 
@@ -243,9 +254,10 @@ export default function ProductionPage() {
   const confirmDeleteProduction = () => {
     if (!productionToDelete) return;
 
-    const deletedUsage = productionToDelete.wholeMilkKilos || 0;
-    if (deletedUsage > 0) {
-      setWholeMilkData(prev => ({ ...prev, stockKilos: prev.stockKilos + deletedUsage }));
+    const deletedUsageInKilos = productionToDelete.wholeMilkKilos || 0;
+    if (deletedUsageInKilos > 0) {
+        const sacosToRestore = deletedUsageInKilos / 25;
+        setWholeMilkData(prev => ({ ...prev, stockSacos: prev.stockSacos + sacosToRestore }));
     }
 
     setProductionHistory(prev => prev.filter(p => p.id !== productionToDelete.id));
@@ -345,10 +357,11 @@ export default function ProductionPage() {
   const { kilosUsedToday, costToReplaceToday } = useMemo(() => {
     const todayStr = format(new Date(), 'yyyy-MM-dd');
     const todaysProduction = productionHistory.find(p => p.date === todayStr);
-    const used = todaysProduction?.wholeMilkKilos || 0;
-    const cost = used * (wholeMilkData.pricePerKilo || 0);
-    return { kilosUsedToday: used, costToReplaceToday: cost };
-  }, [productionHistory, wholeMilkData.pricePerKilo]);
+    const usedInKilos = todaysProduction?.wholeMilkKilos || 0;
+    const usedInSacos = usedInKilos / 25;
+    const cost = usedInSacos * (wholeMilkData.pricePerSaco || 0);
+    return { kilosUsedToday: usedInKilos, costToReplaceToday: cost };
+  }, [productionHistory, wholeMilkData.pricePerSaco]);
 
   if (!isClient || !currentWeekStart) {
     return (
@@ -459,9 +472,9 @@ export default function ProductionPage() {
                                                 name="wholeMilkKilos"
                                                 render={({ field }) => (
                                                     <FormItem>
-                                                        <FormLabel>Kilos de Leche Entera</FormLabel>
+                                                        <FormLabel>Kilos de Leche Entera Usados</FormLabel>
                                                         <FormControl>
-                                                            <Input type="number" placeholder="Ej: 5" {...field} value={field.value ?? ''} />
+                                                            <Input type="number" placeholder="Ej: 9" {...field} value={field.value ?? ''} />
                                                         </FormControl>
                                                         <FormMessage />
                                                     </FormItem>
@@ -603,12 +616,12 @@ export default function ProductionPage() {
                                 <CardContent className="space-y-4">
                                      <FormField
                                         control={wholeMilkForm.control}
-                                        name="stockKilos"
+                                        name="stockSacos"
                                         render={({ field }) => (
                                             <FormItem>
-                                                <FormLabel>Stock Actual (kg)</FormLabel>
+                                                <FormLabel>Stock Actual (Sacos de 25kg)</FormLabel>
                                                 <FormControl>
-                                                    <Input type="number" placeholder="Ej: 100" {...field} value={field.value ?? ''} />
+                                                    <Input type="number" placeholder="Ej: 4" {...field} value={field.value ?? ''} />
                                                 </FormControl>
                                                 <FormMessage />
                                             </FormItem>
@@ -616,12 +629,12 @@ export default function ProductionPage() {
                                     />
                                     <FormField
                                         control={wholeMilkForm.control}
-                                        name="pricePerKilo"
+                                        name="pricePerSaco"
                                         render={({ field }) => (
                                             <FormItem>
-                                                <FormLabel>Precio de Compra (por kg)</FormLabel>
+                                                <FormLabel>Precio de Compra (por Saco)</FormLabel>
                                                 <FormControl>
-                                                    <Input type="number" placeholder="Ej: 2.50" {...field} value={field.value ?? ''} />
+                                                    <Input type="number" placeholder="Ej: 60.00" {...field} value={field.value ?? ''} />
                                                 </FormControl>
                                                 <FormMessage />
                                             </FormItem>
@@ -644,7 +657,7 @@ export default function ProductionPage() {
                                 <CardDescription>Información sobre tu inventario y uso.</CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
-                                {wholeMilkData.stockKilos < 0 && (
+                                {wholeMilkData.stockSacos < 0 && (
                                     <Alert variant="destructive">
                                     <AlertCircle className="h-4 w-4" />
                                     <AlertTitle>Stock Negativo</AlertTitle>
@@ -655,11 +668,11 @@ export default function ProductionPage() {
                                 )}
                                 <div className="flex justify-between items-center">
                                     <span className="text-muted-foreground flex items-center"><Archive className="mr-2 h-4 w-4"/> Stock Actual</span>
-                                    <span className={`font-bold ${wholeMilkData.stockKilos < 0 ? 'text-destructive' : ''}`}>{wholeMilkData.stockKilos.toLocaleString()} kg</span>
+                                    <span className={`font-bold ${wholeMilkData.stockSacos < 0 ? 'text-destructive' : ''}`}>{wholeMilkData.stockSacos.toLocaleString()} sacos</span>
                                 </div>
                                 <div className="flex justify-between items-center">
-                                    <span className="text-muted-foreground flex items-center"><DollarSign className="mr-2 h-4 w-4"/> Precio por Kilo</span>
-                                    <span className="font-bold">{wholeMilkData.pricePerKilo.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</span>
+                                    <span className="text-muted-foreground flex items-center"><DollarSign className="mr-2 h-4 w-4"/> Precio por Saco</span>
+                                    <span className="font-bold">S/. {wholeMilkData.pricePerSaco.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                 </div>
                                 <div className="flex justify-between items-center">
                                     <span className="text-muted-foreground flex items-center"><Milk className="mr-2 h-4 w-4"/> Uso de Hoy</span>
@@ -667,7 +680,7 @@ export default function ProductionPage() {
                                 </div>
                                 <div className="flex justify-between items-center text-lg">
                                     <span className="text-foreground font-semibold flex items-center"><Wallet className="mr-2 h-5 w-5"/> Costo de Reposición (Hoy)</span>
-                                    <span className="font-extrabold text-primary">{costToReplaceToday.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</span>
+                                    <span className="font-extrabold text-primary">S/. {costToReplaceToday.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                 </div>
                             </CardContent>
                         </Card>

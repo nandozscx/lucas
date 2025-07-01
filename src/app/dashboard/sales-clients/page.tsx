@@ -485,7 +485,7 @@ export default function SalesClientsPage() {
 
     toast({
         title: "Pago Registrado",
-        description: `Se registró un pago de ${data.amount.toLocaleString(undefined, {style: 'currency', currency: 'USD'})} para la venta del ${format(parseISO(saleForPayment.date), "PPP", { locale: es })}.`
+        description: `Se registró un pago de S/. ${data.amount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} para la venta del ${format(parseISO(saleForPayment.date), "PPP", { locale: es })}.`
     });
     setSaleForPayment(null); // Close the dialog
   };
@@ -527,10 +527,10 @@ export default function SalesClientsPage() {
       return [
         format(parseISO(sale.date), "PPP", { locale: es }),
         `${sale.quantity} ${sale.unit}`,
-        sale.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-        sale.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-        totalPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-        balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        `S/. ${sale.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+        `S/. ${sale.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+        `S/. ${totalPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+        `S/. ${balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
       ];
     });
 
@@ -539,7 +539,7 @@ export default function SalesClientsPage() {
       body: tableBody,
       startY: 22,
       foot: [
-        ['', '', '', '', 'Deuda Total:', totalDebtForSelectedClient.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })]
+        ['', '', '', '', 'Deuda Total:', `S/. ${totalDebtForSelectedClient.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`]
       ],
       footStyles: { fontStyle: 'bold', halign: 'right' },
     });
@@ -601,7 +601,7 @@ export default function SalesClientsPage() {
     setSales(updatedSales);
     toast({
       title: "Abono Registrado",
-      description: `Se abonó ${amountPaid.toLocaleString('en-US', { style: 'currency', currency: 'USD' })} a la deuda total.`
+      description: `Se abonó S/. ${amountPaid.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} a la deuda total.`
     });
     setIsDebtPaymentDialogOpen(false);
   };
@@ -756,10 +756,10 @@ export default function SalesClientsPage() {
                                                     <TableRow key={sale.id}>
                                                       <TableCell>{format(parseISO(sale.date), "PPP", { locale: es })}</TableCell>
                                                       <TableCell>{`${sale.quantity} ${sale.unit}`}</TableCell>
-                                                      <TableCell className="text-right">{sale.price.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</TableCell>
-                                                      <TableCell className="text-right">{sale.totalAmount.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</TableCell>
-                                                      <TableCell className="text-right">{totalPaid.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</TableCell>
-                                                      <TableCell className={`text-right font-medium ${balance > 0 ? 'text-destructive' : ''}`}>{balance.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</TableCell>
+                                                      <TableCell className="text-right">S/. {sale.price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
+                                                      <TableCell className="text-right">S/. {sale.totalAmount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
+                                                      <TableCell className="text-right">S/. {totalPaid.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
+                                                      <TableCell className={`text-right font-medium ${balance > 0 ? 'text-destructive' : ''}`}>S/. {balance.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
                                                       <TableCell className="text-center">
                                                           <Button
                                                               variant="ghost"
@@ -787,7 +787,7 @@ export default function SalesClientsPage() {
                                                 <TableRow>
                                                     <TableCell colSpan={5} className="text-right font-bold text-lg">Deuda Total:</TableCell>
                                                     <TableCell className="text-right font-bold text-lg text-destructive">
-                                                        {totalDebtForSelectedClient.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
+                                                        S/. {totalDebtForSelectedClient.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                                                     </TableCell>
                                                     <TableCell></TableCell>
                                                 </TableRow>
@@ -908,9 +908,9 @@ export default function SalesClientsPage() {
                               <TableRow key={sale.id} className={cn(isPaid && "text-muted-foreground")}>
                                 <TableCell>{format(parseISO(sale.date), 'PPP', { locale: es })}</TableCell>
                                 <TableCell>{`Venta de ${sale.quantity} ${sale.unit}`}</TableCell>
-                                <TableCell className="text-right">{sale.totalAmount.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</TableCell>
-                                <TableCell className="text-right">{totalPaid.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</TableCell>
-                                <TableCell className={cn("text-right font-medium", !isPaid && "text-destructive")}>{balance.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</TableCell>
+                                <TableCell className="text-right">S/. {sale.totalAmount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
+                                <TableCell className="text-right">S/. {totalPaid.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
+                                <TableCell className={cn("text-right font-medium", !isPaid && "text-destructive")}>S/. {balance.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
                                 <TableCell className="text-center">
                                     <Badge variant={isPaid ? "secondary" : "destructive"}>
                                         {isPaid ? "Pagada" : "Pendiente"}
@@ -924,7 +924,7 @@ export default function SalesClientsPage() {
                           <TableRow>
                             <TableCell colSpan={5} className="text-right font-bold text-lg">Deuda Total Pendiente:</TableCell>
                             <TableCell className="text-right font-bold text-lg text-destructive">
-                              {totalClientDebt.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
+                              S/. {totalClientDebt.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                             </TableCell>
                           </TableRow>
                         </TableFooter>
@@ -1061,7 +1061,7 @@ const PaymentDialog = ({ sale, onClose, onSubmit }: { sale: Sale, onClose: () =>
     amount: z.coerce
       .number({ invalid_type_error: "El monto debe ser un número." })
       .positive({ message: "El monto debe ser un número positivo." })
-      .max(balance, { message: `El pago no puede exceder el saldo de ${balance.toLocaleString()}`})
+      .max(balance, { message: `El pago no puede exceder el saldo de S/. ${balance.toLocaleString()}`})
   });
 
   type PaymentFormData = z.infer<typeof paymentFormSchema>;
@@ -1093,7 +1093,7 @@ const PaymentDialog = ({ sale, onClose, onSubmit }: { sale: Sale, onClose: () =>
                             {sale.payments.map((payment, index) => (
                                 <div key={index} className="flex justify-between items-center text-sm">
                                     <span>{format(parseISO(payment.date), "PPP", { locale: es })}</span>
-                                    <span className="font-mono">{payment.amount.toLocaleString(undefined, { style: 'currency', currency: 'USD' })}</span>
+                                    <span className="font-mono">S/. {payment.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                 </div>
                             ))}
                         </div>
@@ -1103,9 +1103,9 @@ const PaymentDialog = ({ sale, onClose, onSubmit }: { sale: Sale, onClose: () =>
 
               <div className="text-sm space-y-1">
                   <p><strong>Cliente:</strong> {sale.clientName}</p>
-                  <p><strong>Monto Total:</strong> {sale.totalAmount.toLocaleString(undefined, { style: 'currency', currency: 'USD' })}</p>
-                  <p><strong>Total Abonado:</strong> {totalPaid.toLocaleString(undefined, { style: 'currency', currency: 'USD' })}</p>
-                  <p><strong>Saldo Actual:</strong> <span className="font-bold text-destructive">{balance.toLocaleString(undefined, { style: 'currency', currency: 'USD' })}</span></p>
+                  <p><strong>Monto Total:</strong> S/. {sale.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                  <p><strong>Total Abonado:</strong> S/. {totalPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                  <p><strong>Saldo Actual:</strong> <span className="font-bold text-destructive">S/. {balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></p>
               </div>
 
               <Form {...form}>
@@ -1141,7 +1141,7 @@ const DebtPaymentDialog = ({ isOpen, onClose, onSubmit, totalDebt, clientName }:
     amount: z.coerce
       .number({ invalid_type_error: "El monto debe ser un número." })
       .positive({ message: "El monto debe ser un número positivo." })
-      .max(totalDebt, { message: `El pago no puede exceder la deuda total de ${totalDebt.toLocaleString()}` })
+      .max(totalDebt, { message: `El pago no puede exceder la deuda total de S/. ${totalDebt.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` })
   });
 
   type DebtPaymentFormData = z.infer<typeof debtPaymentFormSchema>;
@@ -1171,7 +1171,7 @@ const DebtPaymentDialog = ({ isOpen, onClose, onSubmit, totalDebt, clientName }:
           </DialogDescription>
         </DialogHeader>
         <div className="text-sm">
-          <p><strong>Deuda Total Pendiente:</strong> <span className="font-bold text-destructive">{totalDebt.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</span></p>
+          <p><strong>Deuda Total Pendiente:</strong> <span className="font-bold text-destructive">S/. {totalDebt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></p>
         </div>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-4">
@@ -1381,15 +1381,15 @@ const ConsolidatedDebtDialog = ({ isOpen, onClose, client, sales, toast }: { isO
                 t.description,
                 '',
                 '',
-                t.balance.toLocaleString('en-US', { style: 'currency', currency: 'USD' }),
+                `S/. ${t.balance.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`,
             ];
         }
         return [
             format(parseISO(t.date), "PPP", { locale: es }),
             t.description,
-            t.debit > 0 ? t.debit.toLocaleString('en-US', { style: 'currency', currency: 'USD' }) : '-',
-            t.credit > 0 ? t.credit.toLocaleString('en-US', { style: 'currency', 'currency': 'USD' }) : '-',
-            t.balance.toLocaleString('en-US', { style: 'currency', currency: 'USD' })
+            t.debit > 0 ? `S/. ${t.debit.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : '-',
+            t.credit > 0 ? `S/. ${t.credit.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : '-',
+            `S/. ${t.balance.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`
         ]
     });
 
@@ -1400,7 +1400,7 @@ const ConsolidatedDebtDialog = ({ isOpen, onClose, client, sales, toast }: { isO
       body: tableBody,
       startY: 28,
       foot: [
-        ['', '', '', 'Saldo Final:', finalBalance.toLocaleString('en-US', { style: 'currency', currency: 'USD' })]
+        ['', '', '', 'Saldo Final:', `S/. ${finalBalance.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`]
       ],
       footStyles: { fontStyle: 'bold', halign: 'right' },
        columnStyles: {
@@ -1460,9 +1460,9 @@ const ConsolidatedDebtDialog = ({ isOpen, onClose, client, sales, toast }: { isO
                  <TableRow key={index} className={cn(t.isOpeningBalance && "bg-muted/50 font-semibold")}>
                     <TableCell>{format(parseISO(t.date), "PPP", { locale: es })}</TableCell>
                     <TableCell>{t.description}</TableCell>
-                    <TableCell className="text-right font-mono">{!t.isOpeningBalance && t.debit > 0 ? t.debit.toLocaleString('en-US', { style: 'currency', currency: 'USD' }) : '-'}</TableCell>
-                    <TableCell className="text-right font-mono text-green-500">{!t.isOpeningBalance && t.credit > 0 ? t.credit.toLocaleString('en-US', { style: 'currency', currency: 'USD' }) : '-'}</TableCell>
-                    <TableCell className="text-right font-mono font-medium">{t.balance.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</TableCell>
+                    <TableCell className="text-right font-mono">{!t.isOpeningBalance && t.debit > 0 ? `S/. ${t.debit.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : '-'}</TableCell>
+                    <TableCell className="text-right font-mono text-green-500">{!t.isOpeningBalance && t.credit > 0 ? `S/. ${t.credit.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : '-'}</TableCell>
+                    <TableCell className="text-right font-mono font-medium">S/. {t.balance.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
                  </TableRow>
               )) : (
                 <TableRow>

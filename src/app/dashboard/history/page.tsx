@@ -22,6 +22,7 @@ import { format, parseISO, getDay, startOfWeek, endOfWeek, isWithinInterval, add
 import { es } from 'date-fns/locale';
 import type { Delivery, Provider } from '@/types';
 import { useToast } from "@/hooks/use-toast";
+import type jsPDF from 'jspdf';
 
 interface jsPDFWithAutoTable extends jsPDF {
   autoTable: (options: any) => jsPDF;
@@ -200,8 +201,8 @@ export default function HistoryPage() {
     const tableBody = vendorTotalsForWeek.map(v => [
         v.providerName,
         v.totalQuantity.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}),
-        v.price.toLocaleString('en-US', {style: 'currency', currency: 'USD'}),
-        v.totalToPay.toLocaleString('en-US', {style: 'currency', currency: 'USD'})
+        `S/. ${v.price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`,
+        `S/. ${v.totalToPay.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`
     ]);
     doc.setFontSize(18);
     doc.text('Totales por Proveedor', 14, 15);
@@ -211,7 +212,7 @@ export default function HistoryPage() {
       head: [tableHeaders],
       body: tableBody,
       startY: 28,
-      foot: [['', '', 'Total General:', grandTotalToPay.toLocaleString('en-US', {style: 'currency', currency: 'USD'})]],
+      foot: [['', '', 'Total General:', `S/. ${grandTotalToPay.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`]],
       footStyles: { fontStyle: 'bold', halign: 'right' },
       columnStyles: { 3: { halign: 'right' } }
     });
@@ -301,15 +302,15 @@ export default function HistoryPage() {
                                       <TableRow key={vendor.providerName}>
                                           <TableCell className="font-medium pl-4">{vendor.providerName}</TableCell>
                                           <TableCell className="text-right">{vendor.totalQuantity.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
-                                          <TableCell className="text-right">{vendor.price.toLocaleString('en-US', {style: 'currency', currency: 'USD'})}</TableCell>
-                                          <TableCell className="text-right pr-4 font-semibold">{vendor.totalToPay.toLocaleString('en-US', {style: 'currency', currency: 'USD'})}</TableCell>
+                                          <TableCell className="text-right">S/. {vendor.price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
+                                          <TableCell className="text-right pr-4 font-semibold">S/. {vendor.totalToPay.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
                                       </TableRow>
                                   ))}
                               </TableBody>
                               <TableFooter>
                                   <TableRow>
                                       <TableCell colSpan={3} className="text-right font-bold text-lg">Total General:</TableCell>
-                                      <TableCell className="text-right font-bold text-lg pr-4">{grandTotalToPay.toLocaleString('en-US', {style: 'currency', currency: 'USD'})}</TableCell>
+                                      <TableCell className="text-right font-bold text-lg pr-4">S/. {grandTotalToPay.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
                                   </TableRow>
                               </TableFooter>
                           </Table>

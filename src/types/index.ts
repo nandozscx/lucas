@@ -53,6 +53,6 @@ export interface Production {
 }
 
 export interface WholeMilk {
-  stockKilos: number;
-  pricePerKilo: number;
+  stockSacos: number;
+  pricePerSaco: number;
 }
