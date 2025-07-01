@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -89,9 +88,9 @@ export default function ProductionPage() {
   });
 
   const selectedDate = form.watch('date');
-  const producedUnits = form.watch('producedUnits');
+  const producedUnitsValue = form.watch('producedUnits');
   const useWholeMilk = form.watch('useWholeMilk');
-  const wholeMilkKilos = form.watch('wholeMilkKilos');
+  const wholeMilkKilosValue = form.watch('wholeMilkKilos');
 
   useEffect(() => {
     setIsClient(true);
@@ -146,9 +145,9 @@ export default function ProductionPage() {
       .reduce((sum, d) => sum + d.quantity, 0);
   }, [selectedDate, deliveries]);
 
-  const additionalLitersFromMilk = useWholeMilk && wholeMilkKilos ? wholeMilkKilos * 10 : 0;
+  const additionalLitersFromMilk = useWholeMilk && wholeMilkKilosValue ? Number(wholeMilkKilosValue) * 10 : 0;
   const totalAdjustedRawMaterial = dailyRawMaterial + additionalLitersFromMilk;
-  const transformationIndex = totalAdjustedRawMaterial > 0 && producedUnits > 0 ? ((producedUnits / totalAdjustedRawMaterial) - 1) * 100 : 0;
+  const transformationIndex = totalAdjustedRawMaterial > 0 && producedUnitsValue ? ((Number(producedUnitsValue) / totalAdjustedRawMaterial) - 1) * 100 : 0;
   
   const handleFormSubmit = (data: ProductionFormData) => {
     const dateStr = format(data.date, 'yyyy-MM-dd');
@@ -475,8 +474,8 @@ export default function ProductionPage() {
       <main className="flex-grow">
         <Tabs defaultValue="production" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="production">Registro de Producción</TabsTrigger>
-                <TabsTrigger value="wholeMilk">Gestión de Leche Entera</TabsTrigger>
+                <TabsTrigger value="production">R. Producción</TabsTrigger>
+                <TabsTrigger value="wholeMilk">L. Entera</TabsTrigger>
             </TabsList>
             
             <TabsContent value="production" className="mt-6">
@@ -618,7 +617,7 @@ export default function ProductionPage() {
                                 </div>
                             </CardHeader>
                             <CardContent className="flex-1 flex flex-col">
-                                <ScrollArea className="h-[450px] md:h-[500px] rounded-md border">
+                                <ScrollArea className="h-[450px] md:h-[500px] rounded-md border whitespace-nowrap">
                                     <Table>
                                         <TableHeader>
                                             <TableRow>
@@ -666,6 +665,7 @@ export default function ProductionPage() {
                                             </TableFooter>
                                         )}
                                     </Table>
+                                    <ScrollBar orientation="horizontal" />
                                 </ScrollArea>
                             </CardContent>
                             <CardFooter className="justify-end border-t pt-4">
