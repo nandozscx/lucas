@@ -17,7 +17,6 @@ export const GlobalVoiceButton = () => {
     const [providers, setProviders] = useState<Provider[]>([]);
     const { toast } = useToast();
 
-    // Function to load providers from localStorage
     const loadProviders = useCallback(() => {
         const storedProviders = localStorage.getItem(PROVIDERS_STORAGE_KEY);
         if (storedProviders) {
@@ -33,17 +32,15 @@ export const GlobalVoiceButton = () => {
         }
     }, []);
 
-    // Load providers when the dialog is about to open, and listen for general storage updates
     useEffect(() => {
-        loadProviders(); // Initial load
-
+        loadProviders();
         window.addEventListener('storage-update', loadProviders);
         return () => {
             window.removeEventListener('storage-update', loadProviders);
         };
     }, [loadProviders]);
 
-    const handleVoiceAssistantComplete = (data: { date: Date; entries: { providerName: string; quantity: number }[] }) => {
+    const handleDeliveriesComplete = (data: { date: Date; entries: { providerName: string; quantity: number }[] }) => {
         const providerMap = new Map(providers.map(p => [p.name.toLowerCase(), p]));
         const dateStr = format(data.date, "yyyy-MM-dd");
 
@@ -86,6 +83,31 @@ export const GlobalVoiceButton = () => {
             toast({ title: "Sin coincidencias", description: "No se encontraron proveedores coincidentes para registrar.", variant: "destructive" });
         }
     };
+
+    const handleProviderCreate = (data: { name: string; price: number; address: string; phone: string }) => {
+        const existingProvider = providers.find(p => p.name.toLowerCase() === data.name.toLowerCase());
+        if (existingProvider) {
+            toast({
+                title: "Proveedor Duplicado",
+                description: `El proveedor "${data.name}" ya existe.`,
+                variant: "destructive",
+            });
+            return;
+        }
+
+        const newProvider: Provider = {
+            id: crypto.randomUUID(),
+            name: data.name,
+            address: data.address,
+            phone: data.phone,
+            price: data.price,
+        };
+
+        const updatedProviders = [...providers, newProvider];
+        localStorage.setItem(PROVIDERS_STORAGE_KEY, JSON.stringify(updatedProviders));
+        setProviders(updatedProviders);
+        window.dispatchEvent(new CustomEvent('storage-update'));
+    };
     
     return (
         <>
@@ -94,7 +116,6 @@ export const GlobalVoiceButton = () => {
                 className="fixed bottom-6 right-6 h-16 w-16 rounded-full shadow-lg z-50 flex items-center justify-center bg-accent hover:bg-accent/90"
                 aria-label="Registrar por voz"
                 title="Registrar por voz"
-                disabled={providers.length === 0}
             >
                 <Mic className="h-8 w-8" />
             </Button>
@@ -103,7 +124,8 @@ export const GlobalVoiceButton = () => {
                 isOpen={isOpen}
                 onClose={() => setIsOpen(false)}
                 providers={providers.map(p => p.name)}
-                onComplete={handleVoiceAssistantComplete}
+                onDeliveriesComplete={handleDeliveriesComplete}
+                onProviderCreate={handleProviderCreate}
             />
         </>
     );

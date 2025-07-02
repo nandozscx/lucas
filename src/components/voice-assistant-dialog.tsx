@@ -6,16 +6,18 @@ import { Button } from '@/components/ui/button';
 import { Mic, MicOff, Loader2 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { registerDeliveriesFromText, type RegisterDeliveriesInput } from '@/ai/flows/register-deliveries-flow';
+import { createProviderFromText, type CreateProviderInput } from '@/ai/flows/create-provider-flow';
 import { parseISO } from 'date-fns';
 
 interface VoiceAssistantDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  providers: string[]; // Just provider names
-  onComplete: (data: { date: Date; entries: { providerName: string; quantity: number }[] }) => void;
+  providers: string[];
+  onDeliveriesComplete: (data: { date: Date; entries: { providerName: string; quantity: number }[] }) => void;
+  onProviderCreate: (data: { name: string; price: number; address: string; phone: string }) => void;
 }
 
-export const VoiceAssistantDialog: React.FC<VoiceAssistantDialogProps> = ({ isOpen, onClose, providers, onComplete }) => {
+export const VoiceAssistantDialog: React.FC<VoiceAssistantDialogProps> = ({ isOpen, onClose, providers, onDeliveriesComplete, onProviderCreate }) => {
   const { toast } = useToast();
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
@@ -61,11 +63,10 @@ export const VoiceAssistantDialog: React.FC<VoiceAssistantDialogProps> = ({ isOp
 
     recognition.onend = () => {
       setIsListening(false);
-      setStatus('processing'); // Set to processing, the effect will check the transcript
+      setStatus('processing');
     };
     
     recognition.onerror = (event) => {
-      // Handle network errors gracefully by warning instead of throwing a hard error.
       if (event.error === 'network') {
         console.warn('Speech recognition network error:', event.error);
         toast({
@@ -89,17 +90,13 @@ export const VoiceAssistantDialog: React.FC<VoiceAssistantDialogProps> = ({ isOp
 
     recognitionRef.current = recognition;
     
-    // This effect runs once to initialize.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
   useEffect(() => {
-    // Only process when the status is 'processing' and we have a transcript.
-    // This is triggered by onend.
     if (status === 'processing' && transcript.trim()) {
         handleProcessTranscript(transcript);
     } else if (status === 'processing') {
-        // If there's no transcript, just go back to idle.
         setStatus('idle');
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -122,47 +119,57 @@ export const VoiceAssistantDialog: React.FC<VoiceAssistantDialogProps> = ({ isOp
     }
     
     try {
-      const input: RegisterDeliveriesInput = {
-        query: text,
-        providerNames: providers,
-      };
-      
-      const result = await registerDeliveriesFromText(input);
+      if (text.toLowerCase().includes('proveedor')) {
+        const input: CreateProviderInput = { query: text };
+        const result = await createProviderFromText(input);
 
-      if (result && result.entries.length > 0) {
-        const formattedEntries = result.entries.map(entry => ({
-            providerName: entry.providerName,
-            quantity: entry.quantity,
-        }));
-        
-        onComplete({
-            date: parseISO(result.date),
-            entries: formattedEntries,
-        });
-
-        toast({
-            title: "Entregas Parseadas",
-            description: `Se han reconocido ${formattedEntries.length} entregas.`,
-        });
-        onClose(); // Close dialog on success
+        if (result && result.name) {
+          onProviderCreate(result);
+          toast({
+            title: "Proveedor Creado por Voz",
+            description: `Se ha creado el proveedor "${result.name}".`,
+          });
+          onClose();
+        } else {
+          throw new Error("No se pudo extraer la información del proveedor del texto.");
+        }
       } else {
-        throw new Error("No se pudo extraer ninguna entrega del texto.");
+        const input: RegisterDeliveriesInput = {
+          query: text,
+          providerNames: providers,
+        };
+        
+        const result = await registerDeliveriesFromText(input);
+
+        if (result && result.entries.length > 0) {
+          const formattedEntries = result.entries.map(entry => ({
+              providerName: entry.providerName,
+              quantity: entry.quantity,
+          }));
+          
+          onDeliveriesComplete({
+              date: parseISO(result.date),
+              entries: formattedEntries,
+          });
+
+          onClose();
+        } else {
+          throw new Error("No se pudo extraer ninguna entrega del texto.");
+        }
       }
     } catch (error) {
       console.error(error);
       setStatus('error');
       toast({
         title: "Error al Procesar",
-        description: "No pude entender los detalles de la entrega. Por favor, inténtalo de nuevo.",
+        description: "No pude entender tu solicitud. Por favor, inténtalo de nuevo.",
         variant: "destructive",
       });
     } finally {
-        // Reset status to idle after processing is complete, successful or not.
         setStatus('idle');
     }
   };
 
-  // On close, ensure everything stops.
   useEffect(() => {
     return () => {
         if(recognitionRef.current && isListening) {
@@ -186,7 +193,7 @@ export const VoiceAssistantDialog: React.FC<VoiceAssistantDialogProps> = ({ isOp
         <DialogHeader>
           <DialogTitle>Asistente de Voz para Registro</DialogTitle>
           <DialogDescription>
-            Dime las entregas para registrar. Por ejemplo: "Registra 30 para Don Lucio y 25 para Enma para hoy."
+            Puedes registrar entregas ("Registra 30 para Don Lucio") o crear proveedores ("Añadir proveedor Brigida...").
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col items-center justify-center gap-4 py-8">
