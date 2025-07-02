@@ -89,13 +89,6 @@ export default function OperationsPage() {
     setCurrentYear(new Date().getFullYear().toString());
     if (typeof window !== 'undefined') {
       loadData();
-      window.addEventListener('storage-update', loadData);
-    }
-
-    return () => {
-        if(typeof window !== 'undefined') {
-            window.removeEventListener('storage-update', loadData);
-        }
     }
   }, []);
 
@@ -108,6 +101,8 @@ export default function OperationsPage() {
         newDailyTotals[delivery.date] = (newDailyTotals[delivery.date] || 0) + delivery.quantity;
       });
       setDailyTotals(newDailyTotals);
+      // Dispatch event so other components (like history, production) can refresh their data.
+      window.dispatchEvent(new CustomEvent('storage-update'));
     }
   }, [deliveries, isClient]);
   
@@ -299,7 +294,7 @@ export default function OperationsPage() {
                                     <TableCell className="whitespace-normal">{provider.address}</TableCell>
                                     <TableCell>{provider.phone}</TableCell>
                                     <TableCell className="text-right">
-                                    {provider.price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                                    S/. {provider.price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                                     </TableCell>
                                     <TableCell className="text-right">
                                     <Button variant="ghost" size="icon" onClick={() => handleOpenEditDialog(provider)} aria-label={`Editar ${provider.name}`}>
