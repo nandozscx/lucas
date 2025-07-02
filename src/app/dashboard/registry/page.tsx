@@ -10,11 +10,10 @@ import type { Delivery as DeliveryType, Provider } from '@/types';
 import SupplyEntryForm, { type DailyRegistryFormData } from '@/components/supply-entry-form';
 import SupplyDataView from '@/components/supply-data-view';
 import ProviderForm, { type ProviderFormData } from '@/components/provider-form';
-import { VoiceAssistantDialog } from '@/components/voice-assistant-dialog';
 import { useToast } from "@/hooks/use-toast";
 
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, ClipboardList, Users as UsersIcon, PlusCircle, Edit2, Trash2, Info, Mic } from 'lucide-react';
+import { ArrowLeft, ClipboardList, Users as UsersIcon, PlusCircle, Edit2, Trash2, Info } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -63,13 +62,10 @@ export default function OperationsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProvider, setEditingProvider] = useState<Provider | null>(null);
   const [providerToDelete, setProviderToDelete] = useState<Provider | null>(null);
-  const [isVoiceAssistantOpen, setIsVoiceAssistantOpen] = useState(false);
 
 
   useEffect(() => {
-    setIsClient(true);
-    setCurrentYear(new Date().getFullYear().toString());
-    if (typeof window !== 'undefined') {
+    const loadData = () => {
       // Load Deliveries
       const storedDeliveries = localStorage.getItem(DELIVERIES_STORAGE_KEY);
       if (storedDeliveries) {
@@ -87,6 +83,19 @@ export default function OperationsPage() {
           if (Array.isArray(parsedProviders)) setProviders(parsedProviders);
         } catch (error) { console.error("Error parsing providers", error); }
       }
+    };
+    
+    setIsClient(true);
+    setCurrentYear(new Date().getFullYear().toString());
+    if (typeof window !== 'undefined') {
+      loadData();
+      window.addEventListener('storage-update', loadData);
+    }
+
+    return () => {
+        if(typeof window !== 'undefined') {
+            window.removeEventListener('storage-update', loadData);
+        }
     }
   }, []);
 
@@ -106,6 +115,8 @@ export default function OperationsPage() {
   useEffect(() => {
     if (isClient) {
       localStorage.setItem(PROVIDERS_STORAGE_KEY, JSON.stringify(providers));
+      // Dispatch event so the global voice assistant can get updated providers list
+      window.dispatchEvent(new CustomEvent('storage-update'));
     }
   }, [providers, isClient]);
 
@@ -196,43 +207,6 @@ export default function OperationsPage() {
       </Button>
     </div>
   );
-  
-  const handleVoiceAssistantComplete = (data: { date: Date; entries: { providerName: string; quantity: number }[] }) => {
-    const providerMap = new Map(providers.map(p => [p.name.toLowerCase(), p]));
-
-    const mappedEntries = data.entries.map(voiceEntry => {
-        const provider = providerMap.get(voiceEntry.providerName.toLowerCase());
-        
-        if (!provider) {
-             toast({
-                title: "Proveedor Desconocido",
-                description: `El asistente de IA mencionó a "${voiceEntry.providerName}", pero no está en tu lista de proveedores. Se ha ignorado.`,
-                variant: "destructive"
-            });
-            return null;
-        }
-
-        return {
-            providerId: provider.id,
-            providerName: provider.name,
-            quantity: voiceEntry.quantity,
-        };
-    }).filter(Boolean) as { providerId: string; providerName: string; quantity: number; }[];
-
-    if (mappedEntries.length === 0 && data.entries.length > 0) {
-        toast({ title: "Sin coincidencias", description: "No se encontraron proveedores coincidentes para registrar.", variant: "destructive" });
-        return;
-    }
-
-    if (mappedEntries.length > 0) {
-        const formData: DailyRegistryFormData = {
-            date: data.date,
-            entries: mappedEntries,
-        };
-        handleAddDeliveries(formData);
-    }
-  };
-
 
   if (!isClient) {
     return (
@@ -271,11 +245,6 @@ export default function OperationsPage() {
             </TabsList>
             
             <TabsContent value="deliveries" className="mt-6">
-                <div className="flex justify-end mb-4">
-                  <Button onClick={() => setIsVoiceAssistantOpen(true)} disabled={providers.length === 0}>
-                    <Mic className="mr-2 h-4 w-4" /> Registrar por Voz
-                  </Button>
-                </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
                     <div className="md:col-span-1 space-y-6">
                     {providers.length === 0 ? (
@@ -392,13 +361,6 @@ export default function OperationsPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <VoiceAssistantDialog
-        isOpen={isVoiceAssistantOpen}
-        onClose={() => setIsVoiceAssistantOpen(false)}
-        providers={providers.map(p => p.name)}
-        onComplete={handleVoiceAssistantComplete}
-      />
-      
       <footer className="text-center text-sm text-muted-foreground py-4 mt-auto">
         <p>&copy; {currentYear} acopiapp. Todos los derechos reservados.</p>
       </footer>

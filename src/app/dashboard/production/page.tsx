@@ -1,6 +1,7 @@
+
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -92,10 +93,7 @@ export default function ProductionPage() {
   const useWholeMilk = form.watch('useWholeMilk');
   const wholeMilkKilosValue = form.watch('wholeMilkKilos');
 
-  useEffect(() => {
-    setIsClient(true);
-    setCurrentYear(new Date().getFullYear().toString());
-    setCurrentWeekStart(startOfWeek(new Date(), { weekStartsOn: 0, locale: es }));
+  const loadData = useCallback(() => {
     if (typeof window !== 'undefined') {
       const storedDeliveries = localStorage.getItem(DELIVERIES_STORAGE_KEY);
       if (storedDeliveries) setDeliveries(JSON.parse(storedDeliveries));
@@ -124,6 +122,22 @@ export default function ProductionPage() {
       }
     }
   }, []);
+
+  useEffect(() => {
+    setIsClient(true);
+    setCurrentYear(new Date().getFullYear().toString());
+    setCurrentWeekStart(startOfWeek(new Date(), { weekStartsOn: 0, locale: es }));
+    loadData();
+
+    if (typeof window !== 'undefined') {
+        window.addEventListener('storage-update', loadData);
+    }
+    return () => {
+        if (typeof window !== 'undefined') {
+            window.removeEventListener('storage-update', loadData);
+        }
+    }
+  }, [loadData]);
   
   useEffect(() => {
     if (isClient) {

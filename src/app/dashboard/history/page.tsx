@@ -41,10 +41,7 @@ export default function HistoryPage() {
   const { toast } = useToast();
 
   useEffect(() => {
-    setIsClient(true);
-    setCurrentYear(new Date().getFullYear().toString());
-    setCurrentWeekStart(startOfWeek(new Date(), { weekStartsOn: 0, locale: es }));
-    if (typeof window !== 'undefined') {
+    const loadData = () => {
       const storedDeliveries = localStorage.getItem(DELIVERIES_STORAGE_KEY);
       if (storedDeliveries) {
         try {
@@ -60,6 +57,20 @@ export default function HistoryPage() {
           if (Array.isArray(parsedProviders)) setProviders(parsedProviders);
         } catch (error) { console.error("Error parsing providers from localStorage", error); }
       }
+    };
+
+    setIsClient(true);
+    setCurrentYear(new Date().getFullYear().toString());
+    setCurrentWeekStart(startOfWeek(new Date(), { weekStartsOn: 0, locale: es }));
+    if (typeof window !== 'undefined') {
+      loadData();
+      window.addEventListener('storage-update', loadData);
+    }
+    
+    return () => {
+        if(typeof window !== 'undefined') {
+            window.removeEventListener('storage-update', loadData);
+        }
     }
   }, []);
   

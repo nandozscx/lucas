@@ -1,6 +1,7 @@
 
 import type { Metadata } from 'next';
 import { Toaster } from "@/components/ui/toaster";
+import { GlobalVoiceButton } from '@/components/global-voice-button';
 
 export const metadata: Metadata = {
   title: 'acopiapp', 
@@ -16,6 +17,7 @@ export default function DashboardLayout({
     <>
       {children}
       <Toaster />
+      <GlobalVoiceButton />
     </>
   );
 }
