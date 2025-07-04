@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/form";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { CalendarIcon, PackagePlus, Building, Boxes } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, capitalize } from "@/lib/utils";
 import type { Provider } from "@/types";
 
 const dailyEntrySchema = z.object({
@@ -77,23 +77,13 @@ const SupplyEntryForm: React.FC<SupplyEntryFormProps> = ({ onSubmitDeliveries, p
       entries: providers.map(p => ({ providerId: p.id, providerName: p.name, quantity: undefined }))
     });
   };
-  
-  const getDayName = (date: Date | undefined): string => {
-    if (!date) return "";
-    return format(date, "EEEE", { locale: es });
-  };
-
-  const getDateNumber = (date: Date | undefined): string => {
-    if (!date) return "";
-    return format(date, "d", { locale: es });
-  };
 
   return (
     <Card className="shadow-lg rounded-lg">
       <CardHeader>
         <CardTitle className="flex items-center text-xl text-primary">
           <PackagePlus className="mr-2 h-6 w-6" /> 
-          <span>Registro para el {getDayName(selectedDate)} {getDateNumber(selectedDate)}</span>
+          <span>Registro para {capitalize(format(selectedDate, "EEEE, dd/MM", { locale: es }))}</span>
         </CardTitle>
       </CardHeader>
       <Form {...form}>
@@ -119,7 +109,7 @@ const SupplyEntryForm: React.FC<SupplyEntryFormProps> = ({ onSubmitDeliveries, p
                           )}
                         >
                           {field.value ? (
-                            format(field.value, "PPP", { locale: es }) 
+                            capitalize(format(field.value, "EEEE, dd/MM/yyyy", { locale: es })) 
                           ) : (
                             <span>Seleccione una fecha</span>
                           )}

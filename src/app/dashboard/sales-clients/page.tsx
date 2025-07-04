@@ -69,7 +69,7 @@ import type jsPDF from 'jspdf';
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PlusCircle, Edit2, Trash2, Users, ArrowLeft, Info, ShoppingCart, DollarSign, CalendarIcon, Package, Box, Download, HandCoins, Library, Landmark, Ban } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, capitalize } from '@/lib/utils';
 
 
 const CLIENTS_STORAGE_KEY = 'dailySupplyTrackerClients';
@@ -190,7 +190,7 @@ const SaleForm = ({ onSubmitSale, clients, onClientChange }: { onSubmitSale: (da
                                                     variant={"outline"}
                                                     className={cn("w-full pl-3 text-left font-normal justify-start", !field.value && "text-muted-foreground")}
                                                 >
-                                                    {field.value ? format(field.value, "PPP", { locale: es }) : <span>Seleccione una fecha</span>}
+                                                    {field.value ? capitalize(format(field.value, "EEEE, dd/MM/yyyy", { locale: es })) : <span>Seleccione una fecha</span>}
                                                     <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                                                 </Button>
                                             </FormControl>
@@ -485,7 +485,7 @@ export default function SalesClientsPage() {
 
     toast({
         title: "Pago Registrado",
-        description: `Se registró un pago de S/. ${data.amount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} para la venta del ${format(parseISO(saleForPayment.date), "PPP", { locale: es })}.`
+        description: `Se registró un pago de S/. ${data.amount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} para la venta del ${capitalize(format(parseISO(saleForPayment.date), "EEEE, dd/MM", { locale: es }))}.`
     });
     setSaleForPayment(null); // Close the dialog
   };
@@ -525,7 +525,7 @@ export default function SalesClientsPage() {
       const totalPaid = sale.payments.reduce((sum, p) => sum + p.amount, 0);
       const balance = sale.totalAmount - totalPaid;
       return [
-        format(parseISO(sale.date), "PPP", { locale: es }),
+        capitalize(format(parseISO(sale.date), "EEEE, dd/MM", { locale: es })),
         `${sale.quantity} ${sale.unit}`,
         `S/. ${sale.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
         `S/. ${sale.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
@@ -633,7 +633,7 @@ export default function SalesClientsPage() {
     setSales(updatedSales);
     toast({
       title: "Cuentas Saldadas",
-      description: `Todas las deudas para ${clients.find(c => c.id === selectedClientIdForDebts)?.name} hasta el ${format(cutoffDate, "PPP", { locale: es })} han sido marcadas como pagadas.`
+      description: `Todas las deudas para ${clients.find(c => c.id === selectedClientIdForDebts)?.name} hasta el ${capitalize(format(cutoffDate, "EEEE, dd/MM", { locale: es }))} han sido marcadas como pagadas.`
     });
     setIsCancelAccountDialogOpen(false);
   };
@@ -754,7 +754,7 @@ export default function SalesClientsPage() {
                                                   const balance = sale.totalAmount - totalPaid;
                                                   return (
                                                     <TableRow key={sale.id}>
-                                                      <TableCell>{format(parseISO(sale.date), "PPP", { locale: es })}</TableCell>
+                                                      <TableCell>{capitalize(format(parseISO(sale.date), "EEEE, dd/MM", { locale: es }))}</TableCell>
                                                       <TableCell>{`${sale.quantity} ${sale.unit}`}</TableCell>
                                                       <TableCell className="text-right">S/. {sale.price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
                                                       <TableCell className="text-right">S/. {sale.totalAmount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
@@ -906,7 +906,7 @@ export default function SalesClientsPage() {
                             const isPaid = balance <= 0;
                             return (
                               <TableRow key={sale.id} className={cn(isPaid && "text-muted-foreground")}>
-                                <TableCell>{format(parseISO(sale.date), 'PPP', { locale: es })}</TableCell>
+                                <TableCell>{capitalize(format(parseISO(sale.date), 'EEEE, dd/MM', { locale: es }))}</TableCell>
                                 <TableCell>{`Venta de ${sale.quantity} ${sale.unit}`}</TableCell>
                                 <TableCell className="text-right">S/. {sale.totalAmount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
                                 <TableCell className="text-right">S/. {totalPaid.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
@@ -1034,7 +1034,7 @@ export default function SalesClientsPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción no se puede deshacer. Esto eliminará permanentemente la venta del {saleToDelete ? format(parseISO(saleToDelete.date), "PPP", { locale: es }) : ''} para el cliente "{saleToDelete?.clientName}".
+              Esta acción no se puede deshacer. Esto eliminará permanentemente la venta del {saleToDelete ? capitalize(format(parseISO(saleToDelete.date), "EEEE, dd/MM", { locale: es })) : ''} para el cliente "{saleToDelete?.clientName}".
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1081,7 +1081,7 @@ const PaymentDialog = ({ sale, onClose, onSubmit }: { sale: Sale, onClose: () =>
               <DialogHeader>
                   <DialogTitle>Registrar Pago</DialogTitle>
                   <DialogDescription>
-                      Añadir un nuevo abono para la venta del {format(parseISO(sale.date), "PPP", { locale: es })}.
+                      Añadir un nuevo abono para la venta del {capitalize(format(parseISO(sale.date), "EEEE, dd/MM", { locale: es }))}.
                   </DialogDescription>
               </DialogHeader>
 
@@ -1092,7 +1092,7 @@ const PaymentDialog = ({ sale, onClose, onSubmit }: { sale: Sale, onClose: () =>
                         <div className="space-y-1">
                             {sale.payments.map((payment, index) => (
                                 <div key={index} className="flex justify-between items-center text-sm">
-                                    <span>{format(parseISO(payment.date), "PPP", { locale: es })}</span>
+                                    <span>{capitalize(format(parseISO(payment.date), "EEEE, dd/MM", { locale: es }))}</span>
                                     <span className="font-mono">S/. {payment.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                 </div>
                             ))}
@@ -1246,7 +1246,7 @@ const CancelAccountDialog = ({ isOpen, onClose, onSubmit, clientName }: { isOpen
                                     variant={"outline"}
                                     className={cn("w-full pl-3 text-left font-normal justify-start", !field.value && "text-muted-foreground")}
                                 >
-                                    {field.value ? format(field.value, "PPP", { locale: es }) : <span>Seleccione una fecha</span>}
+                                    {field.value ? capitalize(format(field.value, "EEEE, dd/MM/yyyy", { locale: es })) : <span>Seleccione una fecha</span>}
                                     <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                                 </Button>
                             </FormControl>
@@ -1377,7 +1377,7 @@ const ConsolidatedDebtDialog = ({ isOpen, onClose, client, sales, toast }: { isO
     const tableBody = transactions.map(t => {
         if (t.isOpeningBalance) {
             return [
-                format(parseISO(t.date), "PPP", { locale: es }),
+                capitalize(format(parseISO(t.date), "EEEE, dd/MM", { locale: es })),
                 t.description,
                 '',
                 '',
@@ -1385,7 +1385,7 @@ const ConsolidatedDebtDialog = ({ isOpen, onClose, client, sales, toast }: { isO
             ];
         }
         return [
-            format(parseISO(t.date), "PPP", { locale: es }),
+            capitalize(format(parseISO(t.date), "EEEE, dd/MM", { locale: es })),
             t.description,
             t.debit > 0 ? `S/. ${t.debit.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : '-',
             t.credit > 0 ? `S/. ${t.credit.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : '-',
@@ -1458,7 +1458,7 @@ const ConsolidatedDebtDialog = ({ isOpen, onClose, client, sales, toast }: { isO
             <TableBody>
               {transactions.length > 0 ? transactions.map((t, index) => (
                  <TableRow key={index} className={cn(t.isOpeningBalance && "bg-muted/50 font-semibold")}>
-                    <TableCell>{format(parseISO(t.date), "PPP", { locale: es })}</TableCell>
+                    <TableCell>{capitalize(format(parseISO(t.date), "EEEE, dd/MM", { locale: es }))}</TableCell>
                     <TableCell>{t.description}</TableCell>
                     <TableCell className="text-right font-mono">{!t.isOpeningBalance && t.debit > 0 ? `S/. ${t.debit.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : '-'}</TableCell>
                     <TableCell className="text-right font-mono text-green-500">{!t.isOpeningBalance && t.credit > 0 ? `S/. ${t.credit.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : '-'}</TableCell>

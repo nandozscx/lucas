@@ -22,6 +22,7 @@ import { format, parseISO, getDay, startOfWeek, endOfWeek, isWithinInterval, add
 import { es } from 'date-fns/locale';
 import type { Delivery, Provider } from '@/types';
 import { useToast } from "@/hooks/use-toast";
+import { capitalize } from '@/lib/utils';
 import type jsPDF from 'jspdf';
 
 interface jsPDFWithAutoTable extends jsPDF {
@@ -105,7 +106,7 @@ export default function HistoryPage() {
   }
 
   const currentWeekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 0, locale: es });
-  const weekTitle = `Semana del ${format(currentWeekStart, "dd 'de' MMMM", { locale: es })} al ${format(currentWeekEnd, "dd 'de' MMMM 'de' yyyy", { locale: es })}`;
+  const weekTitle = `Semana del ${format(currentWeekStart, "dd/MM/yy")} al ${format(currentWeekEnd, "dd/MM/yy")}`;
 
   const deliveriesForCurrentWeek = deliveries.filter(d => {
     const deliveryDate = parseISO(d.date);
@@ -113,7 +114,7 @@ export default function HistoryPage() {
   });
 
   const daysOfWeekHeaders = Array.from({ length: 7 }).map((_, i) => 
-    format(addDays(currentWeekStart, i), "EEEE", { locale: es })
+    capitalize(format(addDays(currentWeekStart, i), "EEEE", { locale: es }))
   );
   
   // Data for "Resumen Semanal"
@@ -188,7 +189,7 @@ export default function HistoryPage() {
     const doc = new (jsPDFConstructor as any)() as jsPDFWithAutoTable;
     const tableHeaders = ['Fecha', 'Cantidad Total'];
     const tableBody = dailyTotalsForWeek.map(day => [
-      format(day.date, "PPP", { locale: es }),
+      capitalize(format(day.date, "EEEE, dd/MM", { locale: es })),
       day.total.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})
     ]);
     doc.setFontSize(18);
@@ -382,7 +383,7 @@ export default function HistoryPage() {
                               <TableBody>
                                   {dailyTotalsForWeek.map(({date, total}) => (
                                       <TableRow key={date.toString()}>
-                                          <TableCell className="font-medium">{format(date, "PPP", { locale: es })}</TableCell>
+                                          <TableCell className="font-medium">{capitalize(format(date, "EEEE, dd/MM", { locale: es }))}</TableCell>
                                           <TableCell className="text-right">{total.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})}</TableCell>
                                       </TableRow>
                                   ))}

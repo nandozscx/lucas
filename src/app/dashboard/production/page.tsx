@@ -26,7 +26,7 @@ import type { Delivery, Production as ProductionType, WholeMilkReplenishment } f
 import { ArrowLeft, Cpu, CalendarIcon, Package, Milk, Scale, Percent, Save, Edit2, Trash2, ChevronLeft, ChevronRight, Download, ShoppingBag, Archive, Wallet, DollarSign, AlertCircle, PlusCircle, History } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { cn } from '@/lib/utils';
+import { cn, capitalize } from '@/lib/utils';
 import type jsPDF from 'jspdf';
 
 interface jsPDFWithAutoTable extends jsPDF {
@@ -192,7 +192,7 @@ export default function ProductionPage() {
 
       toast({
         title: "Registro Actualizado",
-        description: `Se actualizó el registro del ${format(data.date, "PPP", { locale: es })}.`,
+        description: `Se actualizó el registro del ${capitalize(format(data.date, "EEEE, dd/MM", { locale: es }))}.`,
       });
       setEditingProduction(null);
 
@@ -222,7 +222,7 @@ export default function ProductionPage() {
 
       toast({
         title: "Producción Registrada",
-        description: `Se guardó el registro para el ${format(data.date, "PPP", { locale: es })}.`,
+        description: `Se guardó el registro para el ${capitalize(format(data.date, "EEEE, dd/MM", { locale: es }))}.`,
       });
     }
     
@@ -285,7 +285,7 @@ export default function ProductionPage() {
     }
 
     const weekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 0, locale: es });
-    const title = `Semana del ${format(currentWeekStart, "dd 'de' MMMM", { locale: es })} al ${format(weekEnd, "dd 'de' MMMM 'de' yyyy", { locale: es })}`;
+    const title = `Semana: ${format(currentWeekStart, "dd/MM/yy")} - ${format(weekEnd, "dd/MM/yy")}`;
 
     const filtered = productionHistory.filter(p => {
       const productionDate = parseISO(p.date);
@@ -311,7 +311,7 @@ export default function ProductionPage() {
 
     const tableHeaders = ['Fecha', 'Materia Prima Total', 'Unidades Prod.', 'Índice de Transf.'];
     const tableBody = productionForCurrentWeek.map(p => [
-      format(parseISO(p.date), 'PPP', { locale: es }),
+      capitalize(format(parseISO(p.date), 'EEEE, dd/MM', { locale: es })),
       `${(p.rawMaterialLiters + (p.wholeMilkKilos * 10)).toLocaleString()} L`,
       p.producedUnits.toLocaleString(),
       `${p.transformationIndex.toFixed(2)}%`
@@ -372,7 +372,7 @@ export default function ProductionPage() {
         prev.map(r => (r.id === editingReplenishment.id ? updatedReplenishment : r))
             .sort((a,b) => parseISO(b.date).getTime() - parseISO(a.date).getTime())
       );
-      toast({ title: "Reabastecimiento Actualizado", description: `Se actualizó la entrada del ${format(data.date, "PPP", { locale: es })}.` });
+      toast({ title: "Reabastecimiento Actualizado", description: `Se actualizó la entrada del ${capitalize(format(data.date, "EEEE, dd/MM", { locale: es }))}.` });
     } else {
       const newReplenishment: WholeMilkReplenishment = {
         id: crypto.randomUUID(),
@@ -512,7 +512,7 @@ export default function ProductionPage() {
                                                         <PopoverTrigger asChild>
                                                             <FormControl>
                                                                 <Button variant="outline" className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
-                                                                    {field.value ? format(field.value, "PPP", { locale: es }) : <span>Seleccione una fecha</span>}
+                                                                    {field.value ? capitalize(format(field.value, "EEEE, dd/MM/yyyy", { locale: es })) : <span>Seleccione una fecha</span>}
                                                                     <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                                                                 </Button>
                                                             </FormControl>
@@ -586,7 +586,7 @@ export default function ProductionPage() {
                         <Card>
                             <CardHeader>
                                 <CardTitle>Cálculos del Día</CardTitle>
-                                <CardDescription>{format(selectedDate, "PPP", { locale: es })}</CardDescription>
+                                <CardDescription>{capitalize(format(selectedDate, "EEEE, dd/MM/yyyy", { locale: es }))}</CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
                                 <div className="flex justify-between items-center">
@@ -646,7 +646,7 @@ export default function ProductionPage() {
                                             {productionForCurrentWeek.length > 0 ? (
                                                 productionForCurrentWeek.map(p => (
                                                     <TableRow key={p.id}>
-                                                        <TableCell>{format(parseISO(p.date), 'PPP', { locale: es })}</TableCell>
+                                                        <TableCell>{capitalize(format(parseISO(p.date), 'EEEE, dd/MM', { locale: es }))}</TableCell>
                                                         <TableCell className="text-right">{(p.rawMaterialLiters + (p.wholeMilkKilos * 10)).toLocaleString()} L</TableCell>
                                                         <TableCell className="text-right">{p.producedUnits.toLocaleString()}</TableCell>
                                                         <TableCell className={`text-right font-medium ${p.transformationIndex >= 0 ? 'text-green-500' : 'text-red-500'}`}>{p.transformationIndex.toFixed(2)}%</TableCell>
@@ -760,7 +760,7 @@ export default function ProductionPage() {
                                             {stockUsageForCurrentWeek.length > 0 ? (
                                                 stockUsageForCurrentWeek.map(usage => (
                                                     <TableRow key={usage.id}>
-                                                        <TableCell>{format(parseISO(usage.date), 'PPP', { locale: es })}</TableCell>
+                                                        <TableCell>{capitalize(format(parseISO(usage.date), 'EEEE, dd/MM', { locale: es }))}</TableCell>
                                                         <TableCell className="text-right">{usage.kilosUsed.toLocaleString()} kg</TableCell>
                                                         <TableCell className="text-right">S/. {usage.costToReplace.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
                                                     </TableRow>
@@ -808,7 +808,7 @@ export default function ProductionPage() {
                                         {replenishmentHistory.length > 0 ? (
                                             replenishmentHistory.map(r => (
                                                 <TableRow key={r.id}>
-                                                    <TableCell>{format(parseISO(r.date), 'PPP', { locale: es })}</TableCell>
+                                                    <TableCell>{capitalize(format(parseISO(r.date), 'EEEE, dd/MM', { locale: es }))}</TableCell>
                                                     <TableCell className="text-right">{r.quantitySacos.toLocaleString()}</TableCell>
                                                     <TableCell className="text-right">S/. {r.pricePerSaco.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
                                                     <TableCell className="text-center">
@@ -844,7 +844,7 @@ export default function ProductionPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción no se puede deshacer. Esto eliminará permanentemente el registro de producción del {productionToDelete ? format(parseISO(productionToDelete.date), 'PPP', { locale: es }) : ''}.
+              Esta acción no se puede deshacer. Esto eliminará permanentemente el registro de producción del {productionToDelete ? capitalize(format(parseISO(productionToDelete.date), 'EEEE, dd/MM', { locale: es })) : ''}.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -871,7 +871,7 @@ export default function ProductionPage() {
             <AlertDialogHeader>
                 <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
                 <AlertDialogDescription>
-                Esta acción no se puede deshacer. Esto eliminará permanentemente el registro de reabastecimiento del {replenishmentToDelete ? format(parseISO(replenishmentToDelete.date), 'PPP', { locale: es }) : ''}.
+                Esta acción no se puede deshacer. Esto eliminará permanentemente el registro de reabastecimiento del {replenishmentToDelete ? capitalize(format(parseISO(replenishmentToDelete.date), 'EEEE, dd/MM', { locale: es })) : ''}.
                 </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -943,7 +943,7 @@ const ReplenishmentDialog = ({ isOpen, onClose, onSubmit, initialData }: { isOpe
                                         <PopoverTrigger asChild>
                                             <FormControl>
                                                 <Button variant="outline" className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
-                                                    {field.value ? format(field.value, "PPP", { locale: es }) : <span>Seleccione una fecha</span>}
+                                                    {field.value ? capitalize(format(field.value, "EEEE, dd/MM/yyyy", { locale: es })) : <span>Seleccione una fecha</span>}
                                                     <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                                                 </Button>
                                             </FormControl>

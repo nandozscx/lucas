@@ -11,6 +11,7 @@ import SupplyEntryForm, { type DailyRegistryFormData } from '@/components/supply
 import SupplyDataView from '@/components/supply-data-view';
 import ProviderForm, { type ProviderFormData } from '@/components/provider-form';
 import { useToast } from "@/hooks/use-toast";
+import { capitalize } from '@/lib/utils';
 
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, ClipboardList, Users as UsersIcon, PlusCircle, Edit2, Trash2, Info } from 'lucide-react';
@@ -148,7 +149,7 @@ export default function OperationsPage() {
 
     toast({
       title: "Entregas Registradas",
-      description: `${submittedEntries.length} entrega(s) para el ${format(data.date, "PPP", { locale: es })} han sido registradas/actualizadas.`,
+      description: `${submittedEntries.length} entrega(s) para el ${capitalize(format(data.date, "EEEE, dd/MM", { locale: es }))} han sido registradas/actualizadas.`,
     });
   }, [toast]);
 

@@ -1,3 +1,4 @@
+
 "use client";
 
 import React from 'react';
@@ -21,6 +22,7 @@ import { es } from 'date-fns/locale';
 import { useToast } from "@/hooks/use-toast";
 import { Button } from './ui/button';
 import { Skeleton } from './ui/skeleton';
+import { capitalize } from '@/lib/utils';
 
 interface jsPDFWithAutoTable extends jsPDF {
   autoTable: (options: any) => jsPDF;
@@ -80,7 +82,7 @@ const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals
   });
 
   const daysOfWeekHeaders = Array.from({ length: 7 }).map((_, i) => 
-    format(addDays(currentWeekStart, i), "EEEE", { locale: es })
+    capitalize(format(addDays(currentWeekStart, i), "EEEE", { locale: es }))
   );
   
   const sortedDailyTotals = Object.entries(dailyTotals).sort(([dateA], [dateB]) => 
@@ -134,7 +136,7 @@ const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals
         vendor.totalToPay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
     ]);
 
-    const weekTitle = `Semana del ${format(currentWeekStart, "dd 'de' MMMM", { locale: es })} al ${format(currentWeekEnd, "dd 'de' MMMM 'de' yyyy", { locale: es })}`;
+    const weekTitle = `Semana del ${format(currentWeekStart, "dd/MM/yy")} al ${format(currentWeekEnd, "dd/MM/yy")}`;
 
     doc.setFontSize(18);
     doc.text('Totales Semanales por Proveedor', 14, 15);
@@ -186,7 +188,7 @@ const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals
         <div className="text-center pt-8 pb-4">
           <CardTitle className="text-xl text-primary">Información de Entregas</CardTitle>
           <CardDescription className="pt-2">
-              Semana del {format(currentWeekStart, "dd 'de' MMMM", { locale: es })} al {format(currentWeekEnd, "dd 'de' MMMM 'de' yyyy", { locale: es })}
+              Semana del {format(currentWeekStart, "dd/MM/yy")} al {format(currentWeekEnd, "dd/MM/yy")}
           </CardDescription>
         </div>
 
@@ -242,7 +244,7 @@ const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals
                     <TableBody>
                         {sortedDailyTotals.map(([date, total]) => (
                         <TableRow key={date}>
-                            <TableCell className="font-medium">{format(parseISO(date), "PPP", { locale: es })}</TableCell>
+                            <TableCell className="font-medium">{capitalize(format(parseISO(date), "EEEE, dd/MM", { locale: es }))}</TableCell>
                             <TableCell className="text-right">{total.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})}</TableCell>
                         </TableRow>
                         ))}
