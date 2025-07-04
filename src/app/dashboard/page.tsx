@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import DashboardHeader from '@/components/dashboard-header';
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card } from "@/components/ui/card";
-import { ClipboardPenLine, ShoppingCart, HistoryIcon, Cpu, Truck } from 'lucide-react';
+import { ClipboardPenLine, ShoppingCart, HistoryIcon, Cpu, BarChart3, DatabaseBackup } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import type { Production, WholeMilkReplenishment } from '@/types';
 
@@ -51,7 +51,7 @@ export default function DashboardPage() {
       <div className="min-h-screen flex flex-col p-4 sm:p-6 space-y-6 bg-background">
         <Skeleton className="h-20 w-full rounded-lg" /> {/* Header Placeholder */}
         <main className="flex-grow grid grid-cols-2 gap-4 p-4 items-center">
-            {[...Array(4)].map((_, i) => (
+            {[...Array(6)].map((_, i) => (
                 <Skeleton key={i} className="w-full rounded-lg aspect-square" />
             ))}
         </main>
@@ -67,6 +67,8 @@ export default function DashboardPage() {
     { title: "Producción", icon: Cpu, action: () => router.push('/dashboard/production') },
     { title: "Ventas y Clientes", icon: ShoppingCart, action: () => router.push('/dashboard/sales-clients') },
     { title: "Historial", icon: HistoryIcon, action: () => router.push('/dashboard/history') },
+    { title: "Estadísticas", icon: BarChart3, action: () => router.push('/dashboard/statistics') },
+    { title: "Salvar y Leer", icon: DatabaseBackup, action: () => router.push('/dashboard/backup') },
   ];
 
   return (
