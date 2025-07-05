@@ -39,6 +39,7 @@ export interface Sale {
   price: number;
   quantity: number;
   unit: 'baldes' | 'unidades';
+  deliveryType: 'personal' | 'envio';
   totalAmount: number;
   payments: Payment[];
 }

@@ -68,7 +68,7 @@ import type { Client, Sale, Payment } from '@/types';
 import type jsPDF from 'jspdf';
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PlusCircle, Edit2, Trash2, Users, ArrowLeft, Info, ShoppingCart, DollarSign, CalendarIcon, Package, Box, Download, HandCoins, Library, Landmark, Ban } from 'lucide-react';
+import { PlusCircle, Edit2, Trash2, Users, ArrowLeft, Info, ShoppingCart, DollarSign, CalendarIcon, Package, Box, Download, HandCoins, Library, Landmark, Ban, PersonStanding, Truck } from 'lucide-react';
 import { cn, capitalize } from '@/lib/utils';
 
 
@@ -95,6 +95,7 @@ const saleFormSchema = z.object({
     .number({ invalid_type_error: "El abono debe ser un número." })
     .min(0, "El abono no puede ser negativo.")
     .optional(),
+  deliveryType: z.enum(['personal', 'envio'], { required_error: "Debe seleccionar un tipo de entrega." }),
 }).refine((data) => {
     // Ensure downPayment is not more than total amount
     if (data.downPayment !== undefined && data.price > 0 && data.quantity > 0) {
@@ -121,6 +122,7 @@ const SaleForm = ({ onSubmitSale, clients, onClientChange }: { onSubmitSale: (da
             quantity: '' as any,
             unit: 'baldes',
             downPayment: '' as any,
+            deliveryType: 'personal',
         },
     });
 
@@ -133,6 +135,7 @@ const SaleForm = ({ onSubmitSale, clients, onClientChange }: { onSubmitSale: (da
             quantity: '' as any,
             unit: 'baldes',
             downPayment: '' as any,
+            deliveryType: 'personal',
         });
     };
 
@@ -279,6 +282,36 @@ const SaleForm = ({ onSubmitSale, clients, onClientChange }: { onSubmitSale: (da
                                 </FormItem>
                             )}
                         />
+                        <FormField
+                            control={form.control}
+                            name="deliveryType"
+                            render={({ field }) => (
+                                <FormItem className="space-y-3">
+                                <FormLabel className="font-semibold">Tipo de Entrega</FormLabel>
+                                <FormControl>
+                                    <RadioGroup
+                                    onValueChange={field.onChange}
+                                    defaultValue={field.value}
+                                    className="flex items-center space-x-4"
+                                    >
+                                    <FormItem className="flex items-center space-x-2 space-y-0">
+                                        <FormControl>
+                                            <RadioGroupItem value="personal" />
+                                        </FormControl>
+                                        <FormLabel className="font-normal flex items-center"><PersonStanding className="mr-1 h-4 w-4"/> Personal</FormLabel>
+                                    </FormItem>
+                                    <FormItem className="flex items-center space-x-2 space-y-0">
+                                        <FormControl>
+                                            <RadioGroupItem value="envio" />
+                                        </FormControl>
+                                        <FormLabel className="font-normal flex items-center"><Truck className="mr-1 h-4 w-4"/> Envío</FormLabel>
+                                    </FormItem>
+                                    </RadioGroup>
+                                </FormControl>
+                                <FormMessage />
+                                </FormItem>
+                            )}
+                        />
                     </CardContent>
                     <CardFooter>
                         <Button type="submit" className="w-full bg-primary hover:bg-primary/90">
@@ -331,21 +364,30 @@ export default function SalesClientsPage() {
                 // Allow any to handle old structure temporarily
                 const parsedSales: any[] = JSON.parse(storedSales);
                 const migratedSales: Sale[] = parsedSales.map(sale => {
-                    // If sale has downPayment but not payments, it's the old structure
-                    if (sale.downPayment !== undefined && !sale.payments) {
-                        const { downPayment, ...rest } = sale;
-                        return {
+                    let migratedSale: any = { ...sale };
+
+                    // Migrate old downPayment structure to new payments array
+                    if (migratedSale.downPayment !== undefined && !migratedSale.payments) {
+                        const { downPayment, ...rest } = migratedSale;
+                        migratedSale = {
                             ...rest,
-                            payments: downPayment > 0 ? [{ date: sale.date, amount: downPayment }] : [],
+                            payments: downPayment > 0 ? [{ date: migratedSale.date, amount: downPayment }] : [],
                         };
                     }
-                    // Ensure payments is an array for sales that might have been partially migrated or corrupted
-                    if (!Array.isArray(sale.payments)) {
-                        sale.payments = [];
+
+                    // Ensure payments is an array
+                    if (!Array.isArray(migratedSale.payments)) {
+                        migratedSale.payments = [];
                     }
-                    return sale;
+                    
+                    // Add deliveryType if it doesn't exist
+                    if (!migratedSale.deliveryType) {
+                        migratedSale.deliveryType = 'personal';
+                    }
+                    
+                    return migratedSale;
                 });
-                setSales(migratedSales);
+                setSales(migratedSales as Sale[]);
             } catch (error) {
                 console.error("Falló al parsear ventas desde localStorage", error);
                 localStorage.removeItem(SALES_STORAGE_KEY);
@@ -440,6 +482,7 @@ export default function SalesClientsPage() {
       price: data.price,
       quantity: data.quantity,
       unit: data.unit,
+      deliveryType: data.deliveryType,
       totalAmount: totalAmount,
       payments: finalDownPayment > 0 ? [{ date: format(data.date, "yyyy-MM-dd"), amount: finalDownPayment }] : [],
     };
@@ -520,13 +563,14 @@ export default function SalesClientsPage() {
     doc.setFontSize(18);
     doc.text(title, 14, 15);
 
-    const tableHeaders = ['Fecha', 'Cantidad', 'Precio Unit.', 'Monto Total', 'Abono', 'Saldo'];
+    const tableHeaders = ['Fecha', 'Cantidad', 'Entrega', 'Precio Unit.', 'Monto Total', 'Abono', 'Saldo'];
     const tableBody = salesForSelectedClient.map(sale => {
       const totalPaid = sale.payments.reduce((sum, p) => sum + p.amount, 0);
       const balance = sale.totalAmount - totalPaid;
       return [
         capitalize(format(parseISO(sale.date), "EEEE, dd/MM", { locale: es })),
         `${sale.quantity} ${sale.unit}`,
+        capitalize(sale.deliveryType),
         `S/. ${sale.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
         `S/. ${sale.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
         `S/. ${totalPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
@@ -539,7 +583,7 @@ export default function SalesClientsPage() {
       body: tableBody,
       startY: 22,
       foot: [
-        ['', '', '', '', 'Deuda Total:', `S/. ${totalDebtForSelectedClient.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`]
+        ['', '', '', '', '', 'Deuda Total:', `S/. ${totalDebtForSelectedClient.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`]
       ],
       footStyles: { fontStyle: 'bold', halign: 'right' },
     });
@@ -741,6 +785,7 @@ export default function SalesClientsPage() {
                                                 <TableRow>
                                                     <TableHead>Fecha</TableHead>
                                                     <TableHead>Cantidad</TableHead>
+                                                    <TableHead>Entrega</TableHead>
                                                     <TableHead className="text-right">Precio Unit.</TableHead>
                                                     <TableHead className="text-right">Monto Total</TableHead>
                                                     <TableHead className="text-right">Abono</TableHead>
@@ -756,6 +801,11 @@ export default function SalesClientsPage() {
                                                     <TableRow key={sale.id}>
                                                       <TableCell>{capitalize(format(parseISO(sale.date), "EEEE, dd/MM", { locale: es }))}</TableCell>
                                                       <TableCell>{`${sale.quantity} ${sale.unit}`}</TableCell>
+                                                      <TableCell>
+                                                        <Badge variant={sale.deliveryType === 'personal' ? 'secondary' : 'outline'}>
+                                                          {capitalize(sale.deliveryType)}
+                                                        </Badge>
+                                                      </TableCell>
                                                       <TableCell className="text-right">S/. {sale.price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
                                                       <TableCell className="text-right">S/. {sale.totalAmount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
                                                       <TableCell className="text-right">S/. {totalPaid.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
@@ -785,7 +835,7 @@ export default function SalesClientsPage() {
                                             </TableBody>
                                              <TableFooter>
                                                 <TableRow>
-                                                    <TableCell colSpan={5} className="text-right font-bold text-lg">Deuda Total:</TableCell>
+                                                    <TableCell colSpan={6} className="text-right font-bold text-lg">Deuda Total:</TableCell>
                                                     <TableCell className="text-right font-bold text-lg text-destructive">
                                                         S/. {totalDebtForSelectedClient.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                                                     </TableCell>
@@ -906,7 +956,7 @@ export default function SalesClientsPage() {
                             const isPaid = balance <= 0;
                             return (
                               <TableRow key={sale.id} className={cn(isPaid && "text-muted-foreground")}>
-                                <TableCell>{capitalize(format(parseISO(sale.date), 'EEEE, dd/MM', { locale: es }))}</TableCell>
+                                <TableCell>{capitalize(format(parseISO(sale.date), "EEEE, dd/MM", { locale: es }))}</TableCell>
                                 <TableCell>{`Venta de ${sale.quantity} ${sale.unit}`}</TableCell>
                                 <TableCell className="text-right">S/. {sale.totalAmount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
                                 <TableCell className="text-right">S/. {totalPaid.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
