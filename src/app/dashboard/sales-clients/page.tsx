@@ -684,26 +684,23 @@ export default function SalesClientsPage() {
   
   const exportDebtsToPDF = async () => {
     if (!selectedClientIdForDebts) {
-      toast({
-        title: "Seleccione un Cliente",
-        description: "Por favor, seleccione un cliente para exportar su estado de deuda.",
-        variant: "destructive",
-      });
-      return;
+        toast({
+            title: "Seleccione un Cliente",
+            description: "Por favor, seleccione un cliente para exportar su estado de cuenta.",
+            variant: "destructive",
+        });
+        return;
     }
-    
-    const debtsToExport = salesForDebtsTab.filter(sale => {
-        const totalPaid = sale.payments.reduce((sum, p) => sum + p.amount, 0);
-        return sale.totalAmount - totalPaid > 0;
-    });
 
-    if (debtsToExport.length === 0) {
-      toast({
-        title: "Sin Deudas",
-        description: "Este cliente no tiene deudas pendientes para exportar.",
-        variant: "destructive",
-      });
-      return;
+    const salesToExport = salesForDebtsTab;
+
+    if (salesToExport.length === 0) {
+        toast({
+            title: "Sin Ventas",
+            description: "Este cliente no tiene ventas registradas para exportar.",
+            variant: "destructive",
+        });
+        return;
     }
 
     const { default: jsPDFConstructor } = await import('jspdf');
@@ -712,45 +709,56 @@ export default function SalesClientsPage() {
     const doc = new jsPDFConstructor() as jsPDFWithAutoTable;
     
     const clientName = clients.find(c => c.id === selectedClientIdForDebts)?.name || 'Cliente Desconocido';
-    const title = `Estado de Deuda - ${clientName}`;
+    const title = `Estado de Cuenta - ${clientName}`;
     
     doc.setFontSize(18);
     doc.text(title, 14, 15);
 
-    const tableHeaders = ['Fecha Venta', 'Descripción', 'Monto Total', 'Total Pagado', 'Saldo Pendiente'];
-    const tableBody = debtsToExport.map(sale => {
-      const totalPaid = sale.payments.reduce((sum, p) => sum + p.amount, 0);
-      const balance = sale.totalAmount - totalPaid;
-      return [
-        capitalize(format(parseISO(sale.date), "EEEE, dd/MM", { locale: es })),
-        `Venta de ${sale.quantity} ${sale.unit}`,
-        `S/. ${sale.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-        `S/. ${totalPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-        `S/. ${balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-      ];
+    const tableHeaders = ['Fecha Venta', 'Descripción', 'Entrega', 'Monto Total', 'Total Pagado', 'Saldo', 'Fecha de Pago'];
+    
+    const tableBody = salesToExport.map(sale => {
+        const totalPaid = sale.payments.reduce((sum, p) => sum + p.amount, 0);
+        const balance = sale.totalAmount - totalPaid;
+        const isPaid = balance <= 0;
+        
+        let paymentDate = '-';
+        if (isPaid && sale.payments.length > 0) {
+            const lastPayment = [...sale.payments].sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime())[0];
+            paymentDate = capitalize(format(parseISO(lastPayment.date), "EEE, dd/MM/yy", { locale: es }));
+        }
+
+        return [
+            capitalize(format(parseISO(sale.date), "EEE, dd/MM/yy", { locale: es })),
+            `Venta de ${sale.quantity} ${sale.unit}`,
+            capitalize(sale.deliveryType),
+            `S/. ${sale.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+            `S/. ${totalPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+            `S/. ${balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+            paymentDate
+        ];
     });
 
     doc.autoTable({
-      head: [tableHeaders],
-      body: tableBody,
-      startY: 22,
-      foot: [
-        ['', '', '', 'Deuda Total:', `S/. ${totalClientDebt.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`]
-      ],
-      footStyles: { fontStyle: 'bold', halign: 'right' },
-      columnStyles: {
-        2: { halign: 'right' },
-        3: { halign: 'right'},
-        4: { halign: 'right'},
-      }
+        head: [tableHeaders],
+        body: tableBody,
+        startY: 22,
+        foot: [
+            ['', '', '', '', 'Deuda Total:', `S/. ${totalClientDebt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, '']
+        ],
+        footStyles: { fontStyle: 'bold', halign: 'right' },
+        columnStyles: {
+            3: { halign: 'right' },
+            4: { halign: 'right' },
+            5: { halign: 'right' },
+        }
     });
 
-    doc.save(`deudas_${clientName.replace(/\s/g, '_')}.pdf`);
+    doc.save(`estado_cuenta_${clientName.replace(/\s/g, '_')}.pdf`);
     toast({
-      title: "Exportación PDF Exitosa",
-      description: "El estado de deuda se ha exportado a PDF.",
+        title: "Exportación PDF Exitosa",
+        description: "El estado de cuenta se ha exportado a PDF.",
     });
-  };
+};
 
 
   if (!isClient) {
@@ -1054,17 +1062,21 @@ export default function SalesClientsPage() {
                     </ScrollArea>
                   )}
                 </CardContent>
-                {totalClientDebt > 0 && (
+                {selectedClientIdForDebts && (
                   <CardFooter className="flex flex-wrap justify-end border-t pt-6 gap-2">
                     <Button onClick={exportDebtsToPDF} variant="outline">
                       <Download className="mr-2 h-4 w-4"/> Exportar PDF
                     </Button>
-                    <Button variant="destructive" onClick={() => setIsCancelAccountDialogOpen(true)}>
-                      <Ban className="mr-2 h-4 w-4"/> Cancelar Cuentas
-                    </Button>
-                    <Button onClick={() => setIsDebtPaymentDialogOpen(true)}>
-                      <Landmark className="mr-2 h-4 w-4"/> Registrar Abono
-                    </Button>
+                    {totalClientDebt > 0 && (
+                        <>
+                        <Button variant="destructive" onClick={() => setIsCancelAccountDialogOpen(true)}>
+                            <Ban className="mr-2 h-4 w-4"/> Cancelar Cuentas
+                        </Button>
+                        <Button onClick={() => setIsDebtPaymentDialogOpen(true)}>
+                            <Landmark className="mr-2 h-4 w-4"/> Registrar Abono
+                        </Button>
+                        </>
+                    )}
                   </CardFooter>
                 )}
               </Card>
