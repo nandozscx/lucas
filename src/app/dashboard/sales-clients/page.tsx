@@ -193,7 +193,7 @@ const SaleForm = ({ onSubmitSale, clients, onClientChange }: { onSubmitSale: (da
                                                     variant={"outline"}
                                                     className={cn("w-full pl-3 text-left font-normal justify-start", !field.value && "text-muted-foreground")}
                                                 >
-                                                    {field.value ? capitalize(format(field.value, "EEEE, dd/MM/yyyy", { locale: es })) : <span>Seleccione una fecha</span>}
+                                                    {field.value ? capitalize(format(field.value, "EEEE, dd/MM", { locale: es })) : <span>Seleccione una fecha</span>}
                                                     <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                                                 </Button>
                                             </FormControl>
@@ -681,6 +681,76 @@ export default function SalesClientsPage() {
     });
     setIsCancelAccountDialogOpen(false);
   };
+  
+  const exportDebtsToPDF = async () => {
+    if (!selectedClientIdForDebts) {
+      toast({
+        title: "Seleccione un Cliente",
+        description: "Por favor, seleccione un cliente para exportar su estado de deuda.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    const debtsToExport = salesForDebtsTab.filter(sale => {
+        const totalPaid = sale.payments.reduce((sum, p) => sum + p.amount, 0);
+        return sale.totalAmount - totalPaid > 0;
+    });
+
+    if (debtsToExport.length === 0) {
+      toast({
+        title: "Sin Deudas",
+        description: "Este cliente no tiene deudas pendientes para exportar.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const { default: jsPDFConstructor } = await import('jspdf');
+    await import('jspdf-autotable');
+
+    const doc = new jsPDFConstructor() as jsPDFWithAutoTable;
+    
+    const clientName = clients.find(c => c.id === selectedClientIdForDebts)?.name || 'Cliente Desconocido';
+    const title = `Estado de Deuda - ${clientName}`;
+    
+    doc.setFontSize(18);
+    doc.text(title, 14, 15);
+
+    const tableHeaders = ['Fecha Venta', 'Descripción', 'Monto Total', 'Total Pagado', 'Saldo Pendiente'];
+    const tableBody = debtsToExport.map(sale => {
+      const totalPaid = sale.payments.reduce((sum, p) => sum + p.amount, 0);
+      const balance = sale.totalAmount - totalPaid;
+      return [
+        capitalize(format(parseISO(sale.date), "EEEE, dd/MM", { locale: es })),
+        `Venta de ${sale.quantity} ${sale.unit}`,
+        `S/. ${sale.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+        `S/. ${totalPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+        `S/. ${balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      ];
+    });
+
+    doc.autoTable({
+      head: [tableHeaders],
+      body: tableBody,
+      startY: 22,
+      foot: [
+        ['', '', '', 'Deuda Total:', `S/. ${totalClientDebt.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`]
+      ],
+      footStyles: { fontStyle: 'bold', halign: 'right' },
+      columnStyles: {
+        2: { halign: 'right' },
+        3: { halign: 'right'},
+        4: { halign: 'right'},
+      }
+    });
+
+    doc.save(`deudas_${clientName.replace(/\s/g, '_')}.pdf`);
+    toast({
+      title: "Exportación PDF Exitosa",
+      description: "El estado de deuda se ha exportado a PDF.",
+    });
+  };
 
 
   if (!isClient) {
@@ -914,7 +984,7 @@ export default function SalesClientsPage() {
 
             {/* Debts Tab */}
             <TabsContent value="debts" className="mt-6">
-              <Card>
+              <Card className="mt-4">
                 <CardHeader>
                   <CardTitle>Gestión de Deudas de Clientes</CardTitle>
                   <CardDescription>Seleccione un cliente para ver y gestionar sus deudas pendientes.</CardDescription>
@@ -980,11 +1050,15 @@ export default function SalesClientsPage() {
                         </TableFooter>
                       </Table>
                       <ScrollBar orientation="horizontal" />
+                      <ScrollBar orientation="vertical" />
                     </ScrollArea>
                   )}
                 </CardContent>
                 {totalClientDebt > 0 && (
-                  <CardFooter className="justify-end border-t pt-6 gap-2">
+                  <CardFooter className="flex flex-wrap justify-end border-t pt-6 gap-2">
+                    <Button onClick={exportDebtsToPDF} variant="outline">
+                      <Download className="mr-2 h-4 w-4"/> Exportar PDF
+                    </Button>
                     <Button variant="destructive" onClick={() => setIsCancelAccountDialogOpen(true)}>
                       <Ban className="mr-2 h-4 w-4"/> Cancelar Cuentas
                     </Button>
@@ -1296,7 +1370,7 @@ const CancelAccountDialog = ({ isOpen, onClose, onSubmit, clientName }: { isOpen
                                     variant={"outline"}
                                     className={cn("w-full pl-3 text-left font-normal justify-start", !field.value && "text-muted-foreground")}
                                 >
-                                    {field.value ? capitalize(format(field.value, "EEEE, dd/MM/yyyy", { locale: es })) : <span>Seleccione una fecha</span>}
+                                    {field.value ? capitalize(format(field.value, "EEEE, dd/MM", { locale: es })) : <span>Seleccione una fecha</span>}
                                     <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                                 </Button>
                             </FormControl>
