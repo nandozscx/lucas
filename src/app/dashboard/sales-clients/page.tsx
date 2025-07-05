@@ -857,18 +857,18 @@ export default function SalesClientsPage() {
                                 ) : salesForSelectedClient.length === 0 ? (
                                     <EmptyState message={showPaidSales ? "Este cliente aún no tiene ventas registradas." : "Este cliente no tiene deudas pendientes."} icon={ShoppingCart}/>
                                 ) : (
-                                    <ScrollArea className="h-[440px] rounded-md border whitespace-nowrap">
+                                    <ScrollArea className="h-[440px] rounded-md border">
                                         <Table>
                                             <TableHeader>
                                                 <TableRow>
-                                                    <TableHead>Fecha</TableHead>
-                                                    <TableHead>Cantidad</TableHead>
-                                                    <TableHead>Entrega</TableHead>
-                                                    <TableHead className="text-right">Precio Unit.</TableHead>
-                                                    <TableHead className="text-right">Monto Total</TableHead>
-                                                    <TableHead className="text-right">Abono</TableHead>
-                                                    <TableHead className="text-right">Saldo</TableHead>
-                                                    <TableHead className="text-center">Acciones</TableHead>
+                                                    <TableHead className="whitespace-nowrap">Fecha</TableHead>
+                                                    <TableHead className="whitespace-nowrap">Cantidad</TableHead>
+                                                    <TableHead className="whitespace-nowrap">Entrega</TableHead>
+                                                    <TableHead className="text-right whitespace-nowrap">Precio Unit.</TableHead>
+                                                    <TableHead className="text-right whitespace-nowrap">Monto Total</TableHead>
+                                                    <TableHead className="text-right whitespace-nowrap">Abono</TableHead>
+                                                    <TableHead className="text-right whitespace-nowrap">Saldo</TableHead>
+                                                    <TableHead className="text-center whitespace-nowrap">Acciones</TableHead>
                                                 </TableRow>
                                             </TableHeader>
                                             <TableBody>
@@ -877,18 +877,18 @@ export default function SalesClientsPage() {
                                                   const balance = sale.totalAmount - totalPaid;
                                                   return (
                                                     <TableRow key={sale.id}>
-                                                      <TableCell>{capitalize(format(parseISO(sale.date), "EEEE, dd/MM", { locale: es }))}</TableCell>
-                                                      <TableCell>{`${sale.quantity} ${sale.unit}`}</TableCell>
-                                                      <TableCell>
+                                                      <TableCell className="whitespace-nowrap">{capitalize(format(parseISO(sale.date), "EEEE, dd/MM", { locale: es }))}</TableCell>
+                                                      <TableCell className="whitespace-nowrap">{`${sale.quantity} ${sale.unit}`}</TableCell>
+                                                      <TableCell className="whitespace-nowrap">
                                                         <Badge variant={sale.deliveryType === 'personal' ? 'secondary' : 'outline'}>
                                                           {capitalize(sale.deliveryType)}
                                                         </Badge>
                                                       </TableCell>
-                                                      <TableCell className="text-right">S/. {sale.price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
-                                                      <TableCell className="text-right">S/. {sale.totalAmount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
-                                                      <TableCell className="text-right">S/. {totalPaid.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
-                                                      <TableCell className={`text-right font-medium ${balance > 0 ? 'text-destructive' : ''}`}>S/. {balance.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
-                                                      <TableCell className="text-center">
+                                                      <TableCell className="text-right whitespace-nowrap">S/. {sale.price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
+                                                      <TableCell className="text-right whitespace-nowrap">S/. {sale.totalAmount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
+                                                      <TableCell className="text-right whitespace-nowrap">S/. {totalPaid.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
+                                                      <TableCell className={`text-right font-medium whitespace-nowrap ${balance > 0 ? 'text-destructive' : ''}`}>S/. {balance.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
+                                                      <TableCell className="text-center whitespace-nowrap">
                                                           <Button
                                                               variant="ghost"
                                                               size="icon"
@@ -913,8 +913,8 @@ export default function SalesClientsPage() {
                                             </TableBody>
                                              <TableFooter>
                                                 <TableRow>
-                                                    <TableCell colSpan={6} className="text-right font-bold text-lg">Deuda Total:</TableCell>
-                                                    <TableCell className="text-right font-bold text-lg text-destructive">
+                                                    <TableCell colSpan={7} className="text-right font-bold text-lg whitespace-nowrap">Deuda Total:</TableCell>
+                                                    <TableCell className="text-right font-bold text-lg text-destructive whitespace-nowrap">
                                                         S/. {totalDebtForSelectedClient.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                                                     </TableCell>
                                                     <TableCell></TableCell>
@@ -955,7 +955,7 @@ export default function SalesClientsPage() {
                          {clients.length === 0 ? (
                            <EmptyState message="Comienza agregando tu primer cliente." onAddClick={handleOpenAddDialog} buttonText="Agregar Primer Cliente" icon={Users}/>
                         ) : (
-                          <ScrollArea className="h-full rounded-md border shadow-md whitespace-nowrap">
+                          <ScrollArea className="h-full rounded-md border shadow-md">
                             <Table>
                               <TableHeader>
                                 <TableRow>
@@ -1015,16 +1015,18 @@ export default function SalesClientsPage() {
                   ) : salesForDebtsTab.length === 0 ? (
                     <EmptyState message="Este cliente no tiene un historial de ventas." icon={ShoppingCart}/>
                   ) : (
-                    <ScrollArea className="h-full max-h-[500px] rounded-md border whitespace-nowrap">
+                    <ScrollArea className="max-h-[500px] rounded-md border">
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>Fecha Venta</TableHead>
-                            <TableHead>Descripción</TableHead>
-                            <TableHead className="text-right">Monto Total</TableHead>
-                            <TableHead className="text-right">Total Pagado</TableHead>
-                            <TableHead className="text-right">Saldo</TableHead>
-                            <TableHead className="text-center">Estado</TableHead>
+                            <TableHead className="whitespace-nowrap">Fecha Venta</TableHead>
+                            <TableHead className="whitespace-nowrap">Descripción</TableHead>
+                            <TableHead className="whitespace-nowrap">Entrega</TableHead>
+                            <TableHead className="text-right whitespace-nowrap">Monto Total</TableHead>
+                            <TableHead className="text-right whitespace-nowrap">Total Pagado</TableHead>
+                            <TableHead className="text-right whitespace-nowrap">Saldo</TableHead>
+                            <TableHead className="text-center whitespace-nowrap">Estado</TableHead>
+                            <TableHead className="text-center whitespace-nowrap">Fecha Pago</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -1032,26 +1034,39 @@ export default function SalesClientsPage() {
                             const totalPaid = sale.payments.reduce((sum, p) => sum + p.amount, 0);
                             const balance = sale.totalAmount - totalPaid;
                             const isPaid = balance <= 0;
+                            
+                            let paymentDate = '-';
+                            if (isPaid && sale.payments.length > 0) {
+                                const lastPayment = [...sale.payments].sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime())[0];
+                                paymentDate = capitalize(format(parseISO(lastPayment.date), "EEE, dd/MM/yy", { locale: es }));
+                            }
+
                             return (
                               <TableRow key={sale.id} className={cn(isPaid && "text-muted-foreground")}>
-                                <TableCell>{capitalize(format(parseISO(sale.date), "EEEE, dd/MM", { locale: es }))}</TableCell>
-                                <TableCell>{`Venta de ${sale.quantity} ${sale.unit}`}</TableCell>
-                                <TableCell className="text-right">S/. {sale.totalAmount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
-                                <TableCell className="text-right">S/. {totalPaid.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
-                                <TableCell className={cn("text-right font-medium", !isPaid && "text-destructive")}>S/. {balance.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
-                                <TableCell className="text-center">
+                                <TableCell className="whitespace-nowrap">{capitalize(format(parseISO(sale.date), "EEEE, dd/MM", { locale: es }))}</TableCell>
+                                <TableCell className="whitespace-nowrap">{`Venta de ${sale.quantity} ${sale.unit}`}</TableCell>
+                                <TableCell className="whitespace-nowrap">
+                                    <Badge variant={sale.deliveryType === 'personal' ? 'secondary' : 'outline'}>
+                                        {capitalize(sale.deliveryType)}
+                                    </Badge>
+                                </TableCell>
+                                <TableCell className="text-right whitespace-nowrap">S/. {sale.totalAmount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
+                                <TableCell className="text-right whitespace-nowrap">S/. {totalPaid.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
+                                <TableCell className={cn("text-right font-medium whitespace-nowrap", !isPaid && "text-destructive")}>S/. {balance.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
+                                <TableCell className="text-center whitespace-nowrap">
                                     <Badge variant={isPaid ? "secondary" : "destructive"}>
                                         {isPaid ? "Pagada" : "Pendiente"}
                                     </Badge>
                                 </TableCell>
+                                <TableCell className="text-center whitespace-nowrap">{paymentDate}</TableCell>
                               </TableRow>
                             );
                           })}
                         </TableBody>
                         <TableFooter>
                           <TableRow>
-                            <TableCell colSpan={5} className="text-right font-bold text-lg">Deuda Total Pendiente:</TableCell>
-                            <TableCell className="text-right font-bold text-lg text-destructive">
+                            <TableCell colSpan={7} className="text-right font-bold text-lg whitespace-nowrap">Deuda Total Pendiente:</TableCell>
+                            <TableCell className="text-right font-bold text-lg text-destructive whitespace-nowrap">
                               S/. {totalClientDebt.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                             </TableCell>
                           </TableRow>
@@ -1580,25 +1595,25 @@ const ConsolidatedDebtDialog = ({ isOpen, onClose, client, sales, toast }: { isO
               </Select>
           </div>
         </DialogHeader>
-        <ScrollArea className="max-h-[60vh] border rounded-md whitespace-nowrap">
+        <ScrollArea className="max-h-[60vh] border rounded-md">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Fecha</TableHead>
-                <TableHead>Descripción</TableHead>
-                <TableHead className="text-right">Cargo</TableHead>
-                <TableHead className="text-right">Abono</TableHead>
-                <TableHead className="text-right">Saldo</TableHead>
+                <TableHead className="whitespace-nowrap">Fecha</TableHead>
+                <TableHead className="whitespace-nowrap">Descripción</TableHead>
+                <TableHead className="text-right whitespace-nowrap">Cargo</TableHead>
+                <TableHead className="text-right whitespace-nowrap">Abono</TableHead>
+                <TableHead className="text-right whitespace-nowrap">Saldo</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {transactions.length > 0 ? transactions.map((t, index) => (
                  <TableRow key={index} className={cn(t.isOpeningBalance && "bg-muted/50 font-semibold")}>
-                    <TableCell>{capitalize(format(parseISO(t.date), "EEEE, dd/MM", { locale: es }))}</TableCell>
-                    <TableCell>{t.description}</TableCell>
-                    <TableCell className="text-right font-mono">{!t.isOpeningBalance && t.debit > 0 ? `S/. ${t.debit.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : '-'}</TableCell>
-                    <TableCell className="text-right font-mono text-green-500">{!t.isOpeningBalance && t.credit > 0 ? `S/. ${t.credit.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : '-'}</TableCell>
-                    <TableCell className="text-right font-mono font-medium">S/. {t.balance.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
+                    <TableCell className="whitespace-nowrap">{capitalize(format(parseISO(t.date), "EEEE, dd/MM", { locale: es }))}</TableCell>
+                    <TableCell className="whitespace-nowrap">{t.description}</TableCell>
+                    <TableCell className="text-right font-mono whitespace-nowrap">{!t.isOpeningBalance && t.debit > 0 ? `S/. ${t.debit.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : '-'}</TableCell>
+                    <TableCell className="text-right font-mono text-green-500 whitespace-nowrap">{!t.isOpeningBalance && t.credit > 0 ? `S/. ${t.credit.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : '-'}</TableCell>
+                    <TableCell className="text-right font-mono font-medium whitespace-nowrap">S/. {t.balance.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
                  </TableRow>
               )) : (
                 <TableRow>
@@ -1620,3 +1635,5 @@ const ConsolidatedDebtDialog = ({ isOpen, onClose, client, sales, toast }: { isO
     </Dialog>
   );
 };
+
+    
