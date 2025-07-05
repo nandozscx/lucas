@@ -1,13 +1,15 @@
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import {
-  Bar,
-  BarChart,
+  LineChart,
+  Line,
   CartesianGrid,
   YAxis,
   XAxis,
+  Legend,
 } from 'recharts';
 import {
   format,
@@ -35,10 +37,7 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart";
-
-const chartConfig = {
-  quantity: { label: "Cantidad Entregada (L)", color: "hsl(var(--chart-1))" },
-} satisfies ChartConfig;
+import { capitalize } from '@/lib/utils';
 
 const EmptyState: React.FC<{ message: string; icon?: React.ElementType }> = ({ message, icon: Icon = Info }) => (
     <div className="flex flex-col items-center justify-center text-center text-muted-foreground py-10 border border-dashed rounded-md min-h-[300px]">
@@ -48,13 +47,23 @@ const EmptyState: React.FC<{ message: string; icon?: React.ElementType }> = ({ m
     </div>
 );
 
+// Pre-defined color palette for the chart lines
+const COLORS = [
+  "hsl(var(--chart-1))",
+  "hsl(var(--chart-2))",
+  "hsl(var(--chart-3))",
+  "hsl(var(--chart-4))",
+  "hsl(var(--chart-5))",
+  "hsl(210, 40%, 80%)",
+  "hsl(160, 60%, 70%)",
+];
 
 export default function StatisticsPage() {
     const [isClient, setIsClient] = useState(false);
     const [deliveries, setDeliveries] = useState<Delivery[]>([]);
     const [providers, setProviders] = useState<Provider[]>([]);
     
-    const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
+    const [selectedProviderId, setSelectedProviderId] = useState<string>('all');
     const [timeRange, setTimeRange] = useState('month');
 
     useEffect(() => {
@@ -67,20 +76,28 @@ export default function StatisticsPage() {
             if (storedProviders) {
                 const parsedProviders = JSON.parse(storedProviders);
                 setProviders(parsedProviders);
-                if (parsedProviders.length > 0) {
-                    setSelectedProviderId(parsedProviders[0].id);
-                }
             }
         }
     }, []);
 
-    const chartData = useMemo(() => {
-        if (!selectedProviderId || providers.length === 0) return [];
-        
-        const provider = providers.find(p => p.id === selectedProviderId);
-        if (!provider) return [];
+    const chartConfig = useMemo(() => {
+        const config: ChartConfig = {};
+        providers.forEach((provider, index) => {
+            config[provider.name] = {
+                label: provider.name,
+                color: COLORS[index % COLORS.length],
+            };
+        });
+        // Add a generic 'quantity' for single provider view
+        config.quantity = {
+            label: "Cantidad",
+            color: "hsl(var(--chart-1))"
+        };
+        return config;
+    }, [providers]);
 
-        const providerDeliveries = deliveries.filter(d => d.providerName === provider.name);
+    const chartData = useMemo(() => {
+        if (providers.length === 0) return [];
         
         const now = new Date();
         let interval: {start: Date, end: Date};
@@ -96,8 +113,8 @@ export default function StatisticsPage() {
                 interval = { start: startOfYear(now), end: endOfYear(now) };
                 break;
             case 'all':
-                if (providerDeliveries.length === 0) return [];
-                const allDates = providerDeliveries.map(d => parseISO(d.date));
+                if (deliveries.length === 0) return [];
+                const allDates = deliveries.map(d => parseISO(d.date));
                 interval = { start: new Date(Math.min(...allDates.map(d=>d.getTime()))), end: new Date(Math.max(...allDates.map(d=>d.getTime()))) };
                 break;
             default:
@@ -105,44 +122,76 @@ export default function StatisticsPage() {
         }
 
         const dataGrouping = timeRange === 'year' || timeRange === 'all' ? 'month' : 'day';
+        const intervalDates = dataGrouping === 'day' ? eachDayOfInterval(interval) : eachMonthOfInterval(interval);
 
-        if (dataGrouping === 'day') {
-            const dailyData = new Map<string, number>(); // Key: 'yyyy-MM-dd'
+        const getLabel = (d: Date) => {
+            if (dataGrouping === 'day') {
+                return timeRange === 'week' ? capitalize(format(d, 'EEEE', { locale: es })) : format(d, 'dd/MM');
+            } else { // month
+                return capitalize(format(d, timeRange === 'year' ? 'MMMM' : 'MMM yy', { locale: es }));
+            }
+        };
+
+        if (selectedProviderId === 'all') {
+            const dataMap = new Map<string, { date: string, [key: string]: number | string }>();
             
+            // Initialize map with all possible dates/months in interval
+            intervalDates.forEach(d => {
+                const label = getLabel(d);
+                if (!dataMap.has(label)) {
+                    const initialEntry: { date: string, [key: string]: any } = { date: label };
+                    providers.forEach(p => initialEntry[p.name] = 0);
+                    dataMap.set(label, initialEntry);
+                }
+            });
+    
+            deliveries.forEach(delivery => {
+                 if (isWithinInterval(parseISO(delivery.date), interval)) {
+                    const label = getLabel(parseISO(delivery.date));
+                    const entry = dataMap.get(label);
+                    if (entry) {
+                        entry[delivery.providerName] = (entry[delivery.providerName] as number || 0) + delivery.quantity;
+                    }
+                }
+            });
+    
+            return Array.from(dataMap.values());
+        } else {
+            // Single provider logic
+            const provider = providers.find(p => p.id === selectedProviderId);
+            if (!provider) return [];
+    
+            const providerDeliveries = deliveries.filter(d => d.providerName === provider.name);
+            const dataMap = new Map<string, number>();
+    
             providerDeliveries.forEach(d => {
-                const key = format(parseISO(d.date), "yyyy-MM-dd");
-                dailyData.set(key, (dailyData.get(key) || 0) + d.quantity);
+                 if (isWithinInterval(parseISO(d.date), interval)) {
+                    const label = getLabel(parseISO(d.date));
+                    dataMap.set(label, (dataMap.get(label) || 0) + d.quantity);
+                }
             });
-
-            const daysInInterval = eachDayOfInterval(interval);
-            return daysInInterval.map(day => {
-                const key = format(day, "yyyy-MM-dd");
-                const label = format(day, timeRange === 'week' ? 'EEEE' : 'dd/MM', { locale: es });
-                return { 
-                    date: label.charAt(0).toUpperCase() + label.slice(1), 
-                    quantity: dailyData.get(key) || 0 
-                };
-            });
-        } else { // dataGrouping === 'month'
-            const monthlyData = new Map<string, number>(); // Key: yyyy-MM
-            const dateFormat = timeRange === 'all' ? 'MMM yy' : 'MMMM';
-
-            providerDeliveries.forEach(d => {
-                const key = format(parseISO(d.date), "yyyy-MM");
-                monthlyData.set(key, (monthlyData.get(key) || 0) + d.quantity);
-            });
-            
-            const monthsInInterval = eachMonthOfInterval(interval);
-            return monthsInInterval.map(month => {
-                const key = format(month, "yyyy-MM");
-                const label = format(month, dateFormat, { locale: es });
+    
+            return intervalDates.map(d => {
+                const label = getLabel(d);
                 return {
-                    date: label.charAt(0).toUpperCase() + label.slice(1),
-                    quantity: monthlyData.get(key) || 0
+                    date: label,
+                    quantity: dataMap.get(label) || 0,
                 };
             });
         }
     }, [deliveries, providers, selectedProviderId, timeRange]);
+
+    const hasData = useMemo(() => {
+        return chartData.length > 0 && chartData.some(row => {
+            // For 'all' providers, check if any provider has a value > 0
+            if (selectedProviderId === 'all') {
+                return Object.keys(row).some(key => key !== 'date' && (row[key as keyof typeof row] as number) > 0);
+            }
+            // For single provider, check if 'quantity' > 0
+            return (row as { quantity: number }).quantity > 0;
+        });
+    }, [chartData, selectedProviderId]);
+
 
     if (!isClient) {
         return (
@@ -176,14 +225,15 @@ export default function StatisticsPage() {
                 <CardHeader className="flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex-1">
                         <CardTitle>Entregas por Proveedor</CardTitle>
-                        <CardDescription>Análisis de la cantidad de materia prima recibida de un proveedor específico.</CardDescription>
+                        <CardDescription>Análisis de la cantidad de materia prima recibida. Selecciona un proveedor o mira a todos juntos.</CardDescription>
                     </div>
                     <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
-                        <Select value={selectedProviderId ?? ''} onValueChange={setSelectedProviderId}>
+                        <Select value={selectedProviderId ?? 'all'} onValueChange={setSelectedProviderId}>
                              <SelectTrigger className="w-full sm:w-[180px]">
                                 <SelectValue placeholder="Seleccionar Proveedor" />
                             </SelectTrigger>
                             <SelectContent>
+                                <SelectItem value="all">Todos los Proveedores</SelectItem>
                                 {providers.length > 0 ? (
                                     providers.map(provider => (
                                         <SelectItem key={provider.id} value={provider.id}>
@@ -210,16 +260,41 @@ export default function StatisticsPage() {
                 </CardHeader>
                 <CardContent>
                      {providers.length === 0 ? <EmptyState message="Necesitas registrar al menos un proveedor para ver estadísticas." icon={Users} /> :
-                      !selectedProviderId ? <EmptyState message="Por favor, selecciona un proveedor para empezar." icon={Users} /> :
-                      chartData.length === 0 || chartData.every(d => d.quantity === 0) ? <EmptyState message="No hay entregas para este proveedor en el período seleccionado." /> :
+                      !hasData ? <EmptyState message="No hay entregas para la selección actual." /> :
                         <ChartContainer config={chartConfig} className="min-h-[400px] w-full">
-                            <BarChart data={chartData} accessibilityLayer>
+                            <LineChart data={chartData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
                                 <CartesianGrid vertical={false} />
-                                <XAxis dataKey="date" tickLine={false} tickMargin={10} axisLine={false} />
-                                <YAxis />
+                                <XAxis 
+                                    dataKey="date" 
+                                    tickLine={false} 
+                                    tickMargin={10} 
+                                    axisLine={false} 
+                                />
+                                <YAxis tickFormatter={(value) => `${value} L`}/>
                                 <ChartTooltip content={<ChartTooltipContent />} />
-                                <Bar dataKey="quantity" name="Cantidad" fill="var(--color-quantity)" radius={4} />
-                            </BarChart>
+                                <Legend />
+                                {selectedProviderId === 'all' ? (
+                                    providers.map((provider) => (
+                                        <Line
+                                            key={provider.id}
+                                            dataKey={provider.name}
+                                            type="monotone"
+                                            stroke={chartConfig[provider.name]?.color}
+                                            strokeWidth={2}
+                                            dot={false}
+                                        />
+                                    ))
+                                ) : (
+                                    <Line
+                                        dataKey="quantity"
+                                        name={providers.find(p => p.id === selectedProviderId)?.name || "Cantidad"}
+                                        type="monotone"
+                                        stroke={chartConfig.quantity?.color}
+                                        strokeWidth={2}
+                                        dot={false}
+                                    />
+                                )}
+                            </LineChart>
                         </ChartContainer>
                     }
                 </CardContent>
