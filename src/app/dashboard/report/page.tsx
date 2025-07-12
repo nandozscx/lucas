@@ -6,8 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, BrainCircuit, BotMessageSquare, Sparkles, TrendingUp, UserCheck, PackageCheck, Archive } from 'lucide-react';
-import { generateWeeklyReport, type WeeklyReportInput, type WeeklyReportOutput } from '@/ai/flows/generate-weekly-report-flow';
-import type { Delivery, Provider, Production, Sale, WholeMilkReplenishment } from '@/types';
+import { generateWeeklyReport } from '@/ai/flows/generate-weekly-report-flow';
+import type { Delivery, Provider, Production, Sale, WholeMilkReplenishment, WeeklyReportInput, WeeklyReportOutput } from '@/types';
 import { startOfWeek, endOfWeek, subDays, isWithinInterval, parseISO } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 
@@ -52,12 +52,12 @@ export default function ReportPage() {
 
       // 4. Prepare input for the AI flow
       const reportInput: WeeklyReportInput = {
-        deliveries: deliveriesForWeek,
-        providers: allProviders,
-        production: allProduction, // Pass all production for stock calculation
-        sales: salesForWeek,
-        wholeMilkReplenishments: allWholeMilkReplenishments,
-        previousWeekSales: salesForPreviousWeek,
+        deliveries: deliveriesForWeek.map(d => ({...d})),
+        providers: allProviders.map(p => ({...p})),
+        production: allProduction.map(p => ({...p})), // Pass all production for stock calculation
+        sales: salesForWeek.map(s => ({...s, payments: s.payments.map(p => ({...p}))})),
+        wholeMilkReplenishments: allWholeMilkReplenishments.map(w => ({...w})),
+        previousWeekSales: salesForPreviousWeek.map(s => ({...s, payments: s.payments.map(p => ({...p}))})),
       };
 
       // 5. Call the AI flow

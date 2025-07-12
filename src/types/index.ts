@@ -1,3 +1,4 @@
+import { z } from 'zod';
 
 export interface Delivery {
   id: string;
@@ -65,10 +66,56 @@ export interface WholeMilkReplenishment {
   pricePerSaco: number;
 }
 
-export interface Report {
-  summary: string;
-  topProvider: string;
-  topClient: string;
-  stockStatus: string;
-  salesTrend: string;
-}
+// Zod Schemas for AI Report Flow
+const AiProviderSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  price: z.number(),
+});
+
+const AiDeliverySchema = z.object({
+  id: z.string(),
+  providerName: z.string(),
+  date: z.string(),
+  quantity: z.number(),
+});
+
+const AiProductionSchema = z.object({
+  id: z.string(),
+  date: z.string(),
+  producedUnits: z.number(),
+  wholeMilkKilos: z.number(),
+  rawMaterialLiters: z.number(),
+  transformationIndex: z.number(),
+});
+
+const AiSaleSchema = z.object({
+  id: z.string(),
+  date: z.string(),
+  clientName: z.string(),
+  totalAmount: z.number(),
+  payments: z.array(z.object({ amount: z.number() })),
+});
+
+const AiWholeMilkReplenishmentSchema = z.object({
+  quantitySacos: z.number(),
+});
+
+export const WeeklyReportInputSchema = z.object({
+  deliveries: z.array(AiDeliverySchema).describe("List of raw material deliveries for the week."),
+  providers: z.array(AiProviderSchema).describe("List of all available providers."),
+  production: z.array(AiProductionSchema).describe("List of production records for the week."),
+  sales: z.array(AiSaleSchema).describe("List of sales records for the week."),
+  wholeMilkReplenishments: z.array(AiWholeMilkReplenishmentSchema).describe("History of all whole milk replenishments."),
+  previousWeekSales: z.array(AiSaleSchema).describe("List of sales records for the previous week for comparison."),
+});
+export type WeeklyReportInput = z.infer<typeof WeeklyReportInputSchema>;
+
+export const WeeklyReportOutputSchema = z.object({
+  summary: z.string().describe("A general summary of the week's performance in Spanish."),
+  topProvider: z.string().describe("Identifies the provider who delivered the most raw material this week. Format: 'NombreProveedor: XXXX L'"),
+  topClient: z.string().describe("Identifies the client with the highest sales amount this week. Format: 'NombreCliente: S/. XXXX.XX'"),
+  stockStatus: z.string().describe("A brief status of the whole milk stock in 'sacos'. E.g., 'X sacos restantes.'"),
+  salesTrend: z.string().describe("Compares this week's sales with the previous week's and calculates the percentage change. E.g., 'Las ventas aumentaron un X%...' or 'Las ventas disminuyeron un X%...'"),
+});
+export type WeeklyReportOutput = z.infer<typeof WeeklyReportOutputSchema>;

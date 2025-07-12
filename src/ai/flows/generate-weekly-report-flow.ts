@@ -3,65 +3,12 @@
  * @fileOverview An AI flow to generate a weekly business report.
  *
  * - generateWeeklyReport - A function that handles the report generation.
- * - WeeklyReportInput - The input type for the generateWeeklyReport function.
- * - WeeklyReportOutput - The return type for the generateWeeklyReport function.
  */
 
 import { ai } from '@/ai/genkit';
-import { z } from 'zod';
+import type { WeeklyReportInput, WeeklyReportOutput } from '@/types';
+import { WeeklyReportInputSchema, WeeklyReportOutputSchema } from '@/types';
 
-const ProviderSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  price: z.number(),
-});
-
-const DeliverySchema = z.object({
-  id: z.string(),
-  providerName: z.string(),
-  date: z.string(),
-  quantity: z.number(),
-});
-
-const ProductionSchema = z.object({
-  id: z.string(),
-  date: z.string(),
-  producedUnits: z.number(),
-  wholeMilkKilos: z.number(),
-  rawMaterialLiters: z.number(),
-  transformationIndex: z.number(),
-});
-
-const SaleSchema = z.object({
-  id: z.string(),
-  date: z.string(),
-  clientName: z.string(),
-  totalAmount: z.number(),
-  payments: z.array(z.object({ amount: z.number() })),
-});
-
-const WholeMilkReplenishmentSchema = z.object({
-  quantitySacos: z.number(),
-});
-
-export const WeeklyReportInputSchema = z.object({
-  deliveries: z.array(DeliverySchema).describe("List of raw material deliveries for the week."),
-  providers: z.array(ProviderSchema).describe("List of all available providers."),
-  production: z.array(ProductionSchema).describe("List of production records for the week."),
-  sales: z.array(SaleSchema).describe("List of sales records for the week."),
-  wholeMilkReplenishments: z.array(WholeMilkReplenishmentSchema).describe("History of all whole milk replenishments."),
-  previousWeekSales: z.array(SaleSchema).describe("List of sales records for the previous week for comparison."),
-});
-export type WeeklyReportInput = z.infer<typeof WeeklyReportInputSchema>;
-
-export const WeeklyReportOutputSchema = z.object({
-  summary: z.string().describe("A general summary of the week's performance in Spanish."),
-  topProvider: z.string().describe("Identifies the provider who delivered the most raw material this week. Format: 'NombreProveedor: XXXX L'"),
-  topClient: z.string().describe("Identifies the client with the highest sales amount this week. Format: 'NombreCliente: S/. XXXX.XX'"),
-  stockStatus: z.string().describe("A brief status of the whole milk stock in 'sacos'. E.g., 'X sacos restantes.'"),
-  salesTrend: z.string().describe("Compares this week's sales with the previous week's and calculates the percentage change. E.g., 'Las ventas aumentaron un X%...' or 'Las ventas disminuyeron un X%...'"),
-});
-export type WeeklyReportOutput = z.infer<typeof WeeklyReportOutputSchema>;
 
 export async function generateWeeklyReport(input: WeeklyReportInput): Promise<WeeklyReportOutput> {
   return generateWeeklyReportFlow(input);
