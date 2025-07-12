@@ -36,15 +36,15 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  // This is required to make next-pwa compatible with Turbopack
   webpack: (config, { isServer }) => {
     if (!isServer) {
+      // This is required to make next-pwa compatible with Turbopack
       config.resolve.fallback = {
         ...config.resolve.fallback,
-        workbox_core_js: false,
-        workbox_precaching_js: false,
-        workbox_routing_js: false,
-        workbox_strategies_js: false,
+        'workbox-core': false,
+        'workbox-precaching': false,
+        'workbox-routing': false,
+        'workbox-strategies': false,
       };
     }
     return config;
@@ -52,3 +52,5 @@ const nextConfig: NextConfig = {
 };
 
 export default withPWA(nextConfig);
+
+    
