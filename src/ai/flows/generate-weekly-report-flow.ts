@@ -51,8 +51,8 @@ const prompt = ai.definePrompt({
         Format: "Quedan {{{stockInSacos}}} sacos restantes."
 
     5.  **salesTrendSummary**: Check 'isTrendComparisonPossible'.
-        - If true, create a sentence describing the trend using 'salesTrendPercentage'. Format as "Las ventas (aumentaron/disminuyeron) un X.XX%...".
-        - If false, state that no comparison is possible. Format as "No hay datos de ventas de semanas anteriores para comparar."
+        - If true, create a sentence describing the trend using 'salesTrendPercentage'. Format as "Las ventas (aumentaron/disminuyeron) un X.XX% con respecto a la semana anterior.".
+        - If false, state that no comparison is possible. Format as "No hay datos de ventas de la semana anterior para comparar."
   `,
 });
 

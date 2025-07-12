@@ -77,7 +77,9 @@ export default function ReportPage() {
 
       // Top Client
       const clientTotals = salesForWeek.reduce((acc, s) => {
-        acc[s.clientName] = (acc[s.clientName] || 0) + s.totalAmount;
+        const client = allClients.find(c => c.id === s.clientId);
+        const clientName = client ? client.name : s.clientName; // Fallback to stored name
+        acc[clientName] = (acc[clientName] || 0) + s.totalAmount;
         return acc;
       }, {} as Record<string, number>);
       const topClientName = Object.keys(clientTotals).sort((a,b) => clientTotals[b] - clientTotals[a])[0] || "N/A";
@@ -91,25 +93,27 @@ export default function ReportPage() {
       // Sales Trend
       let salesTrendPercentage = 0;
       const salesHistoryForChart: { week: number, total: number }[] = [];
-      let previousWeeksSalesTotal = 0;
-      let previousWeeksCount = 0;
-      for (let i = 1; i <= 4; i++) {
+      
+      // Get sales from previous week for direct comparison
+      const previousWeekStart = subDays(currentWeekStart, 7);
+      const previousWeekEnd = subDays(currentWeekEnd, 7);
+      const previousWeekSales = allSales.filter(s => isWithinInterval(parseISO(s.date), { start: previousWeekStart, end: previousWeekEnd }));
+      const previousWeekTotalSales = previousWeekSales.reduce((sum, s) => sum + s.totalAmount, 0);
+
+      // Get sales for the last 4 weeks for the chart
+      for (let i = 4; i >= 1; i--) {
         const weekStart = subDays(currentWeekStart, 7 * i);
         const weekEnd = subDays(currentWeekEnd, 7 * i);
         const weeklySales = allSales.filter(s => isWithinInterval(parseISO(s.date), { start: weekStart, end: weekEnd }));
         const total = weeklySales.reduce((sum, s) => sum + s.totalAmount, 0);
-        if (weeklySales.length > 0) {
-            previousWeeksSalesTotal += total;
-            previousWeeksCount++;
-        }
-        salesHistoryForChart.unshift({ week: -i, total });
+        salesHistoryForChart.push({ week: -i, total });
       }
+      
       const currentWeekTotalSales = salesForWeek.reduce((sum, s) => sum + s.totalAmount, 0);
       salesHistoryForChart.push({ week: 0, total: currentWeekTotalSales });
 
-      const avgPreviousSales = previousWeeksCount > 0 ? previousWeeksSalesTotal / previousWeeksCount : 0;
-      if (avgPreviousSales > 0) {
-        salesTrendPercentage = ((currentWeekTotalSales - avgPreviousSales) / avgPreviousSales) * 100;
+      if (previousWeekTotalSales > 0) {
+        salesTrendPercentage = ((currentWeekTotalSales - previousWeekTotalSales) / previousWeekTotalSales) * 100;
       }
 
       // Summary data
@@ -129,15 +133,17 @@ export default function ReportPage() {
         topClientTotal: topClientTotal,
         stockInSacos,
         salesTrendPercentage,
-        isTrendComparisonPossible: avgPreviousSales > 0,
+        isTrendComparisonPossible: previousWeekTotalSales > 0,
       };
 
       const generatedReport = await generateWeeklyReport(reportInput);
 
       // 4. Bundle data for the UI
       const topProviderDeliveries = deliveriesForWeek.filter(d => d.providerName === topProviderName);
-      const topClientSales = salesForWeek.filter(s => s.clientName === topClientName);
       
+      const topClientInfo = allClients.find(c => c.name === topClientName);
+      const topClientSales = topClientInfo ? salesForWeek.filter(s => s.clientId === topClientInfo.id) : [];
+
       const sortedReplenishments = [...allWholeMilkReplenishments].sort((a,b) => parseISO(b.date).getTime() - parseISO(a.date).getTime());
       const latestMilkPrice = sortedReplenishments.length > 0 ? sortedReplenishments[0].pricePerSaco : 0;
 
@@ -243,7 +249,8 @@ const ReportDisplay = ({ data }: { data: ReportDataBundle }) => {
       return { date: day, total };
   });
   const providerTotal = providerDailyData.reduce((sum, d) => sum + d.total, 0);
-  const avgPrevious4Weeks = salesHistory.slice(0, 4).reduce((sum, s) => sum + s.total, 0) / 4;
+  
+  const previousWeeksDeliveries = 0; // Placeholder for future enhancement
 
   // Top Client Dialog Data
   const clientTotalSales = topClientSales.reduce((sum, sale) => sum + sale.totalAmount, 0);
@@ -312,7 +319,7 @@ const ReportDisplay = ({ data }: { data: ReportDataBundle }) => {
                                 </TableRow>
                             </TableFoot>
                         </Table>
-                         <p className="text-xs text-muted-foreground text-center pt-2">Promedio de las últimas 4 semanas: {avgPrevious4Weeks.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} L</p>
+                         <p className="text-xs text-muted-foreground text-center pt-2">Comparativa con semanas anteriores no disponible.</p>
                     </DialogContent>
                 </Dialog>
 
@@ -343,7 +350,7 @@ const ReportDisplay = ({ data }: { data: ReportDataBundle }) => {
                             <TableBody>
                                 {topClientSales.map(sale => (
                                     <TableRow key={sale.id}>
-                                        <TableCell>{capitalize(format(parseISO(sale.date), "EEEE, dd/MM", {locale: es}))}</TableCell>
+                                        <TableCell>{capitalize(format(parseISO(sale.date), "EEEE, dd/MM", { locale: es }))}</TableCell>
                                         <TableCell className="text-right">S/. {sale.totalAmount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
                                         <TableCell className="text-right">S/. {sale.payments.reduce((sum, p) => sum + p.amount, 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
                                     </TableRow>
@@ -427,7 +434,7 @@ const ReportDisplay = ({ data }: { data: ReportDataBundle }) => {
                         </div>
                          <DialogFooter>
                             <p className="text-xs text-muted-foreground w-full text-center">La ganancia se estima como: costo de reposición × índice de transformación promedio.</p>
-                        </DialogFooter>
+                         </DialogFooter>
                     </DialogContent>
                 </Dialog>
             </div>
