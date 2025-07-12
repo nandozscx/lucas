@@ -64,3 +64,11 @@ export interface WholeMilkReplenishment {
   quantitySacos: number;
   pricePerSaco: number;
 }
+
+export interface Report {
+  summary: string;
+  topProvider: string;
+  topClient: string;
+  stockStatus: string;
+  salesTrend: string;
+}
