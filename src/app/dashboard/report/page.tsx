@@ -5,11 +5,18 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, BrainCircuit, BotMessageSquare, Sparkles, TrendingUp, UserCheck, PackageCheck, Archive } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter as TableFoot } from '@/components/ui/table';
+import { ArrowLeft, BrainCircuit, BotMessageSquare, Sparkles, TrendingUp, UserCheck, PackageCheck, Archive, CalendarDays, LineChart as LineChartIcon, Milk, Wallet } from 'lucide-react';
+import { LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+
 import { generateWeeklyReport } from '@/ai/flows/generate-weekly-report-flow';
-import type { Delivery, Provider, Production, Sale, WholeMilkReplenishment, WeeklyReportInput, WeeklyReportOutput } from '@/types';
-import { startOfWeek, endOfWeek, subDays, isWithinInterval, parseISO } from 'date-fns';
+import type { Delivery, Provider, Production, Sale, Client, WholeMilkReplenishment, WeeklyReportInput, WeeklyReportOutput } from '@/types';
+import { startOfWeek, endOfWeek, subDays, isWithinInterval, parseISO, format, eachDayOfInterval } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
+import { capitalize } from '@/lib/utils';
+
 
 const STORAGE_KEYS = {
   deliveries: 'dailySupplyTrackerDeliveries',
@@ -20,49 +27,88 @@ const STORAGE_KEYS = {
   wholeMilkReplenishments: 'dailySupplyTrackerWholeMilkReplenishments',
 };
 
+type ReportDataBundle = {
+  report: WeeklyReportOutput;
+  topProviderDeliveries: Delivery[];
+  topClientSales: Sale[];
+  salesHistory: { week: number; total: number }[];
+  stockUsage: Production[];
+  latestMilkPrice: number;
+  avgSalePricePerUnit: number;
+};
+
 export default function ReportPage() {
-  const [report, setReport] = useState<WeeklyReportOutput | null>(null);
+  const [reportData, setReportData] = useState<ReportDataBundle | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
   const handleGenerateReport = async () => {
     setIsLoading(true);
-    setReport(null);
+    setReportData(null);
 
     try {
+      const now = new Date();
+      const currentWeekStart = startOfWeek(now, { weekStartsOn: 0 });
+      const currentWeekEnd = endOfWeek(now, { weekStartsOn: 0 });
+
       // 1. Get all data from localStorage
       const allDeliveries: Delivery[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.deliveries) || '[]');
       const allProviders: Provider[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.providers) || '[]');
       const allProduction: Production[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.production) || '[]');
       const allSales: Sale[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.sales) || '[]');
       const allWholeMilkReplenishments: WholeMilkReplenishment[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.wholeMilkReplenishments) || '[]');
-
-      // 2. Define date ranges for current and previous week
-      const now = new Date();
-      const currentWeekStart = startOfWeek(now, { weekStartsOn: 0 });
-      const currentWeekEnd = endOfWeek(now, { weekStartsOn: 0 });
-      const previousWeekStart = subDays(currentWeekStart, 7);
-      const previousWeekEnd = subDays(currentWeekEnd, 7);
       
-      // 3. Filter data for the relevant periods
-      const deliveriesForWeek = allDeliveries.filter(d => isWithinInterval(parseISO(d.date), { start: currentWeekStart, end: currentWeekEnd }));
-      const productionForWeek = allProduction.filter(p => isWithinInterval(parseISO(p.date), { start: currentWeekStart, end: currentWeekEnd }));
       const salesForWeek = allSales.filter(s => isWithinInterval(parseISO(s.date), { start: currentWeekStart, end: currentWeekEnd }));
-      const salesForPreviousWeek = allSales.filter(s => isWithinInterval(parseISO(s.date), { start: previousWeekStart, end: previousWeekEnd }));
+      const productionForWeek = allProduction.filter(p => isWithinInterval(parseISO(p.date), { start: currentWeekStart, end: currentWeekEnd }));
+
+      // Get sales for the last 4 weeks for trend analysis
+      const previousWeeksSalesData: { week: number, total: number }[] = [];
+      const salesHistoryForChart: { week: number, total: number }[] = [];
+      const previousWeeksSalesForPrompt: Sale[] = [];
+
+      for (let i = 1; i <= 4; i++) {
+        const weekStart = subDays(currentWeekStart, 7 * i);
+        const weekEnd = subDays(currentWeekEnd, 7 * i);
+        const weeklySales = allSales.filter(s => isWithinInterval(parseISO(s.date), { start: weekStart, end: weekEnd }));
+        const total = weeklySales.reduce((sum, s) => sum + s.totalAmount, 0);
+        previousWeeksSalesData.push({ week: i, total });
+        salesHistoryForChart.unshift({ week: -i, total }); // For chart
+        previousWeeksSalesForPrompt.push(...weeklySales);
+      }
+      
+      const currentWeekTotalSales = salesForWeek.reduce((sum, s) => sum + s.totalAmount, 0);
+      salesHistoryForChart.push({ week: 0, total: currentWeekTotalSales });
 
       // 4. Prepare input for the AI flow
       const reportInput: WeeklyReportInput = {
-        deliveries: deliveriesForWeek.map(d => ({...d})),
-        providers: allProviders.map(p => ({...p})),
-        production: allProduction.map(p => ({...p})), // Pass all production for stock calculation
-        sales: salesForWeek.map(s => ({...s, payments: s.payments.map(p => ({...p}))})),
-        wholeMilkReplenishments: allWholeMilkReplenishments.map(w => ({...w})),
-        previousWeekSales: salesForPreviousWeek.map(s => ({...s, payments: s.payments.map(p => ({...p}))})),
+        deliveries: allDeliveries.filter(d => isWithinInterval(parseISO(d.date), { start: currentWeekStart, end: currentWeekEnd })),
+        providers: allProviders,
+        production: allProduction, // Pass all production for accurate stock calculation
+        sales: salesForWeek,
+        wholeMilkReplenishments: allWholeMilkReplenishments,
+        previousWeeksSales: previousWeeksSalesForPrompt,
       };
 
-      // 5. Call the AI flow
       const generatedReport = await generateWeeklyReport(reportInput);
-      setReport(generatedReport);
+
+      const topProviderDeliveries = allDeliveries.filter(d => d.providerName === generatedReport.topProviderName && isWithinInterval(parseISO(d.date), { start: currentWeekStart, end: currentWeekEnd }));
+      const topClientSales = salesForWeek.filter(s => s.clientName === generatedReport.topClientName);
+      
+      const sortedReplenishments = [...allWholeMilkReplenishments].sort((a,b) => parseISO(b.date).getTime() - parseISO(a.date).getTime());
+      const latestMilkPrice = sortedReplenishments.length > 0 ? sortedReplenishments[0].pricePerSaco : 0;
+      
+      const totalUnitsSold = salesForWeek.reduce((sum, sale) => sum + (sale.unit === 'baldes' ? sale.quantity * 100 : sale.quantity), 0);
+      const avgSalePricePerUnit = totalUnitsSold > 0 ? currentWeekTotalSales / totalUnitsSold : 0;
+
+      setReportData({
+        report: generatedReport,
+        topProviderDeliveries,
+        topClientSales,
+        salesHistory: salesHistoryForChart,
+        stockUsage: productionForWeek.filter(p => p.wholeMilkKilos > 0),
+        latestMilkPrice,
+        avgSalePricePerUnit
+      });
       
     } catch (error) {
       console.error("Error generating report:", error);
@@ -76,53 +122,6 @@ export default function ReportPage() {
     }
   };
 
-  const ReportDisplay = ({ reportData }: { reportData: WeeklyReportOutput }) => (
-    <Card className="shadow-lg animate-in fade-in-50">
-        <CardHeader>
-            <CardTitle className="flex items-center text-xl text-primary">
-                <BotMessageSquare className="mr-2 h-6 w-6" />
-                Reporte Semanal Inteligente
-            </CardTitle>
-            <CardDescription>
-                Análisis automático de la operación de esta semana.
-            </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6 text-sm">
-            <p className="italic text-muted-foreground">{reportData.summary}</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="flex items-start gap-3 rounded-lg border p-3">
-                    <PackageCheck className="h-6 w-6 text-green-500 mt-1" />
-                    <div>
-                        <h4 className="font-semibold">Proveedor Destacado</h4>
-                        <p className="text-muted-foreground">{reportData.topProvider}</p>
-                    </div>
-                </div>
-                <div className="flex items-start gap-3 rounded-lg border p-3">
-                    <UserCheck className="h-6 w-6 text-blue-500 mt-1" />
-                    <div>
-                        <h4 className="font-semibold">Cliente Principal</h4>
-                        <p className="text-muted-foreground">{reportData.topClient}</p>
-                    </div>
-                </div>
-                <div className="flex items-start gap-3 rounded-lg border p-3">
-                    <TrendingUp className="h-6 w-6 text-yellow-500 mt-1" />
-                    <div>
-                        <h4 className="font-semibold">Tendencia de Ventas</h4>
-                        <p className="text-muted-foreground">{reportData.salesTrend}</p>
-                    </div>
-                </div>
-                <div className="flex items-start gap-3 rounded-lg border p-3">
-                    <Archive className="h-6 w-6 text-purple-500 mt-1" />
-                    <div>
-                        <h4 className="font-semibold">Estado del Stock</h4>
-                        <p className="text-muted-foreground">{reportData.stockStatus}</p>
-                    </div>
-                </div>
-            </div>
-        </CardContent>
-    </Card>
-  );
-  
   const LoadingSkeleton = () => (
     <div className="space-y-6">
         <Skeleton className="h-8 w-3/4" />
@@ -177,9 +176,220 @@ export default function ReportPage() {
 
         <div className="w-full max-w-4xl mt-8">
             {isLoading && <LoadingSkeleton />}
-            {report && <ReportDisplay reportData={report} />}
+            {reportData && <ReportDisplay data={reportData} />}
         </div>
       </main>
     </div>
+  );
+}
+
+
+const ReportDisplay = ({ data }: { data: ReportDataBundle }) => {
+  const { report, topProviderDeliveries, topClientSales, salesHistory, stockUsage, latestMilkPrice, avgSalePricePerUnit } = data;
+
+  const now = new Date();
+  const currentWeekStart = startOfWeek(now, { weekStartsOn: 0 });
+  const weekDays = eachDayOfInterval({start: currentWeekStart, end: endOfWeek(now, {weekStartsOn: 0})});
+
+  // Top Provider Dialog Data
+  const providerDailyData = weekDays.map(day => {
+      const dateStr = format(day, 'yyyy-MM-dd');
+      const total = topProviderDeliveries
+          .filter(d => d.date === dateStr)
+          .reduce((sum, d) => sum + d.quantity, 0);
+      return { date: day, total };
+  });
+  const providerTotal = providerDailyData.reduce((sum, d) => sum + d.total, 0);
+  const avgPrevious4Weeks = salesHistory.slice(0, 4).reduce((sum, s) => sum + s.total, 0) / 4;
+
+  // Top Client Dialog Data
+  const clientTotalSales = topClientSales.reduce((sum, sale) => sum + sale.totalAmount, 0);
+  const clientTotalPaid = topClientSales.reduce((sum, sale) => sum + sale.payments.reduce((pSum, p) => pSum + p.amount, 0), 0);
+
+  // Sales Trend Dialog Data
+  const salesChartData = salesHistory.map(item => ({
+    name: item.week === 0 ? 'Esta Semana' : `Semana ${item.week}`,
+    Ventas: item.total
+  }));
+
+  // Stock Status Dialog Data
+  const totalKilosUsed = stockUsage.reduce((sum, p) => sum + p.wholeMilkKilos, 0);
+  const costToReplenish = (totalKilosUsed / 25) * latestMilkPrice;
+  const revenueFromMilk = totalKilosUsed * 10 * avgSalePricePerUnit; // Kilos to Liters, then Liters to Revenue
+  const profitFromMilk = revenueFromMilk - costToReplenish;
+
+  return (
+    <Card className="shadow-lg animate-in fade-in-50">
+        <CardHeader>
+            <CardTitle className="flex items-center text-xl text-primary">
+                <BotMessageSquare className="mr-2 h-6 w-6" />
+                Reporte Semanal Inteligente
+            </CardTitle>
+            <CardDescription>
+                Análisis automático de la operación de esta semana. Haz clic en una tarjeta para ver más detalles.
+            </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6 text-sm">
+            <p className="italic text-muted-foreground">{report.summary}</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Top Provider */}
+                <Dialog>
+                    <DialogTrigger asChild>
+                        <div className="flex items-start gap-3 rounded-lg border p-3 cursor-pointer hover:bg-muted/50 transition-colors">
+                            <PackageCheck className="h-6 w-6 text-green-500 mt-1 flex-shrink-0" />
+                            <div>
+                                <h4 className="font-semibold">Proveedor Destacado</h4>
+                                <p className="text-muted-foreground">{report.topProviderSummary}</p>
+                            </div>
+                        </div>
+                    </DialogTrigger>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle className="flex items-center"><PackageCheck className="mr-2 h-5 w-5 text-green-500"/>Detalle de Entregas: {report.topProviderName}</DialogTitle>
+                            <DialogDescription>Resumen de entregas para la semana actual.</DialogDescription>
+                        </DialogHeader>
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Día</TableHead>
+                                    <TableHead className="text-right">Litros Entregados</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {providerDailyData.map(d => (
+                                    <TableRow key={d.date.toISOString()}>
+                                        <TableCell>{capitalize(format(d.date, "EEEE", {locale: es}))}</TableCell>
+                                        <TableCell className="text-right">{d.total > 0 ? d.total.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '-'}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                            <TableFoot>
+                                <TableRow>
+                                    <TableCell className="font-bold">Total Semanal</TableCell>
+                                    <TableCell className="text-right font-bold">{providerTotal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} L</TableCell>
+                                </TableRow>
+                            </TableFoot>
+                        </Table>
+                         <p className="text-xs text-muted-foreground text-center pt-2">Promedio de las últimas 4 semanas: {avgPrevious4Weeks.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} L</p>
+                    </DialogContent>
+                </Dialog>
+
+                {/* Top Client */}
+                <Dialog>
+                    <DialogTrigger asChild>
+                        <div className="flex items-start gap-3 rounded-lg border p-3 cursor-pointer hover:bg-muted/50 transition-colors">
+                            <UserCheck className="h-6 w-6 text-blue-500 mt-1 flex-shrink-0" />
+                            <div>
+                                <h4 className="font-semibold">Cliente Principal</h4>
+                                <p className="text-muted-foreground">{report.topClientSummary}</p>
+                            </div>
+                        </div>
+                    </DialogTrigger>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle className="flex items-center"><UserCheck className="mr-2 h-5 w-5 text-blue-500"/>Detalle de Compras: {report.topClientName}</DialogTitle>
+                             <DialogDescription>Resumen de compras y pagos para la semana actual.</DialogDescription>
+                        </DialogHeader>
+                         <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Fecha</TableHead>
+                                    <TableHead className="text-right">Monto Venta</TableHead>
+                                    <TableHead className="text-right">Pagos</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {topClientSales.map(sale => (
+                                    <TableRow key={sale.id}>
+                                        <TableCell>{capitalize(format(parseISO(sale.date), "EEEE, dd/MM", {locale: es}))}</TableCell>
+                                        <TableCell className="text-right">S/. {sale.totalAmount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
+                                        <TableCell className="text-right">S/. {sale.payments.reduce((sum, p) => sum + p.amount, 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                            <TableFoot>
+                                <TableRow>
+                                    <TableCell className="font-bold">Total</TableCell>
+                                    <TableCell className="text-right font-bold">S/. {clientTotalSales.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
+                                    <TableCell className="text-right font-bold text-green-500">S/. {clientTotalPaid.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
+                                </TableRow>
+                            </TableFoot>
+                        </Table>
+                    </DialogContent>
+                </Dialog>
+                
+                {/* Sales Trend */}
+                <Dialog>
+                    <DialogTrigger asChild>
+                       <div className="flex items-start gap-3 rounded-lg border p-3 cursor-pointer hover:bg-muted/50 transition-colors">
+                            <TrendingUp className="h-6 w-6 text-yellow-500 mt-1 flex-shrink-0" />
+                            <div>
+                                <h4 className="font-semibold">Tendencia de Ventas</h4>
+                                <p className="text-muted-foreground">{report.salesTrendSummary}</p>
+                            </div>
+                        </div>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-lg">
+                        <DialogHeader>
+                            <DialogTitle className="flex items-center"><LineChartIcon className="mr-2 h-5 w-5 text-yellow-500"/>Evolución de Ventas Semanales</DialogTitle>
+                        </DialogHeader>
+                        <div className="h-[300px] w-full mt-4">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <LineChart data={salesChartData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis dataKey="name" />
+                                    <YAxis />
+                                    <Tooltip
+                                        contentStyle={{
+                                            backgroundColor: 'hsl(var(--background))',
+                                            borderColor: 'hsl(var(--border))',
+                                        }}
+                                    />
+                                    <Legend />
+                                    <Line type="monotone" dataKey="Ventas" stroke="hsl(var(--chart-1))" strokeWidth={2} />
+                                </LineChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </DialogContent>
+                </Dialog>
+
+                {/* Stock Status */}
+                <Dialog>
+                    <DialogTrigger asChild>
+                        <div className="flex items-start gap-3 rounded-lg border p-3 cursor-pointer hover:bg-muted/50 transition-colors">
+                            <Archive className="h-6 w-6 text-purple-500 mt-1 flex-shrink-0" />
+                            <div>
+                                <h4 className="font-semibold">Estado del Stock (L. Entera)</h4>
+                                <p className="text-muted-foreground">{report.stockStatusSummary}</p>
+                            </div>
+                        </div>
+                    </DialogTrigger>
+                     <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                            <DialogTitle className="flex items-center"><Archive className="mr-2 h-5 w-5 text-purple-500"/>Análisis de Stock de Leche Entera</DialogTitle>
+                            <DialogDescription>Movimientos de la semana actual.</DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4 py-4 text-sm">
+                            <div className="flex justify-between items-center">
+                                <span className="text-muted-foreground flex items-center"><Milk className="mr-2 h-4 w-4"/>Uso Total en la Semana:</span>
+                                <span className="font-bold">{totalKilosUsed.toLocaleString()} kg</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                                <span className="text-muted-foreground flex items-center"><Wallet className="mr-2 h-4 w-4"/>Costo de Reposición:</span>
+                                <span className="font-bold text-destructive">S/. {costToReplenish.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                                <span className="text-muted-foreground flex items-center"><TrendingUp className="mr-2 h-4 w-4"/>Ganancia Estimada por Uso:</span>
+                                <span className="font-bold text-green-500">S/. {profitFromMilk.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                            </div>
+                        </div>
+                         <DialogFooter>
+                            <p className="text-xs text-muted-foreground w-full text-center">La ganancia es una estimación basada en el precio de venta promedio de los productos finales esta semana.</p>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+            </div>
+        </CardContent>
+    </Card>
   );
 }
