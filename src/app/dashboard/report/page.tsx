@@ -1,15 +1,16 @@
 
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter as TableFoot } from '@/components/ui/table';
-import { ArrowLeft, BrainCircuit, BotMessageSquare, Sparkles, TrendingUp, UserCheck, PackageCheck, Archive, Wallet, Milk } from 'lucide-react';
+import { ArrowLeft, BrainCircuit, BotMessageSquare, Sparkles, TrendingUp, UserCheck, PackageCheck, Archive, Wallet, Milk, Download, FileText } from 'lucide-react';
 import { LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
 
 import { generateWeeklyReport } from '@/ai/flows/generate-weekly-report-flow';
 import type { Delivery, Provider, Production, Sale, Client, WholeMilkReplenishment, WeeklyReportInput, WeeklyReportOutput } from '@/types';
@@ -17,6 +18,9 @@ import { startOfWeek, endOfWeek, subDays, isWithinInterval, parseISO, format, ea
 import { es } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import { capitalize } from '@/lib/utils';
+
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 
 const STORAGE_KEYS = {
@@ -38,12 +42,77 @@ type ReportDataBundle = {
   avgTransformationIndex: number;
   topProviderName: string;
   topClientName: string;
+  printableReportData: PrintableReportData;
 };
+
+type PrintableReportData = {
+    weekTitle: string;
+    providerTotals: any[];
+    totalToPayLucio: number;
+    totalToPayOthers: number;
+    productionHistory: Production[];
+    stockUsageHistory: Production[];
+    chartData: any[];
+    chartConfig: ChartConfig;
+};
+
 
 export default function ReportPage() {
   const [reportData, setReportData] = useState<ReportDataBundle | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const printableReportRef = useRef<HTMLDivElement>(null);
+
+  const handleExportPDF = async () => {
+    const input = printableReportRef.current;
+    if (!input) {
+      toast({
+        title: "Error",
+        description: "No se pudo encontrar el contenido del reporte para exportar.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+        const canvas = await html2canvas(input, {
+            scale: 2, // Higher scale for better quality
+            useCORS: true
+        });
+        const imgData = canvas.toDataURL('image/png');
+        const pdf = new jsPDF('p', 'mm', 'a4');
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = pdf.internal.pageSize.getHeight();
+        const canvasWidth = canvas.width;
+        const canvasHeight = canvas.height;
+        const ratio = canvasWidth / canvasHeight;
+        let imgWidth = pdfWidth;
+        let imgHeight = imgWidth / ratio;
+
+        if (imgHeight > pdfHeight) {
+            imgHeight = pdfHeight;
+            imgWidth = imgHeight * ratio;
+        }
+        
+        const xOffset = (pdfWidth - imgWidth) / 2;
+        const yOffset = (pdfHeight - imgHeight) / 2;
+
+        pdf.addImage(imgData, 'PNG', xOffset, yOffset, imgWidth, imgHeight);
+        pdf.save(`reporte_semanal_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+         toast({
+            title: "Exportación Exitosa",
+            description: "El reporte detallado ha sido guardado como PDF."
+        });
+    } catch (error) {
+        console.error("Error al exportar a PDF:", error);
+        toast({
+            title: "Error de Exportación",
+            description: "Ocurrió un error al intentar generar el PDF.",
+            variant: "destructive"
+        });
+    }
+  };
+
 
   const handleGenerateReport = async () => {
     setIsLoading(true);
@@ -92,25 +161,11 @@ export default function ReportPage() {
 
       // Sales Trend
       let salesTrendPercentage = 0;
-      const salesHistoryForChart: { week: number, total: number }[] = [];
-      
-      // Get sales from previous week for direct comparison
       const previousWeekStart = subDays(currentWeekStart, 7);
       const previousWeekEnd = subDays(currentWeekEnd, 7);
       const previousWeekSales = allSales.filter(s => isWithinInterval(parseISO(s.date), { start: previousWeekStart, end: previousWeekEnd }));
       const previousWeekTotalSales = previousWeekSales.reduce((sum, s) => sum + s.totalAmount, 0);
-
-      // Get sales for the last 4 weeks for the chart
-      for (let i = 4; i >= 1; i--) {
-        const weekStart = subDays(currentWeekStart, 7 * i);
-        const weekEnd = subDays(currentWeekEnd, 7 * i);
-        const weeklySales = allSales.filter(s => isWithinInterval(parseISO(s.date), { start: weekStart, end: weekEnd }));
-        const total = weeklySales.reduce((sum, s) => sum + s.totalAmount, 0);
-        salesHistoryForChart.push({ week: -i, total });
-      }
-      
       const currentWeekTotalSales = salesForWeek.reduce((sum, s) => sum + s.totalAmount, 0);
-      salesHistoryForChart.push({ week: 0, total: currentWeekTotalSales });
 
       if (previousWeekTotalSales > 0) {
         salesTrendPercentage = ((currentWeekTotalSales - previousWeekTotalSales) / previousWeekTotalSales) * 100;
@@ -119,8 +174,19 @@ export default function ReportPage() {
       // Summary data
       const totalRawMaterial = deliveriesForWeek.reduce((sum, d) => sum + d.quantity, 0);
       const totalUnitsProduced = productionForWeek.reduce((sum, p) => sum + p.producedUnits, 0);
-      const validIndices = productionForWeek.filter(p => p.transformationIndex !== 0);
+      const validIndices = productionForWeek.filter(p => p.transformationIndex !== 0 && isFinite(p.transformationIndex));
       const avgTransformationIndex = validIndices.length > 0 ? validIndices.reduce((sum, p) => sum + p.transformationIndex, 0) / validIndices.length : 0;
+      
+      const salesHistoryForChart: { week: number, total: number }[] = [];
+      for (let i = 4; i >= 1; i--) {
+        const weekStart = subDays(currentWeekStart, 7 * i);
+        const weekEnd = subDays(currentWeekEnd, 7 * i);
+        const weeklySales = allSales.filter(s => isWithinInterval(parseISO(s.date), { start: weekStart, end: weekEnd }));
+        const total = weeklySales.reduce((sum, s) => sum + s.totalAmount, 0);
+        salesHistoryForChart.push({ week: -i, total });
+      }
+      salesHistoryForChart.push({ week: 0, total: currentWeekTotalSales });
+
 
       // 3. Prepare input for the AI flow with pre-calculated data
       const reportInput: WeeklyReportInput = {
@@ -147,6 +213,9 @@ export default function ReportPage() {
       const sortedReplenishments = [...allWholeMilkReplenishments].sort((a,b) => parseISO(b.date).getTime() - parseISO(a.date).getTime());
       const latestMilkPrice = sortedReplenishments.length > 0 ? sortedReplenishments[0].pricePerSaco : 0;
 
+      // 5. Data for Printable Report
+        const printableReportData = buildPrintableReportData(allProviders, deliveriesForWeek, productionForWeek, currentWeekStart);
+
       setReportData({
         report: generatedReport,
         topProviderDeliveries,
@@ -156,7 +225,8 @@ export default function ReportPage() {
         latestMilkPrice,
         avgTransformationIndex,
         topProviderName,
-        topClientName
+        topClientName,
+        printableReportData
       });
       
     } catch (error) {
@@ -195,7 +265,14 @@ export default function ReportPage() {
           <BrainCircuit className="mr-3 h-8 w-8" />
           Reporte con IA
         </h1>
-        <div className="w-0 sm:w-auto"></div>
+        <div className="flex items-center gap-2">
+            {reportData && (
+                 <Button onClick={handleExportPDF} variant="outline" className="bg-accent text-accent-foreground hover:bg-accent/90">
+                    <FileText className="mr-2 h-4 w-4" />
+                    Exportar Detallado
+                </Button>
+            )}
+        </div>
       </header>
 
       <main className="flex-grow flex flex-col items-center">
@@ -226,6 +303,11 @@ export default function ReportPage() {
         <div className="w-full max-w-4xl mt-8">
             {isLoading && <LoadingSkeleton />}
             {reportData && <ReportDisplay data={reportData} />}
+            {reportData && (
+                <div className="mt-8">
+                    <PrintableReport ref={printableReportRef} data={reportData.printableReportData} />
+                </div>
+            )}
         </div>
       </main>
     </div>
@@ -442,3 +524,235 @@ const ReportDisplay = ({ data }: { data: ReportDataBundle }) => {
     </Card>
   );
 }
+
+// Function to prepare data for the printable report
+const buildPrintableReportData = (allProviders: Provider[], deliveriesForWeek: Delivery[], productionForWeek: Production[], currentWeekStart: Date): PrintableReportData => {
+    // Provider Totals
+    const providerTotalsMap = allProviders.reduce((acc, provider) => {
+        acc[provider.name] = { totalQuantity: 0, price: provider.price };
+        return acc;
+    }, {} as Record<string, { totalQuantity: number, price: number }>);
+
+    deliveriesForWeek.forEach(d => {
+        if (providerTotalsMap[d.providerName]) {
+            providerTotalsMap[d.providerName].totalQuantity += d.quantity;
+        }
+    });
+
+    const providerTotals = Object.entries(providerTotalsMap).map(([name, data]) => ({
+        name,
+        quantity: data.totalQuantity,
+        price: data.price,
+        totalToPay: data.totalQuantity * data.price,
+    })).filter(p => p.quantity > 0);
+
+    const totalToPayLucio = providerTotals.find(p => p.name.toLowerCase() === 'lucio')?.totalToPay || 0;
+    const totalToPayOthers = providerTotals.filter(p => p.name.toLowerCase() !== 'lucio').reduce((sum, p) => sum + p.totalToPay, 0);
+
+    // Stock Usage
+    const stockUsageHistory = productionForWeek.filter(p => p.wholeMilkKilos > 0);
+
+    // Chart Data
+    const COLORS = ["hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))", "hsl(var(--chart-5))"];
+    const chartConfig = allProviders.reduce((config, provider, index) => {
+        config[provider.name] = {
+            label: provider.name,
+            color: COLORS[index % COLORS.length],
+        };
+        return config;
+    }, {} as ChartConfig);
+
+    const weekDays = eachDayOfInterval({start: currentWeekStart, end: endOfWeek(currentWeekStart, {weekStartsOn: 0})});
+    const dataMap = new Map<string, { date: string, [key: string]: number | string }>();
+
+    weekDays.forEach(d => {
+        const label = capitalize(format(d, 'EEEE', { locale: es }));
+        const initialEntry: { date: string, [key: string]: any } = { date: label };
+        allProviders.forEach(p => initialEntry[p.name] = 0);
+        dataMap.set(label, initialEntry);
+    });
+
+    deliveriesForWeek.forEach(delivery => {
+        const label = capitalize(format(parseISO(delivery.date), 'EEEE', { locale: es }));
+        const entry = dataMap.get(label);
+        if (entry) {
+            entry[delivery.providerName] = (entry[delivery.providerName] as number || 0) + delivery.quantity;
+        }
+    });
+
+    return {
+        weekTitle: `Semana del ${format(currentWeekStart, "dd 'de' MMMM", { locale: es })}`,
+        providerTotals,
+        totalToPayLucio,
+        totalToPayOthers,
+        productionHistory: productionForWeek.sort((a, b) => parseISO(a.date).getTime() - parseISO(b.date).getTime()),
+        stockUsageHistory: stockUsageHistory.sort((a, b) => parseISO(a.date).getTime() - parseISO(b.date).getTime()),
+        chartData: Array.from(dataMap.values()),
+        chartConfig,
+    };
+};
+
+// Printable Report Component
+const PrintableReport = React.forwardRef<HTMLDivElement, { data: PrintableReportData }>(({ data }, ref) => {
+    const { weekTitle, providerTotals, totalToPayLucio, totalToPayOthers, productionHistory, stockUsageHistory, chartData, chartConfig } = data;
+    const hasProviderData = providerTotals.length > 0;
+    const hasProductionData = productionHistory.length > 0;
+    const hasStockUsageData = stockUsageHistory.length > 0;
+    const hasChartData = chartData.some(row => Object.keys(row).some(key => key !== 'date' && (row[key as keyof typeof row] as number) > 0));
+
+    return (
+        <div ref={ref} className="bg-white text-black p-8 shadow-2xl printable-a4">
+            <style jsx global>{`
+                .printable-a4 {
+                    width: 210mm;
+                    min-height: 297mm;
+                    margin: auto;
+                    font-family: Arial, sans-serif;
+                }
+                .printable-a4 h2 {
+                    font-size: 1.5rem;
+                    font-weight: bold;
+                    color: #333;
+                    border-bottom: 2px solid #eee;
+                    padding-bottom: 0.5rem;
+                    margin-top: 1.5rem;
+                    margin-bottom: 1rem;
+                }
+                .printable-a4 h1 {
+                    font-size: 2rem;
+                    font-weight: bold;
+                    color: #111;
+                    text-align: center;
+                }
+                 .printable-a4 table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    font-size: 0.8rem;
+                }
+                .printable-a4 th, .printable-a4 td {
+                    border: 1px solid #ddd;
+                    padding: 8px;
+                    text-align: left;
+                }
+                .printable-a4 th {
+                    background-color: #f2f2f2;
+                    font-weight: bold;
+                }
+                .recharts-wrapper {
+                    font-size: 12px;
+                }
+            `}</style>
+            
+            <header className="text-center mb-8">
+                <h1 className="text-3xl font-bold">Reporte Semanal Detallado</h1>
+                <p className="text-lg text-gray-600">{weekTitle}</p>
+            </header>
+
+            <section>
+                <h2>Totales por Proveedor</h2>
+                {hasProviderData ? (
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Proveedor</TableHead>
+                                <TableHead className="text-right">Cantidad</TableHead>
+                                <TableHead className="text-right">Precio</TableHead>
+                                <TableHead className="text-right">Total a Pagar</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {providerTotals.map(p => (
+                                <TableRow key={p.name} className={p.name.toLowerCase() === 'lucio' ? 'font-bold' : ''}>
+                                    <TableCell>{p.name}</TableCell>
+                                    <TableCell className="text-right">{p.quantity.toFixed(2)}</TableCell>
+                                    <TableCell className="text-right">S/. {p.price.toFixed(2)}</TableCell>
+                                    <TableCell className="text-right">S/. {p.totalToPay.toFixed(2)}</TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                        <TableFoot>
+                            <TableRow>
+                                <TableCell colSpan={3} className="text-right font-bold">Total a Pagar (Lucio):</TableCell>
+                                <TableCell className="text-right font-bold">S/. {totalToPayLucio.toFixed(2)}</TableCell>
+                            </TableRow>
+                             <TableRow>
+                                <TableCell colSpan={3} className="text-right font-bold">Total a Pagar (Otros):</TableCell>
+                                <TableCell className="text-right font-bold">S/. {totalToPayOthers.toFixed(2)}</TableCell>
+                            </TableRow>
+                        </TableFoot>
+                    </Table>
+                ) : <p className="text-gray-500">No hay datos de proveedores para esta semana.</p>}
+            </section>
+            
+            <section>
+                <h2>Historial de Producción</h2>
+                {hasProductionData ? (
+                     <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Fecha</TableHead>
+                                <TableHead className="text-right">Materia Prima Total</TableHead>
+                                <TableHead className="text-right">Unidades Prod.</TableHead>
+                                <TableHead className="text-right">Índice</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {productionHistory.map(p => (
+                                <TableRow key={p.id}>
+                                    <TableCell>{capitalize(format(parseISO(p.date), 'EEEE, dd/MM', { locale: es }))}</TableCell>
+                                    <TableCell className="text-right">{(p.rawMaterialLiters + (p.wholeMilkKilos * 10)).toFixed(2)} L</TableCell>
+                                    <TableCell className="text-right">{p.producedUnits}</TableCell>
+                                    <TableCell className={`text-right ${p.transformationIndex >= 0 ? 'text-green-600' : 'text-red-600'}`}>{p.transformationIndex.toFixed(2)}%</TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                ) : <p className="text-gray-500">No hay datos de producción para esta semana.</p>}
+            </section>
+
+             <section>
+                <h2>Uso de Leche Entera</h2>
+                {hasStockUsageData ? (
+                     <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Fecha de Uso</TableHead>
+                                <TableHead className="text-right">Kilos Usados</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {stockUsageHistory.map(p => (
+                                <TableRow key={p.id}>
+                                    <TableCell>{capitalize(format(parseISO(p.date), 'EEEE, dd/MM', { locale: es }))}</TableCell>
+                                    <TableCell className="text-right">{p.wholeMilkKilos.toFixed(2)} kg</TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                ) : <p className="text-gray-500">No se usó leche entera esta semana.</p>}
+            </section>
+
+            <section>
+                <h2>Gráfico de Entregas por Proveedor</h2>
+                {hasChartData ? (
+                    <div className="w-full h-[400px] mt-4">
+                        <ChartContainer config={chartConfig} className="min-h-[400px] w-full">
+                            <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="date" />
+                                <YAxis />
+                                <Tooltip />
+                                <Legend />
+                                {Object.keys(chartConfig).map(key => (
+                                    <Line key={key} type="monotone" dataKey={key} stroke={chartConfig[key].color} />
+                                ))}
+                            </LineChart>
+                        </ChartContainer>
+                    </div>
+                ) : <p className="text-gray-500">No hay datos suficientes para mostrar el gráfico.</p>}
+            </section>
+        </div>
+    );
+});
+
+PrintableReport.displayName = 'PrintableReport';
