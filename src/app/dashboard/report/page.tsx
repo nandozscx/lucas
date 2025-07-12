@@ -6,14 +6,13 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter as TableFoot } from '@/components/ui/table';
-import { ArrowLeft, Sparkles, TrendingUp, UserCheck, PackageCheck, Archive, Wallet, Milk, Download, FileText } from 'lucide-react';
+import { ArrowLeft, Sparkles, TrendingUp, UserCheck, PackageCheck, Archive, Wallet, Milk, Download, FileText, ChevronLeft, ChevronRight } from 'lucide-react';
 import { LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
 
 import type { Delivery, Provider, Production, Sale, Client, WholeMilkReplenishment, WeeklyReportOutput } from '@/types';
-import { startOfWeek, endOfWeek, subDays, isWithinInterval, parseISO, format, eachDayOfInterval } from 'date-fns';
+import { startOfWeek, endOfWeek, subDays, isWithinInterval, parseISO, format, eachDayOfInterval, addDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import { capitalize } from '@/lib/utils';
@@ -60,8 +59,21 @@ type PrintableReportData = {
 export default function ReportPage() {
   const [reportData, setReportData] = useState<ReportDataBundle | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [currentWeekStart, setCurrentWeekStart] = useState<Date>(startOfWeek(new Date(), { weekStartsOn: 0 }));
   const { toast } = useToast();
   const printableReportRef = useRef<HTMLDivElement>(null);
+
+  const weekTitle = `Semana del ${format(currentWeekStart, "dd/MM/yy")} al ${format(endOfWeek(currentWeekStart, { weekStartsOn: 0 }), "dd/MM/yy")}`;
+
+  const handlePreviousWeek = () => {
+    setCurrentWeekStart(prev => subDays(prev, 7));
+    setReportData(null); // Clear previous report
+  };
+
+  const handleNextWeek = () => {
+    setCurrentWeekStart(prev => addDays(prev, 7));
+    setReportData(null); // Clear previous report
+  };
 
   const handleExportPDF = async () => {
     const input = printableReportRef.current;
@@ -76,7 +88,7 @@ export default function ReportPage() {
 
     try {
         const canvas = await html2canvas(input, {
-            scale: 2, // Higher scale for better quality
+            scale: 2,
             useCORS: true
         });
         const imgData = canvas.toDataURL('image/png');
@@ -98,7 +110,7 @@ export default function ReportPage() {
         const yOffset = (pdfHeight - imgHeight) / 2;
 
         pdf.addImage(imgData, 'PNG', xOffset, yOffset, imgWidth, imgHeight);
-        pdf.save(`reporte_semanal_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+        pdf.save(`reporte_semanal_${format(currentWeekStart, 'yyyy-MM-dd')}.pdf`);
          toast({
             title: "Exportación Exitosa",
             description: "El reporte detallado ha sido guardado como PDF."
@@ -119,7 +131,6 @@ export default function ReportPage() {
     setReportData(null);
 
     try {
-      // 1. Get all data from localStorage
       const allDeliveries: Delivery[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.deliveries) || '[]');
       const allProviders: Provider[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.providers) || '[]');
       const allProduction: Production[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.production) || '[]');
@@ -127,16 +138,12 @@ export default function ReportPage() {
       const allClients: Client[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.clients) || '[]');
       const allWholeMilkReplenishments: WholeMilkReplenishment[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.wholeMilkReplenishments) || '[]');
       
-      const now = new Date();
-      const currentWeekStart = startOfWeek(now, { weekStartsOn: 0 });
-      const currentWeekEnd = endOfWeek(now, { weekStartsOn: 0 });
+      const weekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 0 });
       
-      // 2. Perform all calculations locally
-      const deliveriesForWeek = allDeliveries.filter(d => isWithinInterval(parseISO(d.date), { start: currentWeekStart, end: currentWeekEnd }));
-      const productionForWeek = allProduction.filter(p => isWithinInterval(parseISO(p.date), { start: currentWeekStart, end: currentWeekEnd }));
-      const salesForWeek = allSales.filter(s => isWithinInterval(parseISO(s.date), { start: currentWeekStart, end: currentWeekEnd }));
+      const deliveriesForWeek = allDeliveries.filter(d => isWithinInterval(parseISO(d.date), { start: currentWeekStart, end: weekEnd }));
+      const productionForWeek = allProduction.filter(p => isWithinInterval(parseISO(p.date), { start: currentWeekStart, end: weekEnd }));
+      const salesForWeek = allSales.filter(s => isWithinInterval(parseISO(s.date), { start: currentWeekStart, end: weekEnd }));
       
-      // Top Provider
       const providerTotals = deliveriesForWeek.reduce((acc, d) => {
         acc[d.providerName] = (acc[d.providerName] || 0) + d.quantity;
         return acc;
@@ -144,25 +151,22 @@ export default function ReportPage() {
       const topProviderName = Object.keys(providerTotals).sort((a,b) => providerTotals[b] - providerTotals[a])[0] || "N/A";
       const topProviderTotal = providerTotals[topProviderName] || 0;
 
-      // Top Client
       const clientTotals = salesForWeek.reduce((acc, s) => {
         const client = allClients.find(c => c.id === s.clientId);
-        const clientName = client ? client.name : s.clientName; // Fallback to stored name
+        const clientName = client ? client.name : s.clientName;
         acc[clientName] = (acc[clientName] || 0) + s.totalAmount;
         return acc;
       }, {} as Record<string, number>);
       const topClientName = Object.keys(clientTotals).sort((a,b) => clientTotals[b] - clientTotals[a])[0] || "N/A";
       const topClientTotal = clientTotals[topClientName] || 0;
 
-      // Stock Status
       const totalReplenishedSacos = allWholeMilkReplenishments.reduce((sum, r) => sum + r.quantitySacos, 0);
       const totalUsedKilos = allProduction.reduce((sum, p) => sum + (p.wholeMilkKilos || 0), 0);
       const stockInSacos = totalReplenishedSacos - (totalUsedKilos / 25);
 
-      // Sales Trend
       let salesTrendPercentage = 0;
       const previousWeekStart = subDays(currentWeekStart, 7);
-      const previousWeekEnd = subDays(currentWeekEnd, 7);
+      const previousWeekEnd = subDays(weekEnd, 7);
       const previousWeekSales = allSales.filter(s => isWithinInterval(parseISO(s.date), { start: previousWeekStart, end: previousWeekEnd }));
       const previousWeekTotalSales = previousWeekSales.reduce((sum, s) => sum + s.totalAmount, 0);
       const currentWeekTotalSales = salesForWeek.reduce((sum, s) => sum + s.totalAmount, 0);
@@ -171,7 +175,6 @@ export default function ReportPage() {
         salesTrendPercentage = ((currentWeekTotalSales - previousWeekTotalSales) / previousWeekTotalSales) * 100;
       }
 
-      // Summary data
       const totalRawMaterial = deliveriesForWeek.reduce((sum, d) => sum + d.quantity, 0);
       const totalUnitsProduced = productionForWeek.reduce((sum, p) => sum + p.producedUnits, 0);
       const validIndices = productionForWeek.filter(p => p.transformationIndex !== 0 && isFinite(p.transformationIndex));
@@ -180,17 +183,15 @@ export default function ReportPage() {
       const salesHistoryForChart: { week: number, total: number }[] = [];
       for (let i = 4; i >= 1; i--) {
         const weekStart = subDays(currentWeekStart, 7 * i);
-        const weekEnd = subDays(currentWeekEnd, 7 * i);
+        const weekEnd = subDays(currentWeekStart, (7 * i) - 6);
         const weeklySales = allSales.filter(s => isWithinInterval(parseISO(s.date), { start: weekStart, end: weekEnd }));
         const total = weeklySales.reduce((sum, s) => sum + s.totalAmount, 0);
         salesHistoryForChart.push({ week: -i, total });
       }
       salesHistoryForChart.push({ week: 0, total: currentWeekTotalSales });
 
-
-      // 3. Generate summaries with local code
       const generatedReport: WeeklyReportOutput = {
-        summary: `Esta semana se recibieron ${totalRawMaterial.toFixed(2)} L de materia prima y se produjeron ${totalUnitsProduced} unidades, con un índice de transformación promedio de ${avgTransformationIndex.toFixed(2)}%.`,
+        summary: `La semana se recibieron ${totalRawMaterial.toFixed(2)} L de materia prima y se produjeron ${totalUnitsProduced} unidades, con un índice de transformación promedio de ${avgTransformationIndex.toFixed(2)}%.`,
         topProviderSummary: `${topProviderName} fue el proveedor más destacado con ${topProviderTotal.toFixed(2)} L.`,
         topClientSummary: `${topClientName} fue el cliente principal con S/. ${topClientTotal.toFixed(2)} en ventas.`,
         stockStatusSummary: `Quedan ${stockInSacos.toFixed(2)} sacos restantes.`,
@@ -199,7 +200,6 @@ export default function ReportPage() {
           : "No hay datos de ventas de la semana anterior para comparar."
       };
       
-      // 4. Bundle data for the UI
       const topProviderDeliveries = deliveriesForWeek.filter(d => d.providerName === topProviderName);
       
       const topClientInfo = allClients.find(c => c.name === topClientName);
@@ -208,7 +208,6 @@ export default function ReportPage() {
       const sortedReplenishments = [...allWholeMilkReplenishments].sort((a,b) => parseISO(b.date).getTime() - parseISO(a.date).getTime());
       const latestMilkPrice = sortedReplenishments.length > 0 ? sortedReplenishments[0].pricePerSaco : 0;
 
-      // 5. Data for Printable Report
       const printableReportData = buildPrintableReportData(allProviders, deliveriesForWeek, productionForWeek, currentWeekStart, allClients, salesForWeek);
 
       setReportData({
@@ -264,7 +263,7 @@ export default function ReportPage() {
             {reportData && (
                  <Button onClick={handleExportPDF} variant="outline" className="bg-accent text-accent-foreground hover:bg-accent/90">
                     <Download className="mr-2 h-4 w-4" />
-                    Exportar Detallado
+                    <span className="hidden sm:inline">Exportar</span>
                 </Button>
             )}
         </div>
@@ -272,11 +271,25 @@ export default function ReportPage() {
 
       <main className="flex-grow flex flex-col items-center">
         <Card className="w-full max-w-4xl">
-          <CardHeader className="text-center">
-            <CardTitle>Generador de Reportes Semanales</CardTitle>
-            <CardDescription>
-              Haz clic en el botón para analizar los datos de la semana actual y generar un resumen ejecutivo y un reporte detallado.
-            </CardDescription>
+          <CardHeader>
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+              <div className="text-center sm:text-left">
+                <CardTitle>Generador de Reportes</CardTitle>
+                <CardDescription>{weekTitle}</CardDescription>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" onClick={handlePreviousWeek}>
+                  <ChevronLeft className="h-4 w-4 mr-1 sm:mr-2" />
+                  <span className="hidden sm:inline">Semana Ant.</span>
+                  <span className="sm:hidden">Ant.</span>
+                </Button>
+                <Button variant="outline" onClick={handleNextWeek}>
+                  <span className="hidden sm:inline">Semana Sig.</span>
+                  <span className="sm:hidden">Sig.</span>
+                  <ChevronRight className="h-4 w-4 ml-1 sm:ml-2" />
+                </Button>
+              </div>
+            </div>
           </CardHeader>
           <CardFooter className="flex justify-center">
             <Button onClick={handleGenerateReport} disabled={isLoading} size="lg">
@@ -288,14 +301,14 @@ export default function ReportPage() {
               ) : (
                 <>
                   <Sparkles className="mr-2 h-4 w-4" />
-                  Generar Reporte de la Semana
+                  Generar Reporte
                 </>
               )}
             </Button>
           </CardFooter>
         </Card>
 
-        <div className="w-full max-w-4xl mt-8">
+        <div className="w-full max-w-5xl mt-8">
             {isLoading && <LoadingSkeleton />}
             {reportData && <ReportDisplay data={reportData} />}
             {reportData && (
@@ -317,7 +330,6 @@ const ReportDisplay = ({ data }: { data: ReportDataBundle }) => {
   const currentWeekStart = startOfWeek(now, { weekStartsOn: 0 });
   const weekDays = eachDayOfInterval({start: currentWeekStart, end: endOfWeek(now, {weekStartsOn: 0})});
 
-  // Top Provider Dialog Data
   const providerDailyData = weekDays.map(day => {
       const dateStr = format(day, 'yyyy-MM-dd');
       const total = topProviderDeliveries
@@ -327,19 +339,14 @@ const ReportDisplay = ({ data }: { data: ReportDataBundle }) => {
   });
   const providerTotal = providerDailyData.reduce((sum, d) => sum + d.total, 0);
   
-  const previousWeeksDeliveries = 0; // Placeholder for future enhancement
-
-  // Top Client Dialog Data
   const clientTotalSales = topClientSales.reduce((sum, sale) => sum + sale.totalAmount, 0);
   const clientTotalPaid = topClientSales.reduce((sum, sale) => sum + sale.payments.reduce((pSum, p) => pSum + p.amount, 0), 0);
 
-  // Sales Trend Dialog Data
   const salesChartData = salesHistory.map(item => ({
     name: item.week === 0 ? 'Esta Semana' : `Semana ${item.week}`,
     Ventas: item.total
   }));
 
-  // Stock Status Dialog Data
   const totalKilosUsed = stockUsage.reduce((sum, p) => sum + (p.wholeMilkKilos || 0), 0);
   const costToReplenish = (totalKilosUsed / 25) * latestMilkPrice;
   const profitFromMilk = costToReplenish * (avgTransformationIndex / 100);
@@ -352,175 +359,49 @@ const ReportDisplay = ({ data }: { data: ReportDataBundle }) => {
                 Resumen de la Semana
             </CardTitle>
             <CardDescription>
-                Análisis de la operación de esta semana. Haz clic en una tarjeta para ver más detalles.
+                Análisis de la operación para la semana seleccionada.
             </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6 text-sm">
             <p className="italic text-muted-foreground">{report.summary}</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Top Provider */}
-                <Dialog>
-                    <DialogTrigger asChild>
-                        <div className="flex items-start gap-3 rounded-lg border p-3 cursor-pointer hover:bg-muted/50 transition-colors">
-                            <PackageCheck className="h-6 w-6 text-green-500 mt-1 flex-shrink-0" />
-                            <div>
-                                <h4 className="font-semibold">Proveedor Destacado</h4>
-                                <p className="text-muted-foreground">{report.topProviderSummary}</p>
-                            </div>
-                        </div>
-                    </DialogTrigger>
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle className="flex items-center"><PackageCheck className="mr-2 h-5 w-5 text-green-500"/>Detalle de Entregas: {topProviderName}</DialogTitle>
-                            <DialogDescription>Resumen de entregas para la semana actual.</DialogDescription>
-                        </DialogHeader>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Día</TableHead>
-                                    <TableHead className="text-right">Litros Entregados</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {providerDailyData.map(d => (
-                                    <TableRow key={d.date.toISOString()}>
-                                        <TableCell>{capitalize(format(d.date, "EEEE", {locale: es}))}</TableCell>
-                                        <TableCell className="text-right">{d.total > 0 ? d.total.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '-'}</TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                            <TableFoot>
-                                <TableRow>
-                                    <TableCell className="font-bold">Total Semanal</TableCell>
-                                    <TableCell className="text-right font-bold">{providerTotal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} L</TableCell>
-                                </TableRow>
-                            </TableFoot>
-                        </Table>
-                         <p className="text-xs text-muted-foreground text-center pt-2">Comparativa con semanas anteriores no disponible.</p>
-                    </DialogContent>
-                </Dialog>
+                <div className="flex items-start gap-3 rounded-lg border p-3">
+                    <PackageCheck className="h-6 w-6 text-green-500 mt-1 flex-shrink-0" />
+                    <div>
+                        <h4 className="font-semibold">Proveedor Destacado</h4>
+                        <p className="text-muted-foreground">{report.topProviderSummary}</p>
+                    </div>
+                </div>
 
-                {/* Top Client */}
-                <Dialog>
-                    <DialogTrigger asChild>
-                        <div className="flex items-start gap-3 rounded-lg border p-3 cursor-pointer hover:bg-muted/50 transition-colors">
-                            <UserCheck className="h-6 w-6 text-blue-500 mt-1 flex-shrink-0" />
-                            <div>
-                                <h4 className="font-semibold">Cliente Principal</h4>
-                                <p className="text-muted-foreground">{report.topClientSummary}</p>
-                            </div>
-                        </div>
-                    </DialogTrigger>
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle className="flex items-center"><UserCheck className="mr-2 h-5 w-5 text-blue-500"/>Detalle de Compras: {topClientName}</DialogTitle>
-                             <DialogDescription>Resumen de compras y pagos para la semana actual.</DialogDescription>
-                        </DialogHeader>
-                         <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Fecha</TableHead>
-                                    <TableHead className="text-right">Monto Venta</TableHead>
-                                    <TableHead className="text-right">Pagos</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {topClientSales.map(sale => (
-                                    <TableRow key={sale.id}>
-                                        <TableCell>{capitalize(format(parseISO(sale.date), "EEEE, dd/MM", { locale: es }))}</TableCell>
-                                        <TableCell className="text-right">S/. {sale.totalAmount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
-                                        <TableCell className="text-right">S/. {sale.payments.reduce((sum, p) => sum + p.amount, 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                            <TableFoot>
-                                <TableRow>
-                                    <TableCell className="font-bold">Total</TableCell>
-                                    <TableCell className="text-right font-bold">S/. {clientTotalSales.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
-                                    <TableCell className="text-right font-bold text-green-500">S/. {clientTotalPaid.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
-                                </TableRow>
-                            </TableFoot>
-                        </Table>
-                    </DialogContent>
-                </Dialog>
+                <div className="flex items-start gap-3 rounded-lg border p-3">
+                    <UserCheck className="h-6 w-6 text-blue-500 mt-1 flex-shrink-0" />
+                    <div>
+                        <h4 className="font-semibold">Cliente Principal</h4>
+                        <p className="text-muted-foreground">{report.topClientSummary}</p>
+                    </div>
+                </div>
                 
-                {/* Sales Trend */}
-                <Dialog>
-                    <DialogTrigger asChild>
-                       <div className="flex items-start gap-3 rounded-lg border p-3 cursor-pointer hover:bg-muted/50 transition-colors">
-                            <TrendingUp className="h-6 w-6 text-yellow-500 mt-1 flex-shrink-0" />
-                            <div>
-                                <h4 className="font-semibold">Tendencia de Ventas</h4>
-                                <p className="text-muted-foreground">{report.salesTrendSummary}</p>
-                            </div>
-                        </div>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-lg">
-                        <DialogHeader>
-                            <DialogTitle className="flex items-center"><TrendingUp className="mr-2 h-5 w-5 text-yellow-500"/>Evolución de Ventas Semanales</DialogTitle>
-                        </DialogHeader>
-                        <div className="h-[300px] w-full mt-4">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <LineChart data={salesChartData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="name" />
-                                    <YAxis />
-                                    <Tooltip
-                                        contentStyle={{
-                                            backgroundColor: 'hsl(var(--background))',
-                                            borderColor: 'hsl(var(--border))',
-                                        }}
-                                    />
-                                    <Legend />
-                                    <Line type="monotone" dataKey="Ventas" stroke="hsl(var(--chart-1))" strokeWidth={2} />
-                                </LineChart>
-                            </ResponsiveContainer>
-                        </div>
-                    </DialogContent>
-                </Dialog>
+               <div className="flex items-start gap-3 rounded-lg border p-3">
+                    <TrendingUp className="h-6 w-6 text-yellow-500 mt-1 flex-shrink-0" />
+                    <div>
+                        <h4 className="font-semibold">Tendencia de Ventas</h4>
+                        <p className="text-muted-foreground">{report.salesTrendSummary}</p>
+                    </div>
+                </div>
 
-                {/* Stock Status */}
-                <Dialog>
-                    <DialogTrigger asChild>
-                        <div className="flex items-start gap-3 rounded-lg border p-3 cursor-pointer hover:bg-muted/50 transition-colors">
-                            <Archive className="h-6 w-6 text-purple-500 mt-1 flex-shrink-0" />
-                            <div>
-                                <h4 className="font-semibold">Estado del Stock (L. Entera)</h4>
-                                <p className="text-muted-foreground">{report.stockStatusSummary}</p>
-                            </div>
-                        </div>
-                    </DialogTrigger>
-                     <DialogContent className="sm:max-w-md">
-                        <DialogHeader>
-                            <DialogTitle className="flex items-center"><Archive className="mr-2 h-5 w-5 text-purple-500"/>Análisis de Stock de Leche Entera</DialogTitle>
-                            <DialogDescription>Movimientos de la semana actual.</DialogDescription>
-                        </DialogHeader>
-                        <div className="space-y-4 py-4 text-sm">
-                            <div className="flex justify-between items-center">
-                                <span className="text-muted-foreground flex items-center"><Milk className="mr-2 h-4 w-4"/>Uso Total en la Semana:</span>
-                                <span className="font-bold">{totalKilosUsed.toLocaleString()} kg</span>
-                            </div>
-                            <div className="flex justify-between items-center">
-                                <span className="text-muted-foreground flex items-center"><Wallet className="mr-2 h-4 w-4"/>Costo de Reposición:</span>
-                                <span className="font-bold text-destructive">S/. {costToReplenish.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
-                            </div>
-                            <div className="flex justify-between items-center">
-                                <span className="text-muted-foreground flex items-center"><TrendingUp className="mr-2 h-4 w-4"/>Ganancia Estimada por Uso:</span>
-                                <span className="font-bold text-green-500">S/. {profitFromMilk.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
-                            </div>
-                        </div>
-                         <DialogFooter>
-                            <p className="text-xs text-muted-foreground w-full text-center">La ganancia se estima como: costo de reposición × índice de transformación promedio.</p>
-                         </DialogFooter>
-                    </DialogContent>
-                </Dialog>
+                <div className="flex items-start gap-3 rounded-lg border p-3">
+                    <Archive className="h-6 w-6 text-purple-500 mt-1 flex-shrink-0" />
+                    <div>
+                        <h4 className="font-semibold">Estado del Stock (L. Entera)</h4>
+                        <p className="text-muted-foreground">{report.stockStatusSummary}</p>
+                    </div>
+                </div>
             </div>
         </CardContent>
     </Card>
   );
 }
 
-// Function to prepare data for the printable report
 const buildPrintableReportData = (
     allProviders: Provider[], 
     deliveriesForWeek: Delivery[], 
@@ -529,7 +410,6 @@ const buildPrintableReportData = (
     allClients: Client[],
     salesForWeek: Sale[]
 ): PrintableReportData => {
-    // Provider Totals
     const providerTotalsMap = allProviders.reduce((acc, provider) => {
         acc[provider.name] = { totalQuantity: 0, price: provider.price };
         return acc;
@@ -551,10 +431,8 @@ const buildPrintableReportData = (
     const totalToPayLucio = providerTotals.find(p => p.name.toLowerCase() === 'lucio')?.totalToPay || 0;
     const totalToPayOthers = providerTotals.filter(p => p.name.toLowerCase() !== 'lucio').reduce((sum, p) => sum + p.totalToPay, 0);
 
-    // Stock Usage
     const stockUsageHistory = productionForWeek.filter(p => p.wholeMilkKilos > 0);
 
-    // Client Weekly Summary
     const clientSummaryMap = allClients.reduce((acc, client) => {
         acc[client.id] = { name: client.name, totalBought: 0, totalPaid: 0 };
         return acc;
@@ -574,7 +452,6 @@ const buildPrintableReportData = (
       }))
       .filter(c => c.totalBought > 0);
 
-    // Chart Data
     const COLORS = ["hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))", "hsl(var(--chart-5))"];
     const chartConfig = allProviders.reduce((config, provider, index) => {
         config[provider.name] = {
@@ -615,7 +492,6 @@ const buildPrintableReportData = (
     };
 };
 
-// Printable Report Component
 const PrintableReport = React.forwardRef<HTMLDivElement, { data: PrintableReportData }>(({ data }, ref) => {
     const { weekTitle, providerTotals, totalToPayLucio, totalToPayOthers, productionHistory, stockUsageHistory, clientWeeklySummary, chartData, chartConfig } = data;
     const hasProviderData = providerTotals.length > 0;
@@ -625,16 +501,16 @@ const PrintableReport = React.forwardRef<HTMLDivElement, { data: PrintableReport
     const hasChartData = chartData.some(row => Object.keys(row).some(key => key !== 'date' && (row[key as keyof typeof row] as number) > 0));
 
     return (
-        <div ref={ref} className="bg-white text-black p-8 shadow-2xl printable-a4">
+        <div ref={ref} className="bg-white text-black p-4 sm:p-8 shadow-2xl rounded-lg printable-container">
             <style jsx global>{`
-                .printable-a4 {
-                    width: 210mm;
-                    min-height: 297mm;
+                .printable-container {
+                    width: 100%;
+                    max-width: 210mm; /* A4 width for larger screens */
                     margin: auto;
                     font-family: Arial, sans-serif;
                 }
-                .printable-a4 h2 {
-                    font-size: 1.5rem;
+                .printable-container h2 {
+                    font-size: 1.25rem; /* 20px */
                     font-weight: bold;
                     color: #333;
                     border-bottom: 2px solid #eee;
@@ -642,23 +518,23 @@ const PrintableReport = React.forwardRef<HTMLDivElement, { data: PrintableReport
                     margin-top: 1.5rem;
                     margin-bottom: 1rem;
                 }
-                .printable-a4 h1 {
-                    font-size: 2rem;
+                .printable-container h1 {
+                    font-size: 1.75rem; /* 28px */
                     font-weight: bold;
                     color: #111;
                     text-align: center;
                 }
-                 .printable-a4 table {
+                 .printable-container table {
                     width: 100%;
                     border-collapse: collapse;
                     font-size: 0.8rem;
                 }
-                .printable-a4 th, .printable-a4 td {
+                .printable-container th, .printable-container td {
                     border: 1px solid #ddd;
                     padding: 8px;
                     text-align: left;
                 }
-                .printable-a4 th {
+                .printable-container th {
                     background-color: #f2f2f2;
                     font-weight: bold;
                 }
@@ -667,7 +543,7 @@ const PrintableReport = React.forwardRef<HTMLDivElement, { data: PrintableReport
                 }
                 .two-column-grid {
                     display: grid;
-                    grid-template-columns: 1fr 1fr;
+                    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
                     gap: 1.5rem;
                     align-items: start;
                 }
@@ -675,72 +551,96 @@ const PrintableReport = React.forwardRef<HTMLDivElement, { data: PrintableReport
                     padding: 4px;
                     font-size: 0.75rem;
                 }
+
+                @media print {
+                  body * {
+                    visibility: hidden;
+                  }
+                  .printable-container, .printable-container * {
+                    visibility: visible;
+                  }
+                  .printable-container {
+                    position: absolute;
+                    left: 0;
+                    top: 0;
+                    width: 100%;
+                    max-width: none;
+                    margin: 0;
+                    padding: 0;
+                    box-shadow: none;
+                    border: none;
+                  }
+                }
             `}</style>
             
             <header className="text-center mb-8">
-                <h1 className="text-3xl font-bold">Reporte Semanal Detallado</h1>
-                <p className="text-lg text-gray-600">{weekTitle}</p>
+                <h1 className="text-xl sm:text-3xl font-bold">Reporte Semanal Detallado</h1>
+                <p className="text-md sm:text-lg text-gray-600">{weekTitle}</p>
             </header>
 
             <section>
                 <h2>Totales por Proveedor</h2>
                 {hasProviderData ? (
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Proveedor</TableHead>
-                                <TableHead className="text-right">Cantidad</TableHead>
-                                <TableHead className="text-right">Precio</TableHead>
-                                <TableHead className="text-right">Total a Pagar</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {providerTotals.map(p => (
-                                <TableRow key={p.name} className={p.name.toLowerCase() === 'lucio' ? 'font-bold' : ''}>
-                                    <TableCell>{p.name}</TableCell>
-                                    <TableCell className="text-right">{p.quantity.toFixed(2)}</TableCell>
-                                    <TableCell className="text-right">S/. {p.price.toFixed(2)}</TableCell>
-                                    <TableCell className="text-right">S/. {p.totalToPay.toFixed(2)}</TableCell>
+                    <div className="overflow-x-auto">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Proveedor</TableHead>
+                                    <TableHead className="text-right">Cantidad</TableHead>
+                                    <TableHead className="text-right">Precio</TableHead>
+                                    <TableHead className="text-right">Total a Pagar</TableHead>
                                 </TableRow>
-                            ))}
-                        </TableBody>
-                        <TableFoot>
-                            <TableRow>
-                                <TableCell colSpan={3} className="text-right font-bold">Total a Pagar (Lucio):</TableCell>
-                                <TableCell className="text-right font-bold">S/. {totalToPayLucio.toFixed(2)}</TableCell>
-                            </TableRow>
-                             <TableRow>
-                                <TableCell colSpan={3} className="text-right font-bold">Total a Pagar (Otros):</TableCell>
-                                <TableCell className="text-right font-bold">S/. {totalToPayOthers.toFixed(2)}</TableCell>
-                            </TableRow>
-                        </TableFoot>
-                    </Table>
+                            </TableHeader>
+                            <TableBody>
+                                {providerTotals.map(p => (
+                                    <TableRow key={p.name}>
+                                        <TableCell className={p.name.toLowerCase() === 'lucio' ? 'font-bold' : ''}>{p.name}</TableCell>
+                                        <TableCell className="text-right">{p.quantity.toFixed(2)}</TableCell>
+                                        <TableCell className="text-right">S/. {p.price.toFixed(2)}</TableCell>
+                                        <TableCell className="text-right">S/. {p.totalToPay.toFixed(2)}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                            <TableFoot>
+                                <TableRow>
+                                    <TableCell colSpan={3} className="text-right font-bold">Total a Pagar (Lucio):</TableCell>
+                                    <TableCell className="text-right font-bold">S/. {totalToPayLucio.toFixed(2)}</TableCell>
+                                </TableRow>
+                                <TableRow>
+                                    <TableCell colSpan={3} className="text-right font-bold">Total a Pagar (Otros):</TableCell>
+                                    <TableCell className="text-right font-bold">S/. {totalToPayOthers.toFixed(2)}</TableCell>
+                                </TableRow>
+                            </TableFoot>
+                        </Table>
+                    </div>
                 ) : <p className="text-gray-500">No hay datos de proveedores para esta semana.</p>}
             </section>
             
             <section>
                 <h2>Historial de Producción</h2>
                 {hasProductionData ? (
-                     <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Fecha</TableHead>
-                                <TableHead className="text-right">Materia Prima Total</TableHead>
-                                <TableHead className="text-right">Unidades Prod.</TableHead>
-                                <TableHead className="text-right">Índice</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {productionHistory.map(p => (
-                                <TableRow key={p.id}>
-                                    <TableCell>{capitalize(format(parseISO(p.date), 'EEEE, dd/MM', { locale: es }))}</TableCell>
-                                    <TableCell className="text-right">{(p.rawMaterialLiters + (p.wholeMilkKilos * 10)).toFixed(2)} L</TableCell>
-                                    <TableCell className="text-right">{p.producedUnits}</TableCell>
-                                    <TableCell className={`text-right ${p.transformationIndex >= 0 ? 'text-green-600' : 'text-red-600'}`}>{p.transformationIndex.toFixed(2)}%</TableCell>
+                    <div className="overflow-x-auto">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Fecha</TableHead>
+                                    <TableHead className="text-right">Materia Prima Total</TableHead>
+                                    <TableHead className="text-right">Unidades Prod.</TableHead>
+                                    <TableHead className="text-right">Índice</TableHead>
                                 </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
+                            </TableHeader>
+                            <TableBody>
+                                {productionHistory.map(p => (
+                                    <TableRow key={p.id}>
+                                        <TableCell>{capitalize(format(parseISO(p.date), 'EEEE, dd/MM', { locale: es }))}</TableCell>
+                                        <TableCell className="text-right">{(p.rawMaterialLiters + (p.wholeMilkKilos * 10)).toFixed(2)} L</TableCell>
+                                        <TableCell className="text-right">{p.producedUnits}</TableCell>
+                                        <TableCell className={`text-right ${p.transformationIndex >= 0 ? 'text-green-600' : 'text-red-600'}`}>{p.transformationIndex.toFixed(2)}%</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
                 ) : <p className="text-gray-500">No hay datos de producción para esta semana.</p>}
             </section>
 
@@ -748,47 +648,51 @@ const PrintableReport = React.forwardRef<HTMLDivElement, { data: PrintableReport
                 <div>
                     <h2>Uso de Leche Entera</h2>
                     {hasStockUsageData ? (
-                         <Table className="table-compact">
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Fecha de Uso</TableHead>
-                                    <TableHead className="text-right">Kilos Usados</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {stockUsageHistory.map(p => (
-                                    <TableRow key={p.id}>
-                                        <TableCell>{capitalize(format(parseISO(p.date), 'EEE, dd/MM', { locale: es }))}</TableCell>
-                                        <TableCell className="text-right">{p.wholeMilkKilos.toFixed(2)} kg</TableCell>
+                        <div className="overflow-x-auto">
+                            <Table className="table-compact">
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Fecha de Uso</TableHead>
+                                        <TableHead className="text-right">Kilos Usados</TableHead>
                                     </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
+                                </TableHeader>
+                                <TableBody>
+                                    {stockUsageHistory.map(p => (
+                                        <TableRow key={p.id}>
+                                            <TableCell>{capitalize(format(parseISO(p.date), 'EEE, dd/MM', { locale: es }))}</TableCell>
+                                            <TableCell className="text-right">{p.wholeMilkKilos.toFixed(2)} kg</TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
                     ) : <p className="text-gray-500">No se usó leche entera esta semana.</p>}
                 </div>
                 <div>
                     <h2>Resumen de Clientes</h2>
                     {hasClientSummaryData ? (
-                        <Table className="table-compact">
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Cliente</TableHead>
-                                    <TableHead className="text-right">Total Comprado</TableHead>
-                                    <TableHead className="text-right">Total Pagado</TableHead>
-                                    <TableHead className="text-right">Deuda</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {clientWeeklySummary.map(c => (
-                                    <TableRow key={c.name}>
-                                        <TableCell>{c.name}</TableCell>
-                                        <TableCell className="text-right">S/. {c.totalBought.toFixed(2)}</TableCell>
-                                        <TableCell className="text-right">S/. {c.totalPaid.toFixed(2)}</TableCell>
-                                        <TableCell className="text-right">S/. {c.debt.toFixed(2)}</TableCell>
+                        <div className="overflow-x-auto">
+                            <Table className="table-compact">
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Cliente</TableHead>
+                                        <TableHead className="text-right">T. Comprado</TableHead>
+                                        <TableHead className="text-right">T. Pagado</TableHead>
+                                        <TableHead className="text-right">Deuda</TableHead>
                                     </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
+                                </TableHeader>
+                                <TableBody>
+                                    {clientWeeklySummary.map(c => (
+                                        <TableRow key={c.name}>
+                                            <TableCell>{c.name}</TableCell>
+                                            <TableCell className="text-right">S/. {c.totalBought.toFixed(2)}</TableCell>
+                                            <TableCell className="text-right">S/. {c.totalPaid.toFixed(2)}</TableCell>
+                                            <TableCell className="text-right">S/. {c.debt.toFixed(2)}</TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
                     ) : <p className="text-gray-500">No hay ventas registradas esta semana.</p>}
                 </div>
              </section>
@@ -796,17 +700,17 @@ const PrintableReport = React.forwardRef<HTMLDivElement, { data: PrintableReport
             <section>
                 <h2>Gráfico de Entregas por Proveedor</h2>
                 {hasChartData ? (
-                    <div className="w-full h-[400px] mt-4">
-                        <ChartContainer config={chartConfig} className="min-h-[400px] w-full">
+                    <div className="w-full h-[300px] sm:h-[400px] mt-4">
+                        <ChartContainer config={chartConfig} className="min-h-[300px] w-full">
                             <ResponsiveContainer width="100%" height={350}>
-                                <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                                <LineChart data={chartData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
                                     <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="date" />
-                                    <YAxis />
+                                    <XAxis dataKey="date" tick={{fontSize: 10}} />
+                                    <YAxis tick={{fontSize: 10}} />
                                     <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #ccc' }}/>
-                                    <Legend />
+                                    <Legend wrapperStyle={{fontSize: '10px'}}/>
                                     {Object.keys(chartConfig).map(key => (
-                                        <Line key={key} type="monotone" dataKey={key} stroke={chartConfig[key].color} />
+                                        <Line key={key} type="monotone" dataKey={key} stroke={chartConfig[key].color} strokeWidth={2} dot={false}/>
                                     ))}
                                 </LineChart>
                             </ResponsiveContainer>
