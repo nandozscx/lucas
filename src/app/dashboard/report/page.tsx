@@ -1,13 +1,14 @@
+
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter as TableFoot } from '@/components/ui/table';
-import { ArrowLeft, BrainCircuit, BotMessageSquare, Sparkles, TrendingUp, UserCheck, PackageCheck, Archive, CalendarDays, LineChart as LineChartIcon, Milk, Wallet } from 'lucide-react';
+import { ArrowLeft, BrainCircuit, BotMessageSquare, Sparkles, TrendingUp, UserCheck, PackageCheck, Archive, Wallet, Milk } from 'lucide-react';
 import { LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 import { generateWeeklyReport } from '@/ai/flows/generate-weekly-report-flow';
@@ -34,7 +35,9 @@ type ReportDataBundle = {
   salesHistory: { week: number; total: number }[];
   stockUsage: Production[];
   latestMilkPrice: number;
-  avgSalePricePerUnit: number;
+  avgTransformationIndex: number;
+  topProviderName: string;
+  topClientName: string;
 };
 
 export default function ReportPage() {
@@ -47,58 +50,96 @@ export default function ReportPage() {
     setReportData(null);
 
     try {
-      const now = new Date();
-      const currentWeekStart = startOfWeek(now, { weekStartsOn: 0 });
-      const currentWeekEnd = endOfWeek(now, { weekStartsOn: 0 });
-
       // 1. Get all data from localStorage
       const allDeliveries: Delivery[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.deliveries) || '[]');
       const allProviders: Provider[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.providers) || '[]');
       const allProduction: Production[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.production) || '[]');
       const allSales: Sale[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.sales) || '[]');
+      const allClients: Client[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.clients) || '[]');
       const allWholeMilkReplenishments: WholeMilkReplenishment[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.wholeMilkReplenishments) || '[]');
       
-      const salesForWeek = allSales.filter(s => isWithinInterval(parseISO(s.date), { start: currentWeekStart, end: currentWeekEnd }));
+      const now = new Date();
+      const currentWeekStart = startOfWeek(now, { weekStartsOn: 0 });
+      const currentWeekEnd = endOfWeek(now, { weekStartsOn: 0 });
+      
+      // 2. Perform all calculations locally
+      const deliveriesForWeek = allDeliveries.filter(d => isWithinInterval(parseISO(d.date), { start: currentWeekStart, end: currentWeekEnd }));
       const productionForWeek = allProduction.filter(p => isWithinInterval(parseISO(p.date), { start: currentWeekStart, end: currentWeekEnd }));
+      const salesForWeek = allSales.filter(s => isWithinInterval(parseISO(s.date), { start: currentWeekStart, end: currentWeekEnd }));
+      
+      // Top Provider
+      const providerTotals = deliveriesForWeek.reduce((acc, d) => {
+        acc[d.providerName] = (acc[d.providerName] || 0) + d.quantity;
+        return acc;
+      }, {} as Record<string, number>);
+      const topProviderName = Object.keys(providerTotals).sort((a,b) => providerTotals[b] - providerTotals[a])[0] || "N/A";
+      const topProviderTotal = providerTotals[topProviderName] || 0;
 
-      // Get sales for the last 4 weeks for trend analysis
-      const previousWeeksSalesData: { week: number, total: number }[] = [];
+      // Top Client
+      const clientTotals = salesForWeek.reduce((acc, s) => {
+        acc[s.clientName] = (acc[s.clientName] || 0) + s.totalAmount;
+        return acc;
+      }, {} as Record<string, number>);
+      const topClientName = Object.keys(clientTotals).sort((a,b) => clientTotals[b] - clientTotals[a])[0] || "N/A";
+      const topClientTotal = clientTotals[topClientName] || 0;
+
+      // Stock Status
+      const totalReplenishedSacos = allWholeMilkReplenishments.reduce((sum, r) => sum + r.quantitySacos, 0);
+      const totalUsedKilos = allProduction.reduce((sum, p) => sum + (p.wholeMilkKilos || 0), 0);
+      const stockInSacos = totalReplenishedSacos - (totalUsedKilos / 25);
+
+      // Sales Trend
+      let salesTrendPercentage = 0;
       const salesHistoryForChart: { week: number, total: number }[] = [];
-      const previousWeeksSalesForPrompt: Sale[] = [];
-
+      let previousWeeksSalesTotal = 0;
+      let previousWeeksCount = 0;
       for (let i = 1; i <= 4; i++) {
         const weekStart = subDays(currentWeekStart, 7 * i);
         const weekEnd = subDays(currentWeekEnd, 7 * i);
         const weeklySales = allSales.filter(s => isWithinInterval(parseISO(s.date), { start: weekStart, end: weekEnd }));
         const total = weeklySales.reduce((sum, s) => sum + s.totalAmount, 0);
-        previousWeeksSalesData.push({ week: i, total });
-        salesHistoryForChart.unshift({ week: -i, total }); // For chart
-        previousWeeksSalesForPrompt.push(...weeklySales);
+        if (weeklySales.length > 0) {
+            previousWeeksSalesTotal += total;
+            previousWeeksCount++;
+        }
+        salesHistoryForChart.unshift({ week: -i, total });
       }
-      
       const currentWeekTotalSales = salesForWeek.reduce((sum, s) => sum + s.totalAmount, 0);
       salesHistoryForChart.push({ week: 0, total: currentWeekTotalSales });
 
-      // 4. Prepare input for the AI flow
+      const avgPreviousSales = previousWeeksCount > 0 ? previousWeeksSalesTotal / previousWeeksCount : 0;
+      if (avgPreviousSales > 0) {
+        salesTrendPercentage = ((currentWeekTotalSales - avgPreviousSales) / avgPreviousSales) * 100;
+      }
+
+      // Summary data
+      const totalRawMaterial = deliveriesForWeek.reduce((sum, d) => sum + d.quantity, 0);
+      const totalUnitsProduced = productionForWeek.reduce((sum, p) => sum + p.producedUnits, 0);
+      const validIndices = productionForWeek.filter(p => p.transformationIndex !== 0);
+      const avgTransformationIndex = validIndices.length > 0 ? validIndices.reduce((sum, p) => sum + p.transformationIndex, 0) / validIndices.length : 0;
+
+      // 3. Prepare input for the AI flow with pre-calculated data
       const reportInput: WeeklyReportInput = {
-        deliveries: allDeliveries.filter(d => isWithinInterval(parseISO(d.date), { start: currentWeekStart, end: currentWeekEnd })),
-        providers: allProviders,
-        production: allProduction, // Pass all production for accurate stock calculation
-        sales: salesForWeek,
-        wholeMilkReplenishments: allWholeMilkReplenishments,
-        previousWeeksSales: previousWeeksSalesForPrompt,
+        totalRawMaterial,
+        totalUnitsProduced,
+        avgTransformationIndex,
+        topProviderName: topProviderName,
+        topProviderTotal: topProviderTotal,
+        topClientName: topClientName,
+        topClientTotal: topClientTotal,
+        stockInSacos,
+        salesTrendPercentage,
+        isTrendComparisonPossible: avgPreviousSales > 0,
       };
 
       const generatedReport = await generateWeeklyReport(reportInput);
 
-      const topProviderDeliveries = allDeliveries.filter(d => d.providerName === generatedReport.topProviderName && isWithinInterval(parseISO(d.date), { start: currentWeekStart, end: currentWeekEnd }));
-      const topClientSales = salesForWeek.filter(s => s.clientName === generatedReport.topClientName);
+      // 4. Bundle data for the UI
+      const topProviderDeliveries = deliveriesForWeek.filter(d => d.providerName === topProviderName);
+      const topClientSales = salesForWeek.filter(s => s.clientName === topClientName);
       
       const sortedReplenishments = [...allWholeMilkReplenishments].sort((a,b) => parseISO(b.date).getTime() - parseISO(a.date).getTime());
       const latestMilkPrice = sortedReplenishments.length > 0 ? sortedReplenishments[0].pricePerSaco : 0;
-      
-      const totalUnitsSold = salesForWeek.reduce((sum, sale) => sum + (sale.unit === 'baldes' ? sale.quantity * 100 : sale.quantity), 0);
-      const avgSalePricePerUnit = totalUnitsSold > 0 ? currentWeekTotalSales / totalUnitsSold : 0;
 
       setReportData({
         report: generatedReport,
@@ -107,7 +148,9 @@ export default function ReportPage() {
         salesHistory: salesHistoryForChart,
         stockUsage: productionForWeek.filter(p => p.wholeMilkKilos > 0),
         latestMilkPrice,
-        avgSalePricePerUnit
+        avgTransformationIndex,
+        topProviderName,
+        topClientName
       });
       
     } catch (error) {
@@ -185,7 +228,7 @@ export default function ReportPage() {
 
 
 const ReportDisplay = ({ data }: { data: ReportDataBundle }) => {
-  const { report, topProviderDeliveries, topClientSales, salesHistory, stockUsage, latestMilkPrice, avgSalePricePerUnit } = data;
+  const { report, topProviderDeliveries, topClientSales, salesHistory, stockUsage, latestMilkPrice, avgTransformationIndex, topProviderName, topClientName } = data;
 
   const now = new Date();
   const currentWeekStart = startOfWeek(now, { weekStartsOn: 0 });
@@ -213,10 +256,9 @@ const ReportDisplay = ({ data }: { data: ReportDataBundle }) => {
   }));
 
   // Stock Status Dialog Data
-  const totalKilosUsed = stockUsage.reduce((sum, p) => sum + p.wholeMilkKilos, 0);
+  const totalKilosUsed = stockUsage.reduce((sum, p) => sum + (p.wholeMilkKilos || 0), 0);
   const costToReplenish = (totalKilosUsed / 25) * latestMilkPrice;
-  const revenueFromMilk = totalKilosUsed * 10 * avgSalePricePerUnit; // Kilos to Liters, then Liters to Revenue
-  const profitFromMilk = revenueFromMilk - costToReplenish;
+  const profitFromMilk = costToReplenish * (avgTransformationIndex / 100);
 
   return (
     <Card className="shadow-lg animate-in fade-in-50">
@@ -245,7 +287,7 @@ const ReportDisplay = ({ data }: { data: ReportDataBundle }) => {
                     </DialogTrigger>
                     <DialogContent>
                         <DialogHeader>
-                            <DialogTitle className="flex items-center"><PackageCheck className="mr-2 h-5 w-5 text-green-500"/>Detalle de Entregas: {report.topProviderName}</DialogTitle>
+                            <DialogTitle className="flex items-center"><PackageCheck className="mr-2 h-5 w-5 text-green-500"/>Detalle de Entregas: {topProviderName}</DialogTitle>
                             <DialogDescription>Resumen de entregas para la semana actual.</DialogDescription>
                         </DialogHeader>
                         <Table>
@@ -287,7 +329,7 @@ const ReportDisplay = ({ data }: { data: ReportDataBundle }) => {
                     </DialogTrigger>
                     <DialogContent>
                         <DialogHeader>
-                            <DialogTitle className="flex items-center"><UserCheck className="mr-2 h-5 w-5 text-blue-500"/>Detalle de Compras: {report.topClientName}</DialogTitle>
+                            <DialogTitle className="flex items-center"><UserCheck className="mr-2 h-5 w-5 text-blue-500"/>Detalle de Compras: {topClientName}</DialogTitle>
                              <DialogDescription>Resumen de compras y pagos para la semana actual.</DialogDescription>
                         </DialogHeader>
                          <Table>
@@ -331,7 +373,7 @@ const ReportDisplay = ({ data }: { data: ReportDataBundle }) => {
                     </DialogTrigger>
                     <DialogContent className="sm:max-w-lg">
                         <DialogHeader>
-                            <DialogTitle className="flex items-center"><LineChartIcon className="mr-2 h-5 w-5 text-yellow-500"/>Evolución de Ventas Semanales</DialogTitle>
+                            <DialogTitle className="flex items-center"><TrendingUp className="mr-2 h-5 w-5 text-yellow-500"/>Evolución de Ventas Semanales</DialogTitle>
                         </DialogHeader>
                         <div className="h-[300px] w-full mt-4">
                             <ResponsiveContainer width="100%" height="100%">
@@ -384,7 +426,7 @@ const ReportDisplay = ({ data }: { data: ReportDataBundle }) => {
                             </div>
                         </div>
                          <DialogFooter>
-                            <p className="text-xs text-muted-foreground w-full text-center">La ganancia es una estimación basada en el precio de venta promedio de los productos finales esta semana.</p>
+                            <p className="text-xs text-muted-foreground w-full text-center">La ganancia se estima como: costo de reposición × índice de transformación promedio.</p>
                         </DialogFooter>
                     </DialogContent>
                 </Dialog>
