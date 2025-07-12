@@ -8,12 +8,11 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter as TableFoot } from '@/components/ui/table';
-import { ArrowLeft, BrainCircuit, BotMessageSquare, Sparkles, TrendingUp, UserCheck, PackageCheck, Archive, Wallet, Milk, Download, FileText } from 'lucide-react';
+import { ArrowLeft, Sparkles, TrendingUp, UserCheck, PackageCheck, Archive, Wallet, Milk, Download, FileText } from 'lucide-react';
 import { LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
 
-import { generateWeeklyReport } from '@/ai/flows/generate-weekly-report-flow';
-import type { Delivery, Provider, Production, Sale, Client, WholeMilkReplenishment, WeeklyReportInput, WeeklyReportOutput } from '@/types';
+import type { Delivery, Provider, Production, Sale, Client, WholeMilkReplenishment, WeeklyReportOutput } from '@/types';
 import { startOfWeek, endOfWeek, subDays, isWithinInterval, parseISO, format, eachDayOfInterval } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
@@ -188,22 +187,17 @@ export default function ReportPage() {
       salesHistoryForChart.push({ week: 0, total: currentWeekTotalSales });
 
 
-      // 3. Prepare input for the AI flow with pre-calculated data
-      const reportInput: WeeklyReportInput = {
-        totalRawMaterial,
-        totalUnitsProduced,
-        avgTransformationIndex,
-        topProviderName: topProviderName,
-        topProviderTotal: topProviderTotal,
-        topClientName: topClientName,
-        topClientTotal: topClientTotal,
-        stockInSacos,
-        salesTrendPercentage,
-        isTrendComparisonPossible: previousWeekTotalSales > 0,
+      // 3. Generate summaries with local code
+      const generatedReport: WeeklyReportOutput = {
+        summary: `Esta semana se recibieron ${totalRawMaterial.toFixed(2)} L de materia prima y se produjeron ${totalUnitsProduced} unidades, con un índice de transformación promedio de ${avgTransformationIndex.toFixed(2)}%.`,
+        topProviderSummary: `${topProviderName} fue el proveedor más destacado con ${topProviderTotal.toFixed(2)} L.`,
+        topClientSummary: `${topClientName} fue el cliente principal con S/. ${topClientTotal.toFixed(2)} en ventas.`,
+        stockStatusSummary: `Quedan ${stockInSacos.toFixed(2)} sacos restantes.`,
+        salesTrendSummary: previousWeekTotalSales > 0 
+          ? `Las ventas ${salesTrendPercentage >= 0 ? 'aumentaron' : 'disminuyeron'} un ${Math.abs(salesTrendPercentage).toFixed(2)}% con respecto a la semana anterior.`
+          : "No hay datos de ventas de la semana anterior para comparar."
       };
-
-      const generatedReport = await generateWeeklyReport(reportInput);
-
+      
       // 4. Bundle data for the UI
       const topProviderDeliveries = deliveriesForWeek.filter(d => d.providerName === topProviderName);
       
@@ -233,7 +227,7 @@ export default function ReportPage() {
       console.error("Error generating report:", error);
       toast({
         title: "Error al Generar Reporte",
-        description: "No se pudo conectar con el servicio de IA. Por favor, inténtalo de nuevo más tarde.",
+        description: "Ocurrió un error al procesar los datos locales. Revisa la consola para más detalles.",
         variant: "destructive",
       });
     } finally {
@@ -262,13 +256,13 @@ export default function ReportPage() {
           Volver al Panel
         </Link>
         <h1 className="text-2xl md:text-3xl font-bold text-primary flex items-center order-first sm:order-none mx-auto sm:mx-0">
-          <BrainCircuit className="mr-3 h-8 w-8" />
-          Reporte con IA
+          <FileText className="mr-3 h-8 w-8" />
+          Reporte Semanal
         </h1>
         <div className="flex items-center gap-2">
             {reportData && (
                  <Button onClick={handleExportPDF} variant="outline" className="bg-accent text-accent-foreground hover:bg-accent/90">
-                    <FileText className="mr-2 h-4 w-4" />
+                    <Download className="mr-2 h-4 w-4" />
                     Exportar Detallado
                 </Button>
             )}
@@ -280,7 +274,7 @@ export default function ReportPage() {
           <CardHeader className="text-center">
             <CardTitle>Generador de Reportes Semanales</CardTitle>
             <CardDescription>
-              Haz clic en el botón para que la inteligencia artificial analice los datos de la semana actual y genere un resumen ejecutivo.
+              Haz clic en el botón para analizar los datos de la semana actual y generar un resumen ejecutivo y un reporte detallado.
             </CardDescription>
           </CardHeader>
           <CardFooter className="flex justify-center">
@@ -353,11 +347,11 @@ const ReportDisplay = ({ data }: { data: ReportDataBundle }) => {
     <Card className="shadow-lg animate-in fade-in-50">
         <CardHeader>
             <CardTitle className="flex items-center text-xl text-primary">
-                <BotMessageSquare className="mr-2 h-6 w-6" />
-                Reporte Semanal Inteligente
+                <Sparkles className="mr-2 h-6 w-6" />
+                Resumen de la Semana
             </CardTitle>
             <CardDescription>
-                Análisis automático de la operación de esta semana. Haz clic en una tarjeta para ver más detalles.
+                Análisis de la operación de esta semana. Haz clic en una tarjeta para ver más detalles.
             </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6 text-sm">
@@ -737,16 +731,18 @@ const PrintableReport = React.forwardRef<HTMLDivElement, { data: PrintableReport
                 {hasChartData ? (
                     <div className="w-full h-[400px] mt-4">
                         <ChartContainer config={chartConfig} className="min-h-[400px] w-full">
-                            <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey="date" />
-                                <YAxis />
-                                <Tooltip />
-                                <Legend />
-                                {Object.keys(chartConfig).map(key => (
-                                    <Line key={key} type="monotone" dataKey={key} stroke={chartConfig[key].color} />
-                                ))}
-                            </LineChart>
+                            <ResponsiveContainer width="100%" height={350}>
+                                <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis dataKey="date" />
+                                    <YAxis />
+                                    <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #ccc' }}/>
+                                    <Legend />
+                                    {Object.keys(chartConfig).map(key => (
+                                        <Line key={key} type="monotone" dataKey={key} stroke={chartConfig[key].color} />
+                                    ))}
+                                </LineChart>
+                            </ResponsiveContainer>
                         </ChartContainer>
                     </div>
                 ) : <p className="text-gray-500">No hay datos suficientes para mostrar el gráfico.</p>}

@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -5,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import DashboardHeader from '@/components/dashboard-header';
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card } from "@/components/ui/card";
-import { ClipboardPenLine, ShoppingCart, HistoryIcon, Cpu, BarChart3, DatabaseBackup, BrainCircuit } from 'lucide-react';
+import { ClipboardPenLine, ShoppingCart, HistoryIcon, Cpu, BarChart3, DatabaseBackup, FileText } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import type { Production, WholeMilkReplenishment } from '@/types';
 
@@ -68,7 +69,7 @@ export default function DashboardPage() {
     { title: "Ventas y Clientes", icon: ShoppingCart, action: () => router.push('/dashboard/sales-clients') },
     { title: "Historial", icon: HistoryIcon, action: () => router.push('/dashboard/history') },
     { title: "Estadísticas", icon: BarChart3, action: () => router.push('/dashboard/statistics') },
-    { title: "Reporte IA", icon: BrainCircuit, action: () => router.push('/dashboard/report') },
+    { title: "Reporte Detallado", icon: FileText, action: () => router.push('/dashboard/report') },
     { title: "Salvar y Leer", icon: DatabaseBackup, action: () => router.push('/dashboard/backup') },
   ];
 

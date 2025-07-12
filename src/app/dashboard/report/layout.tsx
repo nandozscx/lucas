@@ -3,8 +3,8 @@ import type { Metadata } from 'next';
 import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
-  title: 'Reporte Semanal IA - acopiapp',
-  description: 'Genera un reporte semanal inteligente de tu operación.',
+  title: 'Reporte Semanal Detallado - acopiapp',
+  description: 'Genera un reporte semanal de tu operación.',
 };
 
 export default function ReportLayout({

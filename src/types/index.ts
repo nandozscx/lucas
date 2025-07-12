@@ -66,29 +66,12 @@ export interface WholeMilkReplenishment {
   pricePerSaco: number;
 }
 
-// Zod Schema for AI Report Flow Input
-// This contains pre-calculated, accurate data for the AI to summarize.
-export const WeeklyReportInputSchema = z.object({
-  totalRawMaterial: z.number().describe("The total liters of raw material received this week."),
-  totalUnitsProduced: z.number().describe("The total units produced this week."),
-  avgTransformationIndex: z.number().describe("The average transformation index percentage for the week."),
-  topProviderName: z.string().describe("The name of the provider who delivered the most material."),
-  topProviderTotal: z.number().describe("The total quantity delivered by the top provider."),
-  topClientName: z.string().describe("The name of the client with the highest sales amount."),
-  topClientTotal: z.number().describe("The total sales amount for the top client."),
-  stockInSacos: z.number().describe("The current final stock of whole milk in 'sacos'."),
-  salesTrendPercentage: z.number().describe("The percentage change in sales compared to the previous 4 weeks."),
-  isTrendComparisonPossible: z.boolean().describe("True if there is data from previous weeks to compare sales against."),
-});
-export type WeeklyReportInput = z.infer<typeof WeeklyReportInputSchema>;
 
-// Zod Schema for AI Report Flow Output
-// The AI is expected to return only narrative summaries based on the input data.
-export const WeeklyReportOutputSchema = z.object({
-  summary: z.string().describe("A general summary of the week's performance in Spanish, using the provided data points."),
-  topProviderSummary: z.string().describe("A summary sentence in Spanish for the top provider. Example: 'ProveedorX fue el más destacado con XXXX.XX L.'"),
-  topClientSummary: z.string().describe("A summary sentence in Spanish for the top client. Example: 'ClienteY fue el principal con S/. XXXX.XX en ventas.'"),
-  stockStatusSummary: z.string().describe("A brief status of the whole milk stock in 'sacos'. E.g., 'Quedan X.XX sacos restantes.'"),
-  salesTrendSummary: z.string().describe("Describes the sales trend in Spanish based on the percentage. E.g., 'Las ventas aumentaron un X.XX%...' or 'No hay datos previos para comparar.'"),
-});
-export type WeeklyReportOutput = z.infer<typeof WeeklyReportOutputSchema>;
+// Schema for locally generated Report Output
+export interface WeeklyReportOutput {
+  summary: string;
+  topProviderSummary: string;
+  topClientSummary: string;
+  stockStatusSummary: string;
+  salesTrendSummary: string;
+}
