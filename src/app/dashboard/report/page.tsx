@@ -51,6 +51,7 @@ type PrintableReportData = {
     totalToPayOthers: number;
     productionHistory: Production[];
     stockUsageHistory: Production[];
+    clientWeeklySummary: any[];
     chartData: any[];
     chartConfig: ChartConfig;
 };
@@ -208,7 +209,7 @@ export default function ReportPage() {
       const latestMilkPrice = sortedReplenishments.length > 0 ? sortedReplenishments[0].pricePerSaco : 0;
 
       // 5. Data for Printable Report
-        const printableReportData = buildPrintableReportData(allProviders, deliveriesForWeek, productionForWeek, currentWeekStart);
+      const printableReportData = buildPrintableReportData(allProviders, deliveriesForWeek, productionForWeek, currentWeekStart, allClients, salesForWeek);
 
       setReportData({
         report: generatedReport,
@@ -520,7 +521,14 @@ const ReportDisplay = ({ data }: { data: ReportDataBundle }) => {
 }
 
 // Function to prepare data for the printable report
-const buildPrintableReportData = (allProviders: Provider[], deliveriesForWeek: Delivery[], productionForWeek: Production[], currentWeekStart: Date): PrintableReportData => {
+const buildPrintableReportData = (
+    allProviders: Provider[], 
+    deliveriesForWeek: Delivery[], 
+    productionForWeek: Production[], 
+    currentWeekStart: Date,
+    allClients: Client[],
+    salesForWeek: Sale[]
+): PrintableReportData => {
     // Provider Totals
     const providerTotalsMap = allProviders.reduce((acc, provider) => {
         acc[provider.name] = { totalQuantity: 0, price: provider.price };
@@ -545,6 +553,26 @@ const buildPrintableReportData = (allProviders: Provider[], deliveriesForWeek: D
 
     // Stock Usage
     const stockUsageHistory = productionForWeek.filter(p => p.wholeMilkKilos > 0);
+
+    // Client Weekly Summary
+    const clientSummaryMap = allClients.reduce((acc, client) => {
+        acc[client.id] = { name: client.name, totalBought: 0, totalPaid: 0 };
+        return acc;
+    }, {} as Record<string, { name: string, totalBought: number, totalPaid: number }>);
+
+    salesForWeek.forEach(sale => {
+        if (clientSummaryMap[sale.clientId]) {
+            clientSummaryMap[sale.clientId].totalBought += sale.totalAmount;
+            clientSummaryMap[sale.clientId].totalPaid += sale.payments.reduce((sum, p) => sum + p.amount, 0);
+        }
+    });
+
+    const clientWeeklySummary = Object.values(clientSummaryMap)
+      .map(client => ({
+        ...client,
+        debt: client.totalBought - client.totalPaid,
+      }))
+      .filter(c => c.totalBought > 0);
 
     // Chart Data
     const COLORS = ["hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))", "hsl(var(--chart-5))"];
@@ -581,6 +609,7 @@ const buildPrintableReportData = (allProviders: Provider[], deliveriesForWeek: D
         totalToPayOthers,
         productionHistory: productionForWeek.sort((a, b) => parseISO(a.date).getTime() - parseISO(b.date).getTime()),
         stockUsageHistory: stockUsageHistory.sort((a, b) => parseISO(a.date).getTime() - parseISO(b.date).getTime()),
+        clientWeeklySummary,
         chartData: Array.from(dataMap.values()),
         chartConfig,
     };
@@ -588,10 +617,11 @@ const buildPrintableReportData = (allProviders: Provider[], deliveriesForWeek: D
 
 // Printable Report Component
 const PrintableReport = React.forwardRef<HTMLDivElement, { data: PrintableReportData }>(({ data }, ref) => {
-    const { weekTitle, providerTotals, totalToPayLucio, totalToPayOthers, productionHistory, stockUsageHistory, chartData, chartConfig } = data;
+    const { weekTitle, providerTotals, totalToPayLucio, totalToPayOthers, productionHistory, stockUsageHistory, clientWeeklySummary, chartData, chartConfig } = data;
     const hasProviderData = providerTotals.length > 0;
     const hasProductionData = productionHistory.length > 0;
     const hasStockUsageData = stockUsageHistory.length > 0;
+    const hasClientSummaryData = clientWeeklySummary.length > 0;
     const hasChartData = chartData.some(row => Object.keys(row).some(key => key !== 'date' && (row[key as keyof typeof row] as number) > 0));
 
     return (
@@ -634,6 +664,16 @@ const PrintableReport = React.forwardRef<HTMLDivElement, { data: PrintableReport
                 }
                 .recharts-wrapper {
                     font-size: 12px;
+                }
+                .two-column-grid {
+                    display: grid;
+                    grid-template-columns: 1fr 1fr;
+                    gap: 1.5rem;
+                    align-items: start;
+                }
+                .table-compact th, .table-compact td {
+                    padding: 4px;
+                    font-size: 0.75rem;
                 }
             `}</style>
             
@@ -704,27 +744,54 @@ const PrintableReport = React.forwardRef<HTMLDivElement, { data: PrintableReport
                 ) : <p className="text-gray-500">No hay datos de producción para esta semana.</p>}
             </section>
 
-             <section>
-                <h2>Uso de Leche Entera</h2>
-                {hasStockUsageData ? (
-                     <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Fecha de Uso</TableHead>
-                                <TableHead className="text-right">Kilos Usados</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {stockUsageHistory.map(p => (
-                                <TableRow key={p.id}>
-                                    <TableCell>{capitalize(format(parseISO(p.date), 'EEEE, dd/MM', { locale: es }))}</TableCell>
-                                    <TableCell className="text-right">{p.wholeMilkKilos.toFixed(2)} kg</TableCell>
+             <section className="two-column-grid">
+                <div>
+                    <h2>Uso de Leche Entera</h2>
+                    {hasStockUsageData ? (
+                         <Table className="table-compact">
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Fecha de Uso</TableHead>
+                                    <TableHead className="text-right">Kilos Usados</TableHead>
                                 </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                ) : <p className="text-gray-500">No se usó leche entera esta semana.</p>}
-            </section>
+                            </TableHeader>
+                            <TableBody>
+                                {stockUsageHistory.map(p => (
+                                    <TableRow key={p.id}>
+                                        <TableCell>{capitalize(format(parseISO(p.date), 'EEE, dd/MM', { locale: es }))}</TableCell>
+                                        <TableCell className="text-right">{p.wholeMilkKilos.toFixed(2)} kg</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    ) : <p className="text-gray-500">No se usó leche entera esta semana.</p>}
+                </div>
+                <div>
+                    <h2>Resumen de Clientes</h2>
+                    {hasClientSummaryData ? (
+                        <Table className="table-compact">
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Cliente</TableHead>
+                                    <TableHead className="text-right">Total Comprado</TableHead>
+                                    <TableHead className="text-right">Total Pagado</TableHead>
+                                    <TableHead className="text-right">Deuda</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {clientWeeklySummary.map(c => (
+                                    <TableRow key={c.name}>
+                                        <TableCell>{c.name}</TableCell>
+                                        <TableCell className="text-right">S/. {c.totalBought.toFixed(2)}</TableCell>
+                                        <TableCell className="text-right">S/. {c.totalPaid.toFixed(2)}</TableCell>
+                                        <TableCell className="text-right">S/. {c.debt.toFixed(2)}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    ) : <p className="text-gray-500">No hay ventas registradas esta semana.</p>}
+                </div>
+             </section>
 
             <section>
                 <h2>Gráfico de Entregas por Proveedor</h2>
