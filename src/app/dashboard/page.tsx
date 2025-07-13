@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import DashboardHeader from '@/components/dashboard-header';
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card } from "@/components/ui/card";
-import { ClipboardPenLine, ShoppingCart, HistoryIcon, Cpu, BarChart3, DatabaseBackup, FileText } from 'lucide-react';
+import { ClipboardPenLine, ShoppingCart, HistoryIcon, Cpu, BarChart3, DatabaseBackup, Printer } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import type { Production, WholeMilkReplenishment } from '@/types';
 
@@ -69,14 +69,15 @@ export default function DashboardPage() {
     { title: "Ventas y Clientes", icon: ShoppingCart, action: () => router.push('/dashboard/sales-clients') },
     { title: "Historial", icon: HistoryIcon, action: () => router.push('/dashboard/history') },
     { title: "Estadísticas", icon: BarChart3, action: () => router.push('/dashboard/statistics') },
-    { title: "Reporte Detallado", icon: FileText, action: () => router.push('/dashboard/report') },
+    { title: "Reporte AI", icon: Cpu, action: () => router.push('/dashboard/report') },
+    { title: "Exportar / Imprimir", icon: Printer, action: () => router.push('/dashboard/export') },
     { title: "Salvar y Leer", icon: DatabaseBackup, action: () => router.push('/dashboard/backup') },
   ];
 
   return (
     <div className="min-h-screen flex flex-col p-4 sm:p-6 space-y-6 bg-background">
       <DashboardHeader />
-      <main className="flex-grow grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6 p-4 items-center">
+      <main className="flex-grow grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 p-4 items-center">
         {cardItems.map((item, index) => {
           const IconComponent = item.icon;
           return (
@@ -86,7 +87,7 @@ export default function DashboardPage() {
               tabIndex={0}
               onClick={item.action}
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); item.action?.(); } }}
-              className={`flex flex-col items-center justify-center p-4 hover:shadow-xl transition-all duration-200 ease-in-out cursor-pointer h-auto aspect-square rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 shadow-md ${index === 6 && cardItems.length % 2 !== 0 ? 'md:col-start-2' : ''}`}
+              className={`flex flex-col items-center justify-center p-4 hover:shadow-xl transition-all duration-200 ease-in-out cursor-pointer h-auto aspect-square rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 shadow-md`}
               aria-label={item.title}
             >
               <IconComponent className="h-12 w-12 sm:h-16 sm:w-16 text-primary mb-3" strokeWidth={1.5} />

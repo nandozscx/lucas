@@ -3,8 +3,8 @@ import type { Metadata } from 'next';
 import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
-  title: 'Opciones de Exportación - acopiapp',
-  description: 'Selecciona un formato para exportar tus datos de entregas.',
+  title: 'Exportar y Imprimir - acopiapp',
+  description: 'Selecciona y genera reportes personalizados en formato PDF.',
 };
 
 export default function ExportLayout({

@@ -23,7 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import type { Delivery, Production as ProductionType, WholeMilkReplenishment } from '@/types';
-import { ArrowLeft, Cpu, CalendarIcon, Package, Milk, Scale, Percent, Save, Edit2, Trash2, ChevronLeft, ChevronRight, Download, ShoppingBag, Archive, Wallet, DollarSign, AlertCircle, PlusCircle, History } from 'lucide-react';
+import { ArrowLeft, Cpu, CalendarIcon, Package, Milk, Scale, Percent, Save, Edit2, Trash2, ChevronLeft, ChevronRight, ShoppingBag, Archive, Wallet, DollarSign, AlertCircle, PlusCircle, History } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { cn, capitalize } from '@/lib/utils';
@@ -298,51 +298,6 @@ export default function ProductionPage() {
 
     return { weekTitle: title, productionForCurrentWeek: filtered, totalWeeklyUnits: units, averageWeeklyIndex: avgIndex, currentWeekEnd: weekEnd };
   }, [currentWeekStart, productionHistory]);
-  
-  const exportHistoryToPDF = async () => {
-    if (productionForCurrentWeek.length === 0) {
-      toast({ title: "Sin Datos", description: "No hay datos de producción en la semana actual para exportar.", variant: "destructive" });
-      return;
-    }
-
-    const { default: jsPDFConstructor } = await import('jspdf');
-    await import('jspdf-autotable');
-    const doc = new jsPDFConstructor() as jsPDFWithAutoTable;
-
-    const tableHeaders = ['Fecha', 'Materia Prima Total', 'Unidades Prod.', 'Índice de Transf.'];
-    const tableBody = productionForCurrentWeek.map(p => [
-      capitalize(format(parseISO(p.date), 'EEEE, dd/MM', { locale: es })),
-      `${(p.rawMaterialLiters + (p.wholeMilkKilos * 10)).toLocaleString()} L`,
-      p.producedUnits.toLocaleString(),
-      `${p.transformationIndex.toFixed(2)}%`
-    ]);
-
-    doc.setFontSize(18);
-    doc.text('Historial de Producción Semanal', 14, 15);
-    doc.setFontSize(12);
-    doc.text(weekTitle, 14, 22);
-
-    doc.autoTable({
-      head: [tableHeaders],
-      body: tableBody,
-      startY: 28,
-      foot: [
-        ['Total Semanal', '', totalWeeklyUnits.toLocaleString(), `${averageWeeklyIndex.toFixed(2)}% (Promedio)`]
-      ],
-      footStyles: { fontStyle: 'bold' },
-      didDrawPage: (data) => {
-        if (data.pageNumber === 1) {
-          doc.setFontSize(18);
-          doc.text('Historial de Producción Semanal', data.settings.margin.left, 15);
-          doc.setFontSize(12);
-          doc.text(weekTitle, data.settings.margin.left, 22);
-        }
-      }
-    });
-
-    doc.save(`produccion_semanal_${format(currentWeekStart!, "yyyy-MM-dd")}.pdf`);
-    toast({ title: "Exportación PDF Exitosa", description: "El historial de producción semanal se ha exportado a PDF." });
-  };
   
   const { currentStockSacos, latestPricePerSaco } = useMemo(() => {
     const totalReplenished = replenishmentHistory.reduce((sum, r) => sum + r.quantitySacos, 0);
@@ -682,12 +637,6 @@ export default function ProductionPage() {
                                     <ScrollBar orientation="horizontal" />
                                 </ScrollArea>
                             </CardContent>
-                            <CardFooter className="justify-end border-t pt-4">
-                            <Button onClick={exportHistoryToPDF} disabled={productionForCurrentWeek.length === 0}>
-                                <Download className="mr-2 h-4 w-4"/>
-                                Exportar PDF de la Semana
-                            </Button>
-                            </CardFooter>
                         </Card>
                     </div>
                 </div>
@@ -992,5 +941,3 @@ const ReplenishmentDialog = ({ isOpen, onClose, onSubmit, initialData }: { isOpe
         </Dialog>
     );
 };
-
-    

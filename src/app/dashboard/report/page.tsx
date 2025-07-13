@@ -18,10 +18,6 @@ import { es } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import { capitalize } from '@/lib/utils';
 
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
-
-
 const STORAGE_KEYS = {
   deliveries: 'dailySupplyTrackerDeliveries',
   providers: 'dailySupplyTrackerProviders',
@@ -41,19 +37,6 @@ type ReportDataBundle = {
   avgTransformationIndex: number;
   topProviderName: string;
   topClientName: string;
-  printableReportData: PrintableReportData;
-};
-
-type PrintableReportData = {
-    weekTitle: string;
-    providerTotals: any[];
-    totalToPayLucio: number;
-    totalToPayOthers: number;
-    productionHistory: Production[];
-    stockUsageHistory: Production[];
-    clientWeeklySummary: any[];
-    chartData: any[];
-    chartConfig: ChartConfig;
 };
 
 type DialogDataType = {
@@ -68,7 +51,6 @@ export default function ReportPage() {
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(startOfWeek(new Date(), { weekStartsOn: 0 }));
   const [dialogData, setDialogData] = useState<DialogDataType | null>(null);
   const { toast } = useToast();
-  const printableReportRef = useRef<HTMLDivElement>(null);
 
   const weekTitle = `Semana del ${format(currentWeekStart, "dd/MM/yy")} al ${format(endOfWeek(currentWeekStart, { weekStartsOn: 0 }), "dd/MM/yy")}`;
 
@@ -81,57 +63,6 @@ export default function ReportPage() {
     setCurrentWeekStart(prev => addDays(prev, 7));
     setReportData(null); // Clear previous report
   };
-
-  const handleExportPDF = async () => {
-    const input = printableReportRef.current;
-    if (!input) {
-      toast({
-        title: "Error",
-        description: "No se pudo encontrar el contenido del reporte para exportar.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    try {
-        const canvas = await html2canvas(input, {
-            scale: 2,
-            useCORS: true
-        });
-        const imgData = canvas.toDataURL('image/png');
-        const pdf = new jsPDF('p', 'mm', 'a4');
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pdfHeight = pdf.internal.pageSize.getHeight();
-        const canvasWidth = canvas.width;
-        const canvasHeight = canvas.height;
-        const ratio = canvasWidth / canvasHeight;
-        let imgWidth = pdfWidth;
-        let imgHeight = imgWidth / ratio;
-
-        if (imgHeight > pdfHeight) {
-            imgHeight = pdfHeight;
-            imgWidth = imgHeight * ratio;
-        }
-        
-        const xOffset = (pdfWidth - imgWidth) / 2;
-        const yOffset = (pdfHeight - imgHeight) / 2;
-
-        pdf.addImage(imgData, 'PNG', xOffset, yOffset, imgWidth, imgHeight);
-        pdf.save(`reporte_semanal_${format(currentWeekStart, 'yyyy-MM-dd')}.pdf`);
-         toast({
-            title: "Exportación Exitosa",
-            description: "El reporte detallado ha sido guardado como PDF."
-        });
-    } catch (error) {
-        console.error("Error al exportar a PDF:", error);
-        toast({
-            title: "Error de Exportación",
-            description: "Ocurrió un error al intentar generar el PDF.",
-            variant: "destructive"
-        });
-    }
-  };
-
 
   const handleGenerateReport = async () => {
     setIsLoading(true);
@@ -205,8 +136,6 @@ export default function ReportPage() {
       const sortedReplenishments = [...allWholeMilkReplenishments].sort((a,b) => parseISO(b.date).getTime() - parseISO(a.date).getTime());
       const latestMilkPrice = sortedReplenishments.length > 0 ? sortedReplenishments[0].pricePerSaco : 0;
 
-      const printableReportData = buildPrintableReportData(allProviders, deliveriesForWeek, productionForWeek, currentWeekStart, allClients, salesForWeek);
-
       setReportData({
         report: generatedReport,
         topProviderDeliveries,
@@ -220,7 +149,6 @@ export default function ReportPage() {
         avgTransformationIndex,
         topProviderName,
         topClientName,
-        printableReportData
       });
       
     } catch (error) {
@@ -256,17 +184,10 @@ export default function ReportPage() {
           Volver al Panel
         </Link>
         <h1 className="text-2xl md:text-3xl font-bold text-primary flex items-center order-first sm:order-none mx-auto sm:mx-0">
-          <FileText className="mr-3 h-8 w-8" />
-          Reporte Semanal
+          <Cpu className="mr-3 h-8 w-8" />
+          Reporte AI
         </h1>
-        <div className="flex items-center gap-2">
-            {reportData && (
-                 <Button onClick={handleExportPDF} variant="outline" className="bg-accent text-accent-foreground hover:bg-accent/90">
-                    <Download className="mr-2 h-4 w-4" />
-                    <span className="hidden sm:inline">Exportar</span>
-                </Button>
-            )}
-        </div>
+        <div className="w-0 sm:w-auto"></div>
       </header>
 
       <main className="flex-grow flex flex-col items-center">
@@ -274,7 +195,7 @@ export default function ReportPage() {
           <CardHeader>
             <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
               <div className="text-center sm:text-left">
-                <CardTitle>Generador de Reportes</CardTitle>
+                <CardTitle>Generador de Reportes de IA</CardTitle>
                 <CardDescription>{weekTitle}</CardDescription>
               </div>
               <div className="flex items-center gap-2">
@@ -301,7 +222,7 @@ export default function ReportPage() {
               ) : (
                 <>
                   <Sparkles className="mr-2 h-4 w-4" />
-                  Generar Reporte
+                  Generar Reporte con IA
                 </>
               )}
             </Button>
@@ -311,11 +232,6 @@ export default function ReportPage() {
         <div className="w-full max-w-5xl mt-8">
             {isLoading && <LoadingSkeleton />}
             {reportData && <ReportDisplay data={reportData} setDialogData={setDialogData} />}
-            {reportData && (
-                <div className="mt-8">
-                    <PrintableReport ref={printableReportRef} data={reportData.printableReportData} />
-                </div>
-            )}
         </div>
       </main>
       
@@ -401,328 +317,6 @@ const ReportDisplay = ({ data, setDialogData }: { data: ReportDataBundle, setDia
     </Card>
   );
 }
-
-const buildPrintableReportData = (
-    allProviders: Provider[], 
-    deliveriesForWeek: Delivery[], 
-    productionForWeek: Production[], 
-    currentWeekStart: Date,
-    allClients: Client[],
-    salesForWeek: Sale[]
-): PrintableReportData => {
-    const providerTotalsMap = allProviders.reduce((acc, provider) => {
-        acc[provider.name] = { totalQuantity: 0, price: provider.price };
-        return acc;
-    }, {} as Record<string, { totalQuantity: number, price: number }>);
-
-    deliveriesForWeek.forEach(d => {
-        if (providerTotalsMap[d.providerName]) {
-            providerTotalsMap[d.providerName].totalQuantity += d.quantity;
-        }
-    });
-
-    const providerTotals = Object.entries(providerTotalsMap).map(([name, data]) => ({
-        name,
-        quantity: data.totalQuantity,
-        price: data.price,
-        totalToPay: data.totalQuantity * data.price,
-    })).filter(p => p.quantity > 0);
-
-    const totalToPayLucio = providerTotals.find(p => p.name.toLowerCase() === 'lucio')?.totalToPay || 0;
-    const totalToPayOthers = providerTotals.filter(p => p.name.toLowerCase() !== 'lucio').reduce((sum, p) => sum + p.totalToPay, 0);
-
-    const stockUsageHistory = productionForWeek.filter(p => p.wholeMilkKilos > 0);
-
-    const clientSummaryMap = allClients.reduce((acc, client) => {
-        acc[client.id] = { name: client.name, totalBought: 0, totalPaid: 0 };
-        return acc;
-    }, {} as Record<string, { name: string, totalBought: number, totalPaid: number }>);
-
-    salesForWeek.forEach(sale => {
-        if (clientSummaryMap[sale.clientId]) {
-            clientSummaryMap[sale.clientId].totalBought += sale.totalAmount;
-            clientSummaryMap[sale.clientId].totalPaid += sale.payments.reduce((sum, p) => sum + p.amount, 0);
-        }
-    });
-
-    const clientWeeklySummary = Object.values(clientSummaryMap)
-      .map(client => ({
-        ...client,
-        debt: client.totalBought - client.totalPaid,
-      }))
-      .filter(c => c.totalBought > 0);
-
-    const COLORS = ["hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))", "hsl(var(--chart-5))"];
-    const chartConfig = allProviders.reduce((config, provider, index) => {
-        config[provider.name] = {
-            label: provider.name,
-            color: COLORS[index % COLORS.length],
-        };
-        return config;
-    }, {} as ChartConfig);
-
-    const weekDays = eachDayOfInterval({start: currentWeekStart, end: endOfWeek(currentWeekStart, {weekStartsOn: 0})});
-    const dataMap = new Map<string, { date: string, [key: string]: number | string }>();
-
-    weekDays.forEach(d => {
-        const label = capitalize(format(d, 'EEEE', { locale: es }));
-        const initialEntry: { date: string, [key: string]: any } = { date: label };
-        allProviders.forEach(p => initialEntry[p.name] = 0);
-        dataMap.set(label, initialEntry);
-    });
-
-    deliveriesForWeek.forEach(delivery => {
-        const label = capitalize(format(parseISO(delivery.date), 'EEEE', { locale: es }));
-        const entry = dataMap.get(label);
-        if (entry) {
-            entry[delivery.providerName] = (entry[delivery.providerName] as number || 0) + delivery.quantity;
-        }
-    });
-
-    return {
-        weekTitle: `Semana del ${format(currentWeekStart, "dd 'de' MMMM", { locale: es })}`,
-        providerTotals,
-        totalToPayLucio,
-        totalToPayOthers,
-        productionHistory: productionForWeek.sort((a, b) => parseISO(a.date).getTime() - parseISO(b.date).getTime()),
-        stockUsageHistory: stockUsageHistory.sort((a, b) => parseISO(a.date).getTime() - parseISO(b.date).getTime()),
-        clientWeeklySummary,
-        chartData: Array.from(dataMap.values()),
-        chartConfig,
-    };
-};
-
-const PrintableReport = React.forwardRef<HTMLDivElement, { data: PrintableReportData }>(({ data }, ref) => {
-    const { weekTitle, providerTotals, totalToPayLucio, totalToPayOthers, productionHistory, stockUsageHistory, clientWeeklySummary, chartData, chartConfig } = data;
-    const hasProviderData = providerTotals.length > 0;
-    const hasProductionData = productionHistory.length > 0;
-    const hasStockUsageData = stockUsageHistory.length > 0;
-    const hasClientSummaryData = clientWeeklySummary.length > 0;
-    const hasChartData = chartData.some(row => Object.keys(row).some(key => key !== 'date' && (row[key as keyof typeof row] as number) > 0));
-
-    return (
-        <div ref={ref} className="bg-white text-black p-4 sm:p-8 shadow-2xl rounded-lg printable-container print:shadow-none">
-            <style jsx global>{`
-                .printable-container h2 {
-                    font-size: 1.25rem;
-                    font-weight: bold;
-                    color: #333;
-                    border-bottom: 2px solid #eee;
-                    padding-bottom: 0.5rem;
-                    margin-top: 1.5rem;
-                    margin-bottom: 1rem;
-                }
-                .printable-container h1 {
-                    font-size: 1.75rem;
-                    font-weight: bold;
-                    color: #111;
-                    text-align: center;
-                }
-                 .printable-container table {
-                    width: 100%;
-                    border-collapse: collapse;
-                    font-size: 0.8rem;
-                }
-                .printable-container th, .printable-container td {
-                    border: 1px solid #ddd;
-                    padding: 8px;
-                    text-align: left;
-                }
-                .printable-container th {
-                    background-color: #f2f2f2;
-                    font-weight: bold;
-                }
-                .recharts-wrapper {
-                    font-size: 12px;
-                }
-                .two-column-grid {
-                    display: grid;
-                    grid-template-columns: 1fr; /* Default to single column */
-                    gap: 1.5rem;
-                    align-items: start;
-                }
-                .table-compact th, .table-compact td {
-                    padding: 4px;
-                    font-size: 0.75rem;
-                }
-
-                @media (min-width: 640px) { /* sm breakpoint for two columns */
-                    .two-column-grid {
-                        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-                    }
-                }
-
-                @media print {
-                  body * {
-                    visibility: hidden;
-                  }
-                  .printable-container, .printable-container * {
-                    visibility: visible;
-                  }
-                  .printable-container {
-                    position: absolute;
-                    left: 0;
-                    top: 0;
-                    width: 100%;
-                    max-width: none;
-                    margin: 0;
-                    padding: 20px !important;
-                    box-shadow: none !important;
-                    border: none;
-                  }
-                }
-            `}</style>
-            
-            <header className="text-center mb-8">
-                <h1 className="text-xl sm:text-3xl font-bold">Reporte Semanal Detallado</h1>
-                <p className="text-md sm:text-lg text-gray-600">{weekTitle}</p>
-            </header>
-
-            <section>
-                <h2>Totales por Proveedor</h2>
-                {hasProviderData ? (
-                    <div className="overflow-x-auto">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Proveedor</TableHead>
-                                    <TableHead className="text-right">Cantidad</TableHead>
-                                    <TableHead className="text-right">Precio</TableHead>
-                                    <TableHead className="text-right">Total a Pagar</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {providerTotals.map(p => (
-                                    <TableRow key={p.name}>
-                                        <TableCell className={p.name.toLowerCase() === 'lucio' ? 'font-bold' : ''}>{p.name}</TableCell>
-                                        <TableCell className="text-right">{p.quantity.toFixed(2)}</TableCell>
-                                        <TableCell className="text-right">S/. {p.price.toFixed(2)}</TableCell>
-                                        <TableCell className="text-right font-semibold">{p.name.toLowerCase() === 'lucio' ? `S/. ${p.totalToPay.toFixed(2)}` : `S/. ${p.totalToPay.toFixed(2)}`}</TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                            <TableFoot>
-                                <TableRow>
-                                    <TableCell colSpan={3} className="text-right font-bold">Total a Pagar (Lucio):</TableCell>
-                                    <TableCell className="text-right font-bold">S/. {totalToPayLucio.toFixed(2)}</TableCell>
-                                </TableRow>
-                                <TableRow>
-                                    <TableCell colSpan={3} className="text-right font-bold">Total a Pagar (Otros):</TableCell>
-                                    <TableCell className="text-right font-bold">S/. {totalToPayOthers.toFixed(2)}</TableCell>
-                                </TableRow>
-                            </TableFoot>
-                        </Table>
-                    </div>
-                ) : <p className="text-gray-500">No hay datos de proveedores para esta semana.</p>}
-            </section>
-            
-            <section>
-                <h2>Historial de Producción</h2>
-                {hasProductionData ? (
-                    <div className="overflow-x-auto">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Fecha</TableHead>
-                                    <TableHead className="text-right">Materia Prima Total</TableHead>
-                                    <TableHead className="text-right">Unidades Prod.</TableHead>
-                                    <TableHead className="text-right">Índice</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {productionHistory.map(p => (
-                                    <TableRow key={p.id}>
-                                        <TableCell>{capitalize(format(parseISO(p.date), 'EEEE, dd/MM', { locale: es }))}</TableCell>
-                                        <TableCell className="text-right">{(p.rawMaterialLiters + (p.wholeMilkKilos * 10)).toFixed(2)} L</TableCell>
-                                        <TableCell className="text-right">{p.producedUnits}</TableCell>
-                                        <TableCell className={`text-right ${p.transformationIndex >= 0 ? 'text-green-600' : 'text-red-600'}`}>{p.transformationIndex.toFixed(2)}%</TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </div>
-                ) : <p className="text-gray-500">No hay datos de producción para esta semana.</p>}
-            </section>
-
-             <section className="two-column-grid">
-                <div>
-                    <h2>Uso de Leche Entera</h2>
-                    {hasStockUsageData ? (
-                        <div className="overflow-x-auto">
-                            <Table className="table-compact">
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Fecha de Uso</TableHead>
-                                        <TableHead className="text-right">Kilos Usados</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {stockUsageHistory.map(p => (
-                                        <TableRow key={p.id}>
-                                            <TableCell>{capitalize(format(parseISO(p.date), 'EEE, dd/MM', { locale: es }))}</TableCell>
-                                            <TableCell className="text-right">{p.wholeMilkKilos.toFixed(2)} kg</TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </div>
-                    ) : <p className="text-gray-500">No se usó leche entera esta semana.</p>}
-                </div>
-                <div>
-                    <h2>Resumen de Clientes</h2>
-                    {hasClientSummaryData ? (
-                        <div className="overflow-x-auto">
-                            <Table className="table-compact">
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Cliente</TableHead>
-                                        <TableHead className="text-right">T. Comprado</TableHead>
-                                        <TableHead className="text-right">T. Pagado</TableHead>
-                                        <TableHead className="text-right">Deuda</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {clientWeeklySummary.map(c => (
-                                        <TableRow key={c.name}>
-                                            <TableCell>{c.name}</TableCell>
-                                            <TableCell className="text-right">S/. {c.totalBought.toFixed(2)}</TableCell>
-                                            <TableCell className="text-right">S/. {c.totalPaid.toFixed(2)}</TableCell>
-                                            <TableCell className="text-right">S/. {c.debt.toFixed(2)}</TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </div>
-                    ) : <p className="text-gray-500">No hay ventas registradas esta semana.</p>}
-                </div>
-             </section>
-
-            <section>
-                <h2>Gráfico de Entregas por Proveedor</h2>
-                {hasChartData ? (
-                    <div className="w-full h-[300px] sm:h-[400px] mt-4">
-                        <ChartContainer config={chartConfig} className="min-h-[300px] w-full">
-                            <ResponsiveContainer width="100%" height={350}>
-                                <LineChart data={chartData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="date" tick={{fontSize: 10}} />
-                                    <YAxis tick={{fontSize: 10}} />
-                                    <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #ccc' }}/>
-                                    <Legend wrapperStyle={{fontSize: '10px'}}/>
-                                    {Object.keys(chartConfig).map(key => (
-                                        <Line key={key} type="monotone" dataKey={key} stroke={chartConfig[key].color} strokeWidth={2} dot={false}/>
-                                    ))}
-                                </LineChart>
-                            </ResponsiveContainer>
-                        </ChartContainer>
-                    </div>
-                ) : <p className="text-gray-500">No hay datos suficientes para mostrar el gráfico.</p>}
-            </section>
-        </div>
-    );
-});
-PrintableReport.displayName = 'PrintableReport';
-
 
 const ReportDialog = ({ isOpen, onClose, dialogData }: { isOpen: boolean, onClose: () => void, dialogData: DialogDataType }) => {
   const { type, title, data } = dialogData;
