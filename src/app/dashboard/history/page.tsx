@@ -86,6 +86,41 @@ export default function HistoryPage() {
       setCurrentWeekStart(prev => addDays(prev!, 7));
     }
   };
+  
+  // Data for "Totales por Proveedor" - Moved up to respect Rules of Hooks
+  const vendorTotalsForWeek = useMemo(() => {
+    if (!currentWeekStart) return [];
+
+    // Standard week (e.g., Sunday to Saturday)
+    const standardWeekStart = startOfWeek(currentWeekStart, { weekStartsOn: 0 });
+    const standardWeekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 0 });
+
+    // Lucio's week (Saturday to Friday)
+    const lucioWeekStart = startOfWeek(currentWeekStart, { weekStartsOn: 6 });
+    const lucioWeekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 6 });
+
+    return providers.map(provider => {
+        const isLucio = provider.name.toLowerCase() === 'lucio';
+        const weekInterval = isLucio
+            ? { start: lucioWeekStart, end: lucioWeekEnd }
+            : { start: standardWeekStart, end: standardWeekEnd };
+            
+        const deliveriesForProviderInCycle = deliveries.filter(d => {
+            if (d.providerName !== provider.name) return false;
+            const deliveryDate = parseISO(d.date);
+            return isWithinInterval(deliveryDate, weekInterval);
+        });
+
+        const totalQuantity = deliveriesForProviderInCycle.reduce((sum, d) => sum + d.quantity, 0);
+
+        return {
+            providerName: provider.name,
+            totalQuantity,
+            price: provider.price,
+            totalToPay: totalQuantity * provider.price,
+        };
+    }).filter(v => v.totalQuantity > 0);
+  }, [providers, deliveries, currentWeekStart]);
 
   if (!isClient || !currentWeekStart) {
     return (
@@ -139,42 +174,6 @@ export default function HistoryPage() {
       .reduce((sum, d) => sum + d.quantity, 0);
     return { date, total };
   }).filter(d => d.total > 0);
-
-  // Data for "Totales por Proveedor"
-  const vendorTotalsForWeek = useMemo(() => {
-    if (!currentWeekStart) return [];
-
-    // Standard week (e.g., Sunday to Saturday)
-    const standardWeekStart = startOfWeek(currentWeekStart, { weekStartsOn: 0 });
-    const standardWeekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 0 });
-
-    // Lucio's week (Saturday to Friday)
-    const lucioWeekStart = startOfWeek(currentWeekStart, { weekStartsOn: 6 });
-    const lucioWeekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 6 });
-
-    return providers.map(provider => {
-        const isLucio = provider.name.toLowerCase() === 'lucio';
-        const weekInterval = isLucio
-            ? { start: lucioWeekStart, end: lucioWeekEnd }
-            : { start: standardWeekStart, end: standardWeekEnd };
-            
-        const deliveriesForProviderInCycle = deliveries.filter(d => {
-            if (d.providerName !== provider.name) return false;
-            const deliveryDate = parseISO(d.date);
-            return isWithinInterval(deliveryDate, weekInterval);
-        });
-
-        const totalQuantity = deliveriesForProviderInCycle.reduce((sum, d) => sum + d.quantity, 0);
-
-        return {
-            providerName: provider.name,
-            totalQuantity,
-            price: provider.price,
-            totalToPay: totalQuantity * provider.price,
-        };
-    }).filter(v => v.totalQuantity > 0);
-  }, [providers, deliveries, currentWeekStart]);
-
 
   const grandTotalToPay = vendorTotalsForWeek.reduce((sum, row) => sum + row.totalToPay, 0);
 
