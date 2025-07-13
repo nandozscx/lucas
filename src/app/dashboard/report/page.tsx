@@ -7,9 +7,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter as TableFoot } from '@/components/ui/table';
-import { ArrowLeft, Sparkles, TrendingUp, UserCheck, PackageCheck, Archive, Wallet, Milk, Download, FileText, ChevronLeft, ChevronRight } from 'lucide-react';
-import { LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { ArrowLeft, Sparkles, TrendingUp, UserCheck, PackageCheck, Archive, Wallet, Milk, Download, FileText, ChevronLeft, ChevronRight, BarChartHorizontal } from 'lucide-react';
+import { LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 
 import type { Delivery, Provider, Production, Sale, Client, WholeMilkReplenishment, WeeklyReportOutput } from '@/types';
 import { startOfWeek, endOfWeek, subDays, isWithinInterval, parseISO, format, eachDayOfInterval, addDays } from 'date-fns';
@@ -34,7 +35,7 @@ type ReportDataBundle = {
   report: WeeklyReportOutput;
   topProviderDeliveries: Delivery[];
   topClientSales: Sale[];
-  salesHistory: { week: number; total: number }[];
+  salesTrendData: {name: string, value: number}[];
   stockUsage: Production[];
   latestMilkPrice: number;
   avgTransformationIndex: number;
@@ -55,11 +56,17 @@ type PrintableReportData = {
     chartConfig: ChartConfig;
 };
 
+type DialogDataType = {
+  type: 'provider' | 'client' | 'sales' | 'stock';
+  title: string;
+  data: any;
+};
 
 export default function ReportPage() {
   const [reportData, setReportData] = useState<ReportDataBundle | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(startOfWeek(new Date(), { weekStartsOn: 0 }));
+  const [dialogData, setDialogData] = useState<DialogDataType | null>(null);
   const { toast } = useToast();
   const printableReportRef = useRef<HTMLDivElement>(null);
 
@@ -164,13 +171,13 @@ export default function ReportPage() {
       const totalUsedKilos = allProduction.reduce((sum, p) => sum + (p.wholeMilkKilos || 0), 0);
       const stockInSacos = totalReplenishedSacos - (totalUsedKilos / 25);
 
-      let salesTrendPercentage = 0;
       const previousWeekStart = subDays(currentWeekStart, 7);
       const previousWeekEnd = subDays(weekEnd, 7);
       const previousWeekSales = allSales.filter(s => isWithinInterval(parseISO(s.date), { start: previousWeekStart, end: previousWeekEnd }));
-      const previousWeekTotalSales = previousWeekSales.reduce((sum, s) => sum + s.totalAmount, 0);
       const currentWeekTotalSales = salesForWeek.reduce((sum, s) => sum + s.totalAmount, 0);
-
+      const previousWeekTotalSales = previousWeekSales.reduce((sum, s) => sum + s.totalAmount, 0);
+      
+      let salesTrendPercentage = 0;
       if (previousWeekTotalSales > 0) {
         salesTrendPercentage = ((currentWeekTotalSales - previousWeekTotalSales) / previousWeekTotalSales) * 100;
       }
@@ -180,16 +187,6 @@ export default function ReportPage() {
       const validIndices = productionForWeek.filter(p => p.transformationIndex !== 0 && isFinite(p.transformationIndex));
       const avgTransformationIndex = validIndices.length > 0 ? validIndices.reduce((sum, p) => sum + p.transformationIndex, 0) / validIndices.length : 0;
       
-      const salesHistoryForChart: { week: number, total: number }[] = [];
-      for (let i = 4; i >= 1; i--) {
-        const weekStart = subDays(currentWeekStart, 7 * i);
-        const weekEnd = subDays(currentWeekStart, (7 * i) - 6);
-        const weeklySales = allSales.filter(s => isWithinInterval(parseISO(s.date), { start: weekStart, end: weekEnd }));
-        const total = weeklySales.reduce((sum, s) => sum + s.totalAmount, 0);
-        salesHistoryForChart.push({ week: -i, total });
-      }
-      salesHistoryForChart.push({ week: 0, total: currentWeekTotalSales });
-
       const generatedReport: WeeklyReportOutput = {
         summary: `La semana se recibieron ${totalRawMaterial.toFixed(2)} L de materia prima y se produjeron ${totalUnitsProduced} unidades, con un índice de transformación promedio de ${avgTransformationIndex.toFixed(2)}%.`,
         topProviderSummary: `${topProviderName} fue el proveedor más destacado con ${topProviderTotal.toFixed(2)} L.`,
@@ -214,7 +211,10 @@ export default function ReportPage() {
         report: generatedReport,
         topProviderDeliveries,
         topClientSales,
-        salesHistory: salesHistoryForChart,
+        salesTrendData: [
+            { name: 'Semana Anterior', value: previousWeekTotalSales },
+            { name: 'Esta Semana', value: currentWeekTotalSales }
+        ],
         stockUsage: productionForWeek.filter(p => p.wholeMilkKilos > 0),
         latestMilkPrice,
         avgTransformationIndex,
@@ -310,7 +310,7 @@ export default function ReportPage() {
 
         <div className="w-full max-w-5xl mt-8">
             {isLoading && <LoadingSkeleton />}
-            {reportData && <ReportDisplay data={reportData} />}
+            {reportData && <ReportDisplay data={reportData} setDialogData={setDialogData} />}
             {reportData && (
                 <div className="mt-8">
                     <PrintableReport ref={printableReportRef} data={reportData.printableReportData} />
@@ -318,38 +318,56 @@ export default function ReportPage() {
             )}
         </div>
       </main>
+      
+      {dialogData && (
+        <ReportDialog
+          isOpen={!!dialogData}
+          onClose={() => setDialogData(null)}
+          dialogData={dialogData}
+        />
+      )}
     </div>
   );
 }
 
 
-const ReportDisplay = ({ data }: { data: ReportDataBundle }) => {
-  const { report, topProviderDeliveries, topClientSales, salesHistory, stockUsage, latestMilkPrice, avgTransformationIndex, topProviderName, topClientName } = data;
+const ReportDisplay = ({ data, setDialogData }: { data: ReportDataBundle, setDialogData: (data: DialogDataType | null) => void }) => {
+  const { report, topProviderDeliveries, topClientSales, salesTrendData, stockUsage, latestMilkPrice, avgTransformationIndex, topProviderName, topClientName } = data;
 
-  const now = new Date();
-  const currentWeekStart = startOfWeek(now, { weekStartsOn: 0 });
-  const weekDays = eachDayOfInterval({start: currentWeekStart, end: endOfWeek(now, {weekStartsOn: 0})});
-
-  const providerDailyData = weekDays.map(day => {
-      const dateStr = format(day, 'yyyy-MM-dd');
-      const total = topProviderDeliveries
-          .filter(d => d.date === dateStr)
-          .reduce((sum, d) => sum + d.quantity, 0);
-      return { date: day, total };
-  });
-  const providerTotal = providerDailyData.reduce((sum, d) => sum + d.total, 0);
-  
-  const clientTotalSales = topClientSales.reduce((sum, sale) => sum + sale.totalAmount, 0);
-  const clientTotalPaid = topClientSales.reduce((sum, sale) => sum + sale.payments.reduce((pSum, p) => pSum + p.amount, 0), 0);
-
-  const salesChartData = salesHistory.map(item => ({
-    name: item.week === 0 ? 'Esta Semana' : `Semana ${item.week}`,
-    Ventas: item.total
-  }));
-
-  const totalKilosUsed = stockUsage.reduce((sum, p) => sum + (p.wholeMilkKilos || 0), 0);
-  const costToReplenish = (totalKilosUsed / 25) * latestMilkPrice;
-  const profitFromMilk = costToReplenish * (avgTransformationIndex / 100);
+  const cardItems = [
+    { 
+      type: 'provider',
+      title: 'Proveedor Destacado', 
+      icon: PackageCheck, 
+      color: 'text-green-500', 
+      summary: report.topProviderSummary,
+      data: { topProviderDeliveries, topProviderName }
+    },
+    { 
+      type: 'client',
+      title: 'Cliente Principal', 
+      icon: UserCheck, 
+      color: 'text-blue-500', 
+      summary: report.topClientSummary,
+      data: { topClientSales, topClientName }
+    },
+    { 
+      type: 'sales',
+      title: 'Tendencia de Ventas', 
+      icon: TrendingUp, 
+      color: 'text-yellow-500', 
+      summary: report.salesTrendSummary,
+      data: salesTrendData
+    },
+    { 
+      type: 'stock',
+      title: 'Estado del Stock (L. Entera)', 
+      icon: Archive, 
+      color: 'text-purple-500', 
+      summary: report.stockStatusSummary,
+      data: { stockUsage, latestMilkPrice, avgTransformationIndex }
+    },
+  ];
 
   return (
     <Card className="shadow-lg animate-in fade-in-50">
@@ -359,44 +377,26 @@ const ReportDisplay = ({ data }: { data: ReportDataBundle }) => {
                 Resumen de la Semana
             </CardTitle>
             <CardDescription>
-                Análisis de la operación para la semana seleccionada.
+                {report.summary}
             </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6 text-sm">
-            <p className="italic text-muted-foreground">{report.summary}</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="flex items-start gap-3 rounded-lg border p-3">
-                    <PackageCheck className="h-6 w-6 text-green-500 mt-1 flex-shrink-0" />
-                    <div>
-                        <h4 className="font-semibold">Proveedor Destacado</h4>
-                        <p className="text-muted-foreground">{report.topProviderSummary}</p>
-                    </div>
-                </div>
-
-                <div className="flex items-start gap-3 rounded-lg border p-3">
-                    <UserCheck className="h-6 w-6 text-blue-500 mt-1 flex-shrink-0" />
-                    <div>
-                        <h4 className="font-semibold">Cliente Principal</h4>
-                        <p className="text-muted-foreground">{report.topClientSummary}</p>
-                    </div>
-                </div>
-                
-               <div className="flex items-start gap-3 rounded-lg border p-3">
-                    <TrendingUp className="h-6 w-6 text-yellow-500 mt-1 flex-shrink-0" />
-                    <div>
-                        <h4 className="font-semibold">Tendencia de Ventas</h4>
-                        <p className="text-muted-foreground">{report.salesTrendSummary}</p>
-                    </div>
-                </div>
-
-                <div className="flex items-start gap-3 rounded-lg border p-3">
-                    <Archive className="h-6 w-6 text-purple-500 mt-1 flex-shrink-0" />
-                    <div>
-                        <h4 className="font-semibold">Estado del Stock (L. Entera)</h4>
-                        <p className="text-muted-foreground">{report.stockStatusSummary}</p>
-                    </div>
-                </div>
-            </div>
+        <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+            {cardItems.map((item) => {
+              const Icon = item.icon;
+              return(
+                <button
+                  key={item.title}
+                  onClick={() => setDialogData({ type: item.type as DialogDataType['type'], title: item.title, data: item.data })}
+                  className="flex items-start gap-3 rounded-lg border p-3 text-left hover:bg-muted/50 transition-colors"
+                >
+                  <Icon className={`h-6 w-6 ${item.color} mt-1 flex-shrink-0`} />
+                  <div>
+                      <h4 className="font-semibold">{item.title}</h4>
+                      <p className="text-muted-foreground">{item.summary}</p>
+                  </div>
+                </button>
+              )
+            })}
         </CardContent>
     </Card>
   );
@@ -501,16 +501,10 @@ const PrintableReport = React.forwardRef<HTMLDivElement, { data: PrintableReport
     const hasChartData = chartData.some(row => Object.keys(row).some(key => key !== 'date' && (row[key as keyof typeof row] as number) > 0));
 
     return (
-        <div ref={ref} className="bg-white text-black p-4 sm:p-8 shadow-2xl rounded-lg printable-container">
+        <div ref={ref} className="bg-white text-black p-4 sm:p-8 shadow-2xl rounded-lg printable-container print:shadow-none">
             <style jsx global>{`
-                .printable-container {
-                    width: 100%;
-                    max-width: 210mm; /* A4 width for larger screens */
-                    margin: auto;
-                    font-family: Arial, sans-serif;
-                }
                 .printable-container h2 {
-                    font-size: 1.25rem; /* 20px */
+                    font-size: 1.25rem;
                     font-weight: bold;
                     color: #333;
                     border-bottom: 2px solid #eee;
@@ -519,7 +513,7 @@ const PrintableReport = React.forwardRef<HTMLDivElement, { data: PrintableReport
                     margin-bottom: 1rem;
                 }
                 .printable-container h1 {
-                    font-size: 1.75rem; /* 28px */
+                    font-size: 1.75rem;
                     font-weight: bold;
                     color: #111;
                     text-align: center;
@@ -543,13 +537,19 @@ const PrintableReport = React.forwardRef<HTMLDivElement, { data: PrintableReport
                 }
                 .two-column-grid {
                     display: grid;
-                    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+                    grid-template-columns: 1fr; /* Default to single column */
                     gap: 1.5rem;
                     align-items: start;
                 }
                 .table-compact th, .table-compact td {
                     padding: 4px;
                     font-size: 0.75rem;
+                }
+
+                @media (min-width: 640px) { /* sm breakpoint for two columns */
+                    .two-column-grid {
+                        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+                    }
                 }
 
                 @media print {
@@ -566,8 +566,8 @@ const PrintableReport = React.forwardRef<HTMLDivElement, { data: PrintableReport
                     width: 100%;
                     max-width: none;
                     margin: 0;
-                    padding: 0;
-                    box-shadow: none;
+                    padding: 20px !important;
+                    box-shadow: none !important;
                     border: none;
                   }
                 }
@@ -597,7 +597,7 @@ const PrintableReport = React.forwardRef<HTMLDivElement, { data: PrintableReport
                                         <TableCell className={p.name.toLowerCase() === 'lucio' ? 'font-bold' : ''}>{p.name}</TableCell>
                                         <TableCell className="text-right">{p.quantity.toFixed(2)}</TableCell>
                                         <TableCell className="text-right">S/. {p.price.toFixed(2)}</TableCell>
-                                        <TableCell className="text-right">S/. {p.totalToPay.toFixed(2)}</TableCell>
+                                        <TableCell className="text-right font-semibold">{p.name.toLowerCase() === 'lucio' ? `S/. ${p.totalToPay.toFixed(2)}` : `S/. ${p.totalToPay.toFixed(2)}`}</TableCell>
                                     </TableRow>
                                 ))}
                             </TableBody>
@@ -721,5 +721,103 @@ const PrintableReport = React.forwardRef<HTMLDivElement, { data: PrintableReport
         </div>
     );
 });
-
 PrintableReport.displayName = 'PrintableReport';
+
+
+const ReportDialog = ({ isOpen, onClose, dialogData }: { isOpen: boolean, onClose: () => void, dialogData: DialogDataType }) => {
+  const { type, title, data } = dialogData;
+
+  const renderContent = () => {
+    switch (type) {
+      case 'provider':
+        return (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Fecha</TableHead>
+                <TableHead className="text-right">Cantidad (L)</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {data.topProviderDeliveries.length > 0 ? data.topProviderDeliveries.map((d: Delivery) => (
+                <TableRow key={d.id}>
+                  <TableCell>{capitalize(format(parseISO(d.date), 'EEEE, dd/MM', { locale: es }))}</TableCell>
+                  <TableCell className="text-right">{d.quantity.toLocaleString()}</TableCell>
+                </TableRow>
+              )) : (
+                <TableRow><TableCell colSpan={2} className="text-center">No hay entregas registradas.</TableCell></TableRow>
+              )}
+            </TableBody>
+          </Table>
+        );
+      case 'client':
+        const totalPaid = data.topClientSales.reduce((sum: number, sale: Sale) => sum + sale.payments.reduce((pSum, p) => pSum + p.amount, 0), 0);
+        const totalAmount = data.topClientSales.reduce((sum: number, sale: Sale) => sum + sale.totalAmount, 0);
+        const debt = totalAmount - totalPaid;
+        return (
+          <div className="space-y-2">
+            <div className="flex justify-between"><span>Total Comprado:</span> <span className="font-medium">S/. {totalAmount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span></div>
+            <div className="flex justify-between"><span>Total Pagado:</span> <span className="font-medium text-green-500">S/. {totalPaid.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span></div>
+            <div className="flex justify-between"><span>Deuda de la Semana:</span> <span className="font-medium text-destructive">S/. {debt.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span></div>
+          </div>
+        );
+      case 'sales':
+        return (
+          <div className="w-full h-[200px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={data} layout="vertical" margin={{ left: 20 }}>
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                <XAxis type="number" />
+                <YAxis type="category" dataKey="name" width={100} tickLine={false} axisLine={false} />
+                <Tooltip cursor={{fill: 'hsl(var(--muted))'}} contentStyle={{ backgroundColor: 'hsl(var(--background))' }} />
+                <Bar dataKey="value" name="Ventas" fill="hsl(var(--chart-1))" radius={[0, 4, 4, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        );
+      case 'stock':
+        const totalKilosUsed = data.stockUsage.reduce((sum: number, p: Production) => sum + p.wholeMilkKilos, 0);
+        const costToReplenish = (totalKilosUsed / 25) * data.latestMilkPrice;
+        return (
+           <div className="space-y-4">
+            <div className="flex justify-between text-sm"><span>Total Usado en la Semana:</span> <span className="font-medium">{totalKilosUsed.toLocaleString()} kg</span></div>
+            <div className="flex justify-between text-sm"><span>Costo de Reposición (aprox):</span> <span className="font-medium">S/. {costToReplenish.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span></div>
+            <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead>Fecha</TableHead>
+                        <TableHead className="text-right">Kilos Usados</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {data.stockUsage.length > 0 ? data.stockUsage.map((p: Production) => (
+                        <TableRow key={p.id}>
+                            <TableCell>{capitalize(format(parseISO(p.date), 'EEEE, dd/MM', { locale: es }))}</TableCell>
+                            <TableCell className="text-right">{p.wholeMilkKilos.toLocaleString()}</TableCell>
+                        </TableRow>
+                    )) : (
+                        <TableRow><TableCell colSpan={2} className="text-center">No se usó leche entera esta semana.</TableCell></TableRow>
+                    )}
+                </TableBody>
+            </Table>
+           </div>
+        );
+      default:
+        return <p>No hay detalles disponibles.</p>;
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>Detalles para la semana seleccionada.</DialogDescription>
+        </DialogHeader>
+        <div className="py-4">
+          {renderContent()}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
