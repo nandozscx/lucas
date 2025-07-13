@@ -8,16 +8,14 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, ChevronLeft, ChevronRight, Download, Printer, FileText } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, Download, Printer } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import type { Delivery, Provider, Production, Sale, Client, WholeMilkReplenishment } from '@/types';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
-import { format, startOfWeek, endOfWeek, subDays, addDays, isWithinInterval, parseISO, eachDayOfInterval } from 'date-fns';
+import { format, startOfWeek, endOfWeek, subDays, addDays, isWithinInterval, parseISO, startOfDay, getDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { capitalize } from '@/lib/utils';
-import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
-import { LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } from 'recharts';
 
 interface jsPDFWithAutoTable extends jsPDF {
   autoTable: (options: any) => jsPDF;
@@ -65,7 +63,7 @@ export default function ExportPage() {
 
   const handleExport = async () => {
     const {
-      deliveries, providers, production, sales, clients, wholeMilkReplenishments
+      deliveries, providers, production, sales, clients
     } = loadAllData();
 
     if (Object.values(reportOptions).every(o => !o)) {
@@ -115,7 +113,10 @@ export default function ExportPage() {
 
     if (reportOptions.providerTotals) {
       checkYPos(40);
-      const providerTotals = buildProviderTotals(providers, deliveriesForWeek);
+      const providerTotals = buildProviderTotals(providers, deliveries, currentWeekStart);
+      const lucioTotal = providerTotals.find(p => p.name.toLowerCase() === 'lucio')?.totalToPay || 0;
+      const otherProvidersTotal = providerTotals.filter(p => p.name.toLowerCase() !== 'lucio').reduce((sum, p) => sum + p.totalToPay, 0);
+
       doc.autoTable({
         head: [['Proveedor', 'Cantidad', 'Precio', 'Total a Pagar']],
         body: providerTotals.map(p => [p.name, p.quantity.toFixed(2), `S/. ${p.price.toFixed(2)}`, `S/. ${p.totalToPay.toFixed(2)}`]),
@@ -123,8 +124,8 @@ export default function ExportPage() {
         didDrawPage: (data) => { yPos = data.cursor?.y || yPos; },
         headStyles: { fillColor: [63, 81, 181] },
         foot: [
-            ['', '', 'Total (Lucio):', `S/. ${providerTotals.find(p => p.name.toLowerCase() === 'lucio')?.totalToPay.toFixed(2) || '0.00'}`],
-            ['', '', 'Total (Otros):', `S/. ${providerTotals.filter(p => p.name.toLowerCase() !== 'lucio').reduce((sum, p) => sum + p.totalToPay, 0).toFixed(2)}`],
+            ['', '', 'Total (Lucio):', `S/. ${lucioTotal.toFixed(2)}`],
+            ['', '', 'Total (Otros):', `S/. ${otherProvidersTotal.toFixed(2)}`],
         ],
         footStyles: { fontStyle: 'bold' }
       });
@@ -286,25 +287,38 @@ const loadAllData = () => {
     };
 };
 
-const buildProviderTotals = (allProviders: Provider[], deliveriesForWeek: Delivery[]) => {
-    const providerTotalsMap = allProviders.reduce((acc, provider) => {
-        acc[provider.name] = { totalQuantity: 0, price: provider.price };
-        return acc;
-    }, {} as Record<string, { totalQuantity: number, price: number }>);
+const buildProviderTotals = (allProviders: Provider[], allDeliveries: Delivery[], weekStart: Date) => {
+    // Standard week cycle (Sunday to Saturday)
+    const standardWeekStart = startOfWeek(weekStart, { weekStartsOn: 0 });
+    const standardWeekEnd = endOfWeek(weekStart, { weekStartsOn: 0 });
 
-    deliveriesForWeek.forEach(d => {
-        if (providerTotalsMap[d.providerName]) {
-            providerTotalsMap[d.providerName].totalQuantity += d.quantity;
-        }
+    // Lucio's week cycle (Saturday to Friday)
+    const lucioWeekStart = startOfWeek(weekStart, { weekStartsOn: 6 });
+    const lucioWeekEnd = endOfWeek(weekStart, { weekStartsOn: 6 });
+
+    const providerTotals = allProviders.map(provider => {
+        const isLucio = provider.name.toLowerCase() === 'lucio';
+        const cycle = isLucio ? { start: lucioWeekStart, end: lucioWeekEnd } : { start: standardWeekStart, end: standardWeekEnd };
+        
+        const deliveriesForProviderInCycle = allDeliveries.filter(d => {
+            if (d.providerName !== provider.name) return false;
+            const deliveryDate = parseISO(d.date);
+            return isWithinInterval(deliveryDate, cycle);
+        });
+
+        const totalQuantity = deliveriesForProviderInCycle.reduce((sum, d) => sum + d.quantity, 0);
+
+        return {
+            name: provider.name,
+            quantity: totalQuantity,
+            price: provider.price,
+            totalToPay: totalQuantity * provider.price,
+        };
     });
 
-    return Object.entries(providerTotalsMap).map(([name, data]) => ({
-        name,
-        quantity: data.totalQuantity,
-        price: data.price,
-        totalToPay: data.totalQuantity * data.price,
-    })).filter(p => p.quantity > 0);
+    return providerTotals.filter(p => p.quantity > 0);
 };
+
 
 const buildClientSummary = (allClients: Client[], salesForWeek: Sale[]) => {
     const clientSummaryMap = allClients.reduce((acc, client) => {

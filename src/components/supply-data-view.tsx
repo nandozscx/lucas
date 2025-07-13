@@ -17,12 +17,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Users, CalendarDays, Info, CalendarRange, ShoppingBag, Download } from 'lucide-react';
-import { format, parseISO, getDay, startOfWeek, endOfWeek, isWithinInterval, addDays } from 'date-fns';
+import { format, parseISO, getDay, startOfWeek, endOfWeek, isWithinInterval, addDays, nextSaturday, previousFriday } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useToast } from "@/hooks/use-toast";
 import { Button } from './ui/button';
 import { Skeleton } from './ui/skeleton';
 import { capitalize } from '@/lib/utils';
+import type jsPDF from 'jspdf';
+
 
 interface jsPDFWithAutoTable extends jsPDF {
   autoTable: (options: any) => jsPDF;
@@ -89,26 +91,41 @@ const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals
     parseISO(dateB).getTime() - parseISO(dateA).getTime()
   );
 
-  const weeklyVendorTotalsMap: Record<string, { totalQuantity: number }> = {};
-  deliveriesForCurrentWeek.forEach(delivery => {
-    if (!weeklyVendorTotalsMap[delivery.providerName]) {
-      weeklyVendorTotalsMap[delivery.providerName] = { totalQuantity: 0 };
-    }
-    weeklyVendorTotalsMap[delivery.providerName].totalQuantity += delivery.quantity;
-  });
+  const enrichedVendorTotalsForCurrentWeek = React.useMemo(() => {
+    const today = new Date();
+    // Standard week (e.g., Sunday to Saturday)
+    const standardWeekStart = startOfWeek(today, { weekStartsOn: 0 });
+    const standardWeekEnd = endOfWeek(today, { weekStartsOn: 0 });
+    // Lucio's week (Saturday to Friday)
+    const lucioWeekEnd = getDay(today) === 6 ? today : previousFriday(today); // If today is Saturday, it's the start of a new week for others, but end of an old one for Lucio
+    const lucioWeekStart = getDay(lucioWeekEnd) === 5 ? nextSaturday(subDays(lucioWeekEnd, 7)) : startOfWeek(lucioWeekEnd, { weekStartsOn: 6 });
 
-  const enrichedVendorTotalsForCurrentWeek = providers.map(provider => {
-      const vendorData = weeklyVendorTotalsMap[provider.name];
-      const totalQuantity = vendorData?.totalQuantity || 0;
-      const price = provider.price;
-      const totalToPay = totalQuantity * price;
-      return {
-          originalName: provider.name,
-          totalQuantity,
-          price,
-          totalToPay,
-      };
-  });
+
+    return providers.map(provider => {
+        const isLucio = provider.name.toLowerCase() === 'lucio';
+        const weekInterval = isLucio
+            ? { start: lucioWeekStart, end: lucioWeekEnd }
+            : { start: standardWeekStart, end: standardWeekEnd };
+            
+        const deliveriesForProviderInCycle = deliveries.filter(d => {
+            if (d.providerName !== provider.name) return false;
+            const deliveryDate = parseISO(d.date);
+            return isWithinInterval(deliveryDate, weekInterval);
+        });
+
+        const totalQuantity = deliveriesForProviderInCycle.reduce((sum, d) => sum + d.quantity, 0);
+        const price = provider.price;
+        const totalToPay = totalQuantity * price;
+
+        return {
+            originalName: provider.name,
+            totalQuantity,
+            price,
+            totalToPay,
+        };
+    });
+  }, [providers, deliveries]);
+
 
   const grandTotalToPay = enrichedVendorTotalsForCurrentWeek.reduce((sum, vendor) => sum + vendor.totalToPay, 0);
   
@@ -256,10 +273,6 @@ const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals
 
             <TabsContent value="vendorTotals">
                 <div className="flex justify-end mb-4">
-                <Button onClick={exportVendorTotalsToPDF} className="bg-accent text-accent-foreground hover:bg-accent/90">
-                    <Download className="mr-2 h-4 w-4" />
-                    Exportar a PDF
-                </Button>
                 </div>
                 {enrichedVendorTotalsForCurrentWeek.filter(v => v.totalQuantity > 0).length === 0 ? (
                 <EmptyState message="Los totales por proveedor para la semana actual se calcularán y mostrarán aquí." icon={Users}/>

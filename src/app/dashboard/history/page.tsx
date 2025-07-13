@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -18,7 +18,7 @@ import {
   TableRow,
   TableFooter
 } from "@/components/ui/table";
-import { format, parseISO, getDay, startOfWeek, endOfWeek, isWithinInterval, addDays, subDays } from 'date-fns';
+import { format, parseISO, getDay, startOfWeek, endOfWeek, isWithinInterval, addDays, subDays, nextSaturday, previousFriday } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { Delivery, Provider } from '@/types';
 import { useToast } from "@/hooks/use-toast";
@@ -141,18 +141,40 @@ export default function HistoryPage() {
   }).filter(d => d.total > 0);
 
   // Data for "Totales por Proveedor"
-  const vendorTotalsForWeek = providers.map(provider => {
-    const totalQuantity = deliveriesForCurrentWeek
-      .filter(d => d.providerName === provider.name)
-      .reduce((sum, d) => sum + d.quantity, 0);
-    const totalToPay = totalQuantity * provider.price;
-    return {
-        providerName: provider.name,
-        totalQuantity,
-        price: provider.price,
-        totalToPay,
-    };
-  }).filter(v => v.totalQuantity > 0);
+  const vendorTotalsForWeek = useMemo(() => {
+    if (!currentWeekStart) return [];
+
+    // Standard week (e.g., Sunday to Saturday)
+    const standardWeekStart = startOfWeek(currentWeekStart, { weekStartsOn: 0 });
+    const standardWeekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 0 });
+
+    // Lucio's week (Saturday to Friday)
+    const lucioWeekStart = startOfWeek(currentWeekStart, { weekStartsOn: 6 });
+    const lucioWeekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 6 });
+
+    return providers.map(provider => {
+        const isLucio = provider.name.toLowerCase() === 'lucio';
+        const weekInterval = isLucio
+            ? { start: lucioWeekStart, end: lucioWeekEnd }
+            : { start: standardWeekStart, end: standardWeekEnd };
+            
+        const deliveriesForProviderInCycle = deliveries.filter(d => {
+            if (d.providerName !== provider.name) return false;
+            const deliveryDate = parseISO(d.date);
+            return isWithinInterval(deliveryDate, weekInterval);
+        });
+
+        const totalQuantity = deliveriesForProviderInCycle.reduce((sum, d) => sum + d.quantity, 0);
+
+        return {
+            providerName: provider.name,
+            totalQuantity,
+            price: provider.price,
+            totalToPay: totalQuantity * provider.price,
+        };
+    }).filter(v => v.totalQuantity > 0);
+  }, [providers, deliveries, currentWeekStart]);
+
 
   const grandTotalToPay = vendorTotalsForWeek.reduce((sum, row) => sum + row.totalToPay, 0);
 
