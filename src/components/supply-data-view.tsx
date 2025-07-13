@@ -1,7 +1,7 @@
 
 "use client";
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import type { Delivery, Provider } from '@/types';
 import {
   Table,
@@ -17,7 +17,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Users, CalendarDays, Info, CalendarRange, ShoppingBag, Download } from 'lucide-react';
-import { format, parseISO, getDay, startOfWeek, endOfWeek, isWithinInterval, addDays, nextSaturday, previousFriday } from 'date-fns';
+import { format, parseISO, getDay, startOfWeek, endOfWeek, isWithinInterval, addDays, nextSaturday, previousFriday, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useToast } from "@/hooks/use-toast";
 import { Button } from './ui/button';
@@ -47,6 +47,43 @@ const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals
     const end = endOfWeek(start, { weekStartsOn: 0, locale: es });
     setWeekDates({ start, end });
   }, []);
+
+  const enrichedVendorTotalsForCurrentWeek = useMemo(() => {
+    if (!weekDates) return [];
+
+    const { start: currentWeekStart } = weekDates;
+
+    // Standard week (e.g., Sunday to Saturday)
+    const standardWeekStart = startOfWeek(currentWeekStart, { weekStartsOn: 0 });
+    const standardWeekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 0 });
+    // Lucio's week (Saturday to Friday)
+    const lucioWeekStart = startOfWeek(currentWeekStart, { weekStartsOn: 6 });
+    const lucioWeekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 6 });
+
+    return providers.map(provider => {
+        const isLucio = provider.name.toLowerCase() === 'lucio';
+        const weekInterval = isLucio
+            ? { start: lucioWeekStart, end: lucioWeekEnd }
+            : { start: standardWeekStart, end: standardWeekEnd };
+            
+        const deliveriesForProviderInCycle = deliveries.filter(d => {
+            if (d.providerName !== provider.name) return false;
+            const deliveryDate = parseISO(d.date);
+            return isWithinInterval(deliveryDate, weekInterval);
+        });
+
+        const totalQuantity = deliveriesForProviderInCycle.reduce((sum, d) => sum + d.quantity, 0);
+        const price = provider.price;
+        const totalToPay = totalQuantity * price;
+
+        return {
+            originalName: provider.name,
+            totalQuantity,
+            price,
+            totalToPay,
+        };
+    });
+  }, [providers, deliveries, weekDates]);
 
   if (!weekDates) {
     return (
@@ -90,42 +127,6 @@ const SupplyDataView: React.FC<SupplyDataViewProps> = ({ deliveries, dailyTotals
   const sortedDailyTotals = Object.entries(dailyTotals).sort(([dateA], [dateB]) => 
     parseISO(dateB).getTime() - parseISO(dateA).getTime()
   );
-
-  const enrichedVendorTotalsForCurrentWeek = React.useMemo(() => {
-    const today = new Date();
-    // Standard week (e.g., Sunday to Saturday)
-    const standardWeekStart = startOfWeek(today, { weekStartsOn: 0 });
-    const standardWeekEnd = endOfWeek(today, { weekStartsOn: 0 });
-    // Lucio's week (Saturday to Friday)
-    const lucioWeekEnd = getDay(today) === 6 ? today : previousFriday(today); // If today is Saturday, it's the start of a new week for others, but end of an old one for Lucio
-    const lucioWeekStart = getDay(lucioWeekEnd) === 5 ? nextSaturday(subDays(lucioWeekEnd, 7)) : startOfWeek(lucioWeekEnd, { weekStartsOn: 6 });
-
-
-    return providers.map(provider => {
-        const isLucio = provider.name.toLowerCase() === 'lucio';
-        const weekInterval = isLucio
-            ? { start: lucioWeekStart, end: lucioWeekEnd }
-            : { start: standardWeekStart, end: standardWeekEnd };
-            
-        const deliveriesForProviderInCycle = deliveries.filter(d => {
-            if (d.providerName !== provider.name) return false;
-            const deliveryDate = parseISO(d.date);
-            return isWithinInterval(deliveryDate, weekInterval);
-        });
-
-        const totalQuantity = deliveriesForProviderInCycle.reduce((sum, d) => sum + d.quantity, 0);
-        const price = provider.price;
-        const totalToPay = totalQuantity * price;
-
-        return {
-            originalName: provider.name,
-            totalQuantity,
-            price,
-            totalToPay,
-        };
-    });
-  }, [providers, deliveries]);
-
 
   const grandTotalToPay = enrichedVendorTotalsForCurrentWeek.reduce((sum, vendor) => sum + vendor.totalToPay, 0);
   
