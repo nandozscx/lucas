@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import DashboardHeader from '@/components/dashboard-header';
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card } from "@/components/ui/card";
-import { ClipboardPenLine, ShoppingCart, HistoryIcon, Cpu, BarChart3, DatabaseBackup, Printer } from 'lucide-react';
+import { ClipboardPenLine, ShoppingCart, History as HistoryIcon, Cpu, BarChart3, DatabaseBackup, Printer } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import type { Production, WholeMilkReplenishment } from '@/types';
 
