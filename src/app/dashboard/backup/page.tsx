@@ -70,31 +70,6 @@ export default function BackupPage() {
     }
   }, []);
 
-  useEffect(() => {
-    const loadDirHandle = async () => {
-      try {
-        const handle = await get<FileSystemDirectoryHandle>(BACKUP_DIR_HANDLE_KEY);
-        if (handle) {
-          const permission = await handle.queryPermission({ mode: 'readwrite' });
-          if (permission === 'granted') {
-            setDirHandle(handle);
-          } else {
-             del(BACKUP_DIR_HANDLE_KEY); // Clear stale handle if permission is lost
-          }
-        }
-      } catch (error) {
-        console.error("Error loading directory handle from IndexedDB:", error);
-      } finally {
-        setIsLoadingFiles(false);
-      }
-    };
-    if (isApiSupported) {
-      loadDirHandle();
-    } else {
-      setIsLoadingFiles(false);
-    }
-  }, [isApiSupported]);
-  
   const scanBackupFiles = useCallback(async (handle: FileSystemDirectoryHandle | null) => {
     if (!handle) return;
     setIsLoadingFiles(true);
@@ -114,12 +89,34 @@ export default function BackupPage() {
       setIsLoadingFiles(false);
     }
   }, [toast]);
-  
+
   useEffect(() => {
-    if (dirHandle) {
-      scanBackupFiles(dirHandle);
+    const loadDirHandleAndScan = async () => {
+      setIsLoadingFiles(true);
+      try {
+        const handle = await get<FileSystemDirectoryHandle>(BACKUP_DIR_HANDLE_KEY);
+        if (handle) {
+          const permission = await handle.queryPermission({ mode: 'readwrite' });
+          if (permission === 'granted') {
+            setDirHandle(handle);
+            await scanBackupFiles(handle); // Scan files right after setting handle
+          } else {
+             await del(BACKUP_DIR_HANDLE_KEY); // Clear stale handle if permission is lost
+          }
+        }
+      } catch (error) {
+        console.error("Error loading directory handle from IndexedDB:", error);
+      } finally {
+        setIsLoadingFiles(false);
+      }
+    };
+
+    if (isApiSupported) {
+      loadDirHandleAndScan();
+    } else {
+      setIsLoadingFiles(false);
     }
-  }, [dirHandle, scanBackupFiles]);
+  }, [isApiSupported, scanBackupFiles]);
 
   const requestAndSetDirHandle = async () => {
     try {
@@ -127,6 +124,7 @@ export default function BackupPage() {
       await handle.requestPermission({ mode: 'readwrite' });
       await set(BACKUP_DIR_HANDLE_KEY, handle);
       setDirHandle(handle);
+      await scanBackupFiles(handle); // Also scan after connecting for the first time
       return handle;
     } catch (error) {
       if ((error as Error).name !== 'AbortError') {
@@ -138,17 +136,23 @@ export default function BackupPage() {
   };
 
   const handleBackup = async (currentHandle?: FileSystemDirectoryHandle | null) => {
-    const handle = currentHandle || dirHandle;
+    let handle = currentHandle || dirHandle;
 
     if (!handle) {
       const newHandle = await requestAndSetDirHandle();
-      if (newHandle) {
-        await handleBackup(newHandle); // Recurse with the new handle
-      }
-      return;
+      if (!newHandle) return; // User cancelled the picker
+      handle = newHandle;
     }
     
     try {
+      // Re-verify permission just in case
+      const permission = await handle.queryPermission({ mode: 'readwrite' });
+      if (permission !== 'granted') {
+        const newHandle = await requestAndSetDirHandle();
+        if(!newHandle) return;
+        handle = newHandle;
+      }
+
       const backupData: Record<string, any> = {};
       for (const key in STORAGE_KEYS) {
         const storageKey = STORAGE_KEYS[key as keyof typeof STORAGE_KEYS];
@@ -167,15 +171,24 @@ export default function BackupPage() {
         title: "Respaldo Creado",
         description: `El archivo ${fileName} ha sido guardado en tu carpeta conectada.`,
       });
-      scanBackupFiles(handle); // Refresh file list
+      await scanBackupFiles(handle); // Refresh file list
       
     } catch (error) {
       console.error("Error al crear el respaldo:", error);
-      toast({
-        title: "Error de Respaldo",
-        description: "No se pudo crear el archivo de respaldo. Revisa la consola para más detalles.",
-        variant: "destructive",
-      });
+      if ((error as DOMException).name === 'NotAllowedError') {
+          toast({
+            title: "Permiso denegado",
+            description: "No se pudo guardar. Intenta reconectar la carpeta.",
+            variant: "destructive",
+          });
+          handleDisconnect();
+      } else {
+        toast({
+          title: "Error de Respaldo",
+          description: "No se pudo crear el archivo de respaldo. Revisa la consola para más detalles.",
+          variant: "destructive",
+        });
+      }
     }
   };
 
