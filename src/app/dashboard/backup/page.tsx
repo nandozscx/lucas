@@ -148,9 +148,9 @@ export default function BackupPage() {
       // Re-verify permission just in case
       const permission = await handle.queryPermission({ mode: 'readwrite' });
       if (permission !== 'granted') {
-        const newHandle = await requestAndSetDirHandle();
-        if(!newHandle) return;
-        handle = newHandle;
+        const reconnectedHandle = await requestAndSetDirHandle(); // Re-prompt if permission is denied/revoked
+        if(!reconnectedHandle) return;
+        handle = reconnectedHandle;
       }
 
       const backupData: Record<string, any> = {};
@@ -181,7 +181,7 @@ export default function BackupPage() {
             description: "No se pudo guardar. Intenta reconectar la carpeta.",
             variant: "destructive",
           });
-          handleDisconnect();
+          await handleDisconnect(); // Disconnect to force user to reconnect
       } else {
         toast({
           title: "Error de Respaldo",
@@ -328,9 +328,9 @@ export default function BackupPage() {
               {isApiSupported ? (
                 <Card>
                   <CardHeader>
-                    <CardTitle>Gestión de Respaldos</CardTitle>
+                    <CardTitle>Gestión de Respaldos (Recomendado)</CardTitle>
                     <CardDescription>
-                      {dirHandle ? "Crea un nuevo respaldo o restaura desde una copia anterior en tu carpeta conectada." : "Conecta una carpeta en tu dispositivo para gestionar tus respaldos."}
+                      {dirHandle ? "Crea un nuevo respaldo o restaura desde una copia anterior en tu carpeta conectada." : "Conecta una carpeta en tu dispositivo para gestionar tus respaldos de forma automática."}
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -380,7 +380,7 @@ export default function BackupPage() {
                     )}
                   </CardContent>
                   <CardFooter className="flex flex-col sm:flex-row gap-4">
-                    <Button onClick={() => handleBackup()} className="w-full sm:w-auto">
+                    <Button onClick={() => handleBackup()} className="w-full sm:w-auto" disabled={!dirHandle && !isApiSupported}>
                       <Download className="mr-2 h-4 w-4" />
                       Crear Nuevo Respaldo
                     </Button>
@@ -391,24 +391,25 @@ export default function BackupPage() {
                   </CardFooter>
                 </Card>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Salvar Datos (Respaldo)</CardTitle>
-                      <CardDescription>Crea una copia de seguridad y descárgala a tu dispositivo.</CardDescription>
-                    </CardHeader>
-                    <CardFooter>
-                      <Button onClick={createLegacyBackup} className="w-full">
-                        <Download className="mr-2 h-4 w-4" /> Descargar Respaldo
-                      </Button>
-                    </CardFooter>
-                  </Card>
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Leer Datos (Restaurar)</CardTitle>
-                      <CardDescription>Selecciona un archivo de respaldo de tu dispositivo para restaurar los datos.</CardDescription>
-                    </CardHeader>
-                    <CardFooter>
+                <Alert>
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertTitle>Navegador no compatible</AlertTitle>
+                  <AlertDescription>
+                    Tu navegador no es compatible con la API de Acceso al Sistema de Archivos. Utiliza los métodos de respaldo manual.
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Método de Respaldo Manual</CardTitle>
+                  <CardDescription>Usa estos botones si la gestión automática no funciona o si prefieres el método tradicional.</CardDescription>
+                </CardHeader>
+                <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                   <Button onClick={createLegacyBackup} className="w-full">
+                      <Download className="mr-2 h-4 w-4" /> Descargar Respaldo
+                    </Button>
+                    <div>
                        <input 
                           type="file" 
                           ref={fileInputRef} 
@@ -417,12 +418,11 @@ export default function BackupPage() {
                           className="hidden"
                       />
                       <Button onClick={() => fileInputRef.current?.click()} className="w-full" variant="outline">
-                        <FileUp className="mr-2 h-4 w-4" /> Seleccionar Archivo
+                        <FileUp className="mr-2 h-4 w-4" /> Seleccionar Archivo para Restaurar
                       </Button>
-                    </CardFooter>
-                  </Card>
-                </div>
-              )}
+                    </div>
+                </CardContent>
+              </Card>
 
               <Alert variant="destructive" className="mt-8">
                 <AlertTriangle className="h-4 w-4" />
@@ -459,3 +459,5 @@ export default function BackupPage() {
     </>
   );
 }
+
+    
