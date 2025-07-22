@@ -121,25 +121,30 @@ export default function BackupPage() {
     }
   }, [dirHandle, scanBackupFiles]);
 
-  // --- Handlers ---
-  const handleConnectDirectory = async () => {
+  const requestAndSetDirHandle = async () => {
     try {
       const handle = await window.showDirectoryPicker();
       await handle.requestPermission({ mode: 'readwrite' });
       await set(BACKUP_DIR_HANDLE_KEY, handle);
       setDirHandle(handle);
-      toast({ title: "Carpeta Conectada", description: "Ahora puedes guardar y cargar respaldos desde esta ubicación." });
+      return handle;
     } catch (error) {
       if ((error as Error).name !== 'AbortError') {
         console.error("Error selecting directory:", error);
         toast({ title: "Error", description: "No se pudo conectar a la carpeta.", variant: "destructive" });
       }
+      return null;
     }
   };
 
-  const handleBackup = async () => {
-    if (!dirHandle) {
-      toast({ title: "Carpeta no conectada", description: "Por favor, conecta una carpeta para guardar el respaldo.", variant: "destructive" });
+  const handleBackup = async (currentHandle?: FileSystemDirectoryHandle | null) => {
+    const handle = currentHandle || dirHandle;
+
+    if (!handle) {
+      const newHandle = await requestAndSetDirHandle();
+      if (newHandle) {
+        await handleBackup(newHandle); // Recurse with the new handle
+      }
       return;
     }
     
@@ -153,7 +158,7 @@ export default function BackupPage() {
       
       const date = new Date().toISOString().slice(0, 10);
       const fileName = `${BACKUP_FILE_PREFIX}${date}.json`;
-      const fileHandle = await dirHandle.getFileHandle(fileName, { create: true });
+      const fileHandle = await handle.getFileHandle(fileName, { create: true });
       const writable = await fileHandle.createWritable();
       await writable.write(JSON.stringify(backupData, null, 2));
       await writable.close();
@@ -162,7 +167,7 @@ export default function BackupPage() {
         title: "Respaldo Creado",
         description: `El archivo ${fileName} ha sido guardado en tu carpeta conectada.`,
       });
-      scanBackupFiles(dirHandle); // Refresh file list
+      scanBackupFiles(handle); // Refresh file list
       
     } catch (error) {
       console.error("Error al crear el respaldo:", error);
@@ -173,6 +178,49 @@ export default function BackupPage() {
       });
     }
   };
+
+  // --- Handlers ---
+  const handleConnectDirectory = async () => {
+    const newHandle = await requestAndSetDirHandle();
+    if(newHandle){
+      toast({ title: "Carpeta Conectada", description: "Ahora puedes guardar y cargar respaldos desde esta ubicación." });
+    }
+  };
+  
+  const createLegacyBackup = () => {
+    try {
+      const backupData: Record<string, any> = {};
+      for (const key in STORAGE_KEYS) {
+        const storageKey = STORAGE_KEYS[key as keyof typeof STORAGE_KEYS];
+        const data = localStorage.getItem(storageKey);
+        backupData[key] = data ? JSON.parse(data) : [];
+      }
+      
+      const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const date = new Date().toISOString().slice(0, 10);
+      a.href = url;
+      a.download = `${BACKUP_FILE_PREFIX}${date}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: "Respaldo Descargado",
+        description: `El archivo ${a.download} ha sido generado.`,
+      });
+    } catch (error) {
+      console.error("Error al crear el respaldo de descarga:", error);
+      toast({
+        title: "Error de Respaldo",
+        description: "No se pudo crear el archivo de respaldo.",
+        variant: "destructive",
+      });
+    }
+  };
+
 
   const confirmRestore = async () => {
     const fileToProcess = fileToRestore || (selectedFile ? await selectedFile.handle.getFile() : null);
@@ -318,18 +366,16 @@ export default function BackupPage() {
                       </div>
                     )}
                   </CardContent>
-                  {dirHandle && (
-                    <CardFooter className="flex flex-col sm:flex-row gap-4">
-                      <Button onClick={handleBackup} className="w-full sm:w-auto">
-                        <Download className="mr-2 h-4 w-4" />
-                        Crear Nuevo Respaldo
-                      </Button>
-                      <Button onClick={() => confirmRestore()} disabled={!selectedFile} className="w-full sm:w-auto">
-                        <UploadCloud className="mr-2 h-4 w-4" />
-                        Restaurar Selección
-                      </Button>
-                    </CardFooter>
-                  )}
+                  <CardFooter className="flex flex-col sm:flex-row gap-4">
+                    <Button onClick={() => handleBackup()} className="w-full sm:w-auto">
+                      <Download className="mr-2 h-4 w-4" />
+                      Crear Nuevo Respaldo
+                    </Button>
+                    <Button onClick={() => confirmRestore()} disabled={!selectedFile} className="w-full sm:w-auto">
+                      <UploadCloud className="mr-2 h-4 w-4" />
+                      Restaurar Selección
+                    </Button>
+                  </CardFooter>
                 </Card>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -339,7 +385,7 @@ export default function BackupPage() {
                       <CardDescription>Crea una copia de seguridad y descárgala a tu dispositivo.</CardDescription>
                     </CardHeader>
                     <CardFooter>
-                      <Button onClick={handleBackup} className="w-full">
+                      <Button onClick={createLegacyBackup} className="w-full">
                         <Download className="mr-2 h-4 w-4" /> Descargar Respaldo
                       </Button>
                     </CardFooter>
@@ -400,5 +446,3 @@ export default function BackupPage() {
     </>
   );
 }
-
-    
