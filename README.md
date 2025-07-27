@@ -1,4 +1,4 @@
-# acopiapp
+ # acopiapp
 
 Esta es una aplicación Next.js para la gestión de acopio y producción.
 
