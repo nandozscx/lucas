@@ -1405,7 +1405,7 @@ const ConsolidatedDebtDialog = ({ isOpen, onClose, client, sales, toast }: { isO
                     <TableCell className="whitespace-nowrap">{capitalize(format(parseISO(t.date), "EEEE, dd/MM", { locale: es }))}</TableCell>
                     <TableCell className="whitespace-nowrap">{t.description}</TableCell>
                     <TableCell className="text-right font-mono whitespace-nowrap">{!t.isOpeningBalance && t.debit > 0 ? `S/. ${t.debit.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : '-'}</TableCell>
-                    <TableCell className="text-right font-mono text-green-500 whitespace-nowrap">{!t.isOpeningBalance && t.credit > 0 ? `S/. ${t.credit.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : '-'}</TableCell>
+                    <TableCell className="text-right font-mono text-green-500 whitespace-nowrap">{!t.isOpeningBalance && t.credit > 0 ? `S/. ${t.credit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}</TableCell>
                     <TableCell className="text-right font-mono font-medium whitespace-nowrap">S/. {t.balance.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
                  </TableRow>
               )) : (
