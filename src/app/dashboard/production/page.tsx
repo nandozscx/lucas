@@ -537,31 +537,6 @@ export default function ProductionPage() {
                                 </form>
                             </Form>
                         </Card>
-
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Cálculos del Día</CardTitle>
-                                <CardDescription>{capitalize(format(selectedDate, "EEEE, dd/MM/yyyy", { locale: es }))}</CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                <div className="flex justify-between items-center">
-                                    <span className="text-muted-foreground flex items-center"><Milk className="mr-2 h-4 w-4"/> Materia Prima (Entregas)</span>
-                                    <span className="font-bold">{dailyRawMaterial.toLocaleString()} L</span>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                    <span className="text-muted-foreground flex items-center"><Scale className="mr-2 h-4 w-4"/> Leche Entera Adicional</span>
-                                    <span className="font-bold">{additionalLitersFromMilk.toLocaleString()} L</span>
-                                </div>
-                                <div className="flex justify-between items-center text-lg">
-                                    <span className="text-foreground font-semibold flex items-center"><Package className="mr-2 h-5 w-5"/> Total Materia Prima</span>
-                                    <span className="font-extrabold text-primary">{totalAdjustedRawMaterial.toLocaleString()} L</span>
-                                </div>
-                                <div className="flex justify-between items-center text-lg">
-                                    <span className="text-foreground font-semibold flex items-center"><Percent className="mr-2 h-5 w-5"/> Índice de Transformación</span>
-                                    <span className={`font-extrabold ${transformationIndex >= 0 ? 'text-green-500' : 'text-destructive'}`}>{transformationIndex.toFixed(2)} %</span>
-                                </div>
-                            </CardContent>
-                        </Card>
                     </div>
                     <div className="lg:col-span-2">
                         <Card className="h-full flex flex-col">
