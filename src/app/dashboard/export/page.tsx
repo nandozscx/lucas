@@ -33,6 +33,7 @@ const STORAGE_KEYS = {
 type ReportOptions = {
   weeklySummary: boolean;
   providerTotals: boolean;
+  profitCalculation: boolean;
   productionHistory: boolean;
   stockUsage: boolean;
   clientSummary: boolean;
@@ -45,10 +46,11 @@ export default function ExportPage() {
   const [reportOptions, setReportOptions] = useState<ReportOptions>({
     weeklySummary: true,
     providerTotals: true,
+    profitCalculation: true,
     productionHistory: true,
     stockUsage: true,
     clientSummary: true,
-    deliveriesChart: true,
+    deliveriesChart: false, // Disabled by default as it is visual and not implemented yet
   });
   const { toast } = useToast();
 
@@ -131,6 +133,30 @@ export default function ExportPage() {
       });
       yPos = (doc as any).lastAutoTable.finalY + 10;
     }
+
+    if (reportOptions.profitCalculation) {
+        checkYPos(30);
+        const totalUnitsProduced = productionForWeek.reduce((sum, p) => sum + p.producedUnits, 0);
+        const totalRevenue = totalUnitsProduced * 1.75;
+        const providerTotals = buildProviderTotals(providers, deliveries, currentWeekStart);
+        const totalProviderCost = providerTotals.reduce((sum, p) => sum + p.totalToPay, 0);
+        const grossProfit = totalRevenue - totalProviderCost;
+
+        doc.autoTable({
+            head: [['Descripción', 'Monto']],
+            body: [
+                ['(+) Ingresos Totales por Producción (Venta a S/. 1.75)', `S/. ${totalRevenue.toFixed(2)}`],
+                ['(-) Costo Total por Proveedores', `S/. ${totalProviderCost.toFixed(2)}`],
+            ],
+            startY: yPos,
+            theme: 'striped',
+            didDrawPage: (data) => { yPos = data.cursor?.y || yPos; },
+            headStyles: { fillColor: [0, 150, 136] }, // Teal
+            foot: [['Ganancia Bruta Semanal', `S/. ${grossProfit.toFixed(2)}`]],
+            footStyles: { fontStyle: 'bold', fillColor: [200, 230, 201], textColor: [0, 0, 0] }
+        });
+        yPos = (doc as any).lastAutoTable.finalY + 10;
+    }
     
     if (reportOptions.productionHistory) {
       checkYPos(40);
@@ -204,10 +230,11 @@ export default function ExportPage() {
   const options = [
     { id: 'weeklySummary', label: 'Resumen Semanal de Operaciones' },
     { id: 'providerTotals', label: 'Totales por Proveedor' },
+    { id: 'profitCalculation', label: 'Cálculo de Ganancias' },
     { id: 'productionHistory', label: 'Historial de Producción' },
     { id: 'stockUsage', label: 'Uso de Leche Entera' },
     { id: 'clientSummary', label: 'Resumen Semanal de Clientes' },
-    { id: 'deliveriesChart', label: 'Gráfico de Entregas (Visual)' },
+    { id: 'deliveriesChart', label: 'Gráfico de Entregas (No disponible)' },
   ];
 
   return (
@@ -251,8 +278,9 @@ export default function ExportPage() {
                                 onCheckedChange={(checked) => {
                                     setReportOptions(prev => ({ ...prev, [option.id]: !!checked }))
                                 }}
+                                disabled={option.id === 'deliveriesChart'}
                             />
-                            <Label htmlFor={option.id} className="text-sm font-medium leading-none cursor-pointer">
+                            <Label htmlFor={option.id} className={`text-sm font-medium leading-none cursor-pointer ${option.id === 'deliveriesChart' ? 'text-muted-foreground' : ''}`}>
                                 {option.label}
                             </Label>
                         </div>
@@ -340,3 +368,5 @@ const buildClientSummary = (allClients: Client[], salesForWeek: Sale[]) => {
       }))
       .filter(c => c.totalBought > 0);
 }
+
+    
