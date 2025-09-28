@@ -112,7 +112,7 @@ type SaleFormData = z.infer<typeof saleFormSchema>;
 
 
 // Sales Form Component
-const SaleForm = ({ onSubmitSale, clients, onClientChange }: { onSubmitSale: (data: SaleFormData) => void, clients: Client[], onClientChange: (clientId: string) => void }) => {
+const SaleForm = ({ onSubmitSale, clients, onClientChange, activeClientId, setActiveClientId }: { onSubmitSale: (data: SaleFormData) => void, clients: Client[], onClientChange: (clientId: string) => void, activeClientId: string | null, setActiveClientId: (id: string) => void }) => {
     const form = useForm<SaleFormData>({
         resolver: zodResolver(saleFormSchema),
         defaultValues: {
@@ -125,12 +125,19 @@ const SaleForm = ({ onSubmitSale, clients, onClientChange }: { onSubmitSale: (da
             deliveryType: 'personal',
         },
     });
+    
+    useEffect(() => {
+        if(activeClientId) {
+            form.setValue('clientId', activeClientId);
+        }
+    }, [activeClientId, form]);
 
     const handleSubmit = (data: SaleFormData) => {
         onSubmitSale(data);
+        setActiveClientId(data.clientId); // Ensure the tab for this client is active
         form.reset({
             date: new Date(),
-            clientId: '',
+            clientId: data.clientId,
             price: '' as any,
             quantity: '' as any,
             unit: 'baldes',
@@ -335,12 +342,9 @@ export default function SalesClientsPage() {
   const [saleToDelete, setSaleToDelete] = useState<Sale | null>(null);
   const [saleForPayment, setSaleForPayment] = useState<Sale | null>(null);
   const [isConsolidatedDialogOpen, setIsConsolidatedDialogOpen] = useState(false);
-  const [isDebtPaymentDialogOpen, setIsDebtPaymentDialogOpen] = useState(false);
-  const [isCancelAccountDialogOpen, setIsCancelAccountDialogOpen] = useState(false);
   const { toast } = useToast();
   const [currentYear, setCurrentYear] = useState('');
-  const [selectedClientIdForHistory, setSelectedClientIdForHistory] = useState<string | null>(null);
-  const [selectedClientIdForDebts, setSelectedClientIdForDebts] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<string | null>(null);
   const [showPaidSales, setShowPaidSales] = useState(false);
 
   // Load data from localStorage
@@ -351,7 +355,11 @@ export default function SalesClientsPage() {
       const storedClients = localStorage.getItem(CLIENTS_STORAGE_KEY);
       if (storedClients) {
         try {
-          setClients(JSON.parse(storedClients));
+          const parsedClients = JSON.parse(storedClients);
+          setClients(parsedClients);
+          if (parsedClients.length > 0 && !activeTab) {
+            setActiveTab(parsedClients[0].id);
+          }
         } catch (error) {
           console.error("Falló al parsear clientes desde localStorage", error);
           localStorage.removeItem(CLIENTS_STORAGE_KEY);
@@ -429,15 +437,18 @@ export default function SalesClientsPage() {
 
   const handleClientFormSubmit = useCallback((data: ClientFormData) => {
     if (editingClient) {
-      setClients(prev => prev.map(c => c.id === editingClient.id ? { ...c, ...data } : c));
+      const updatedClients = clients.map(c => c.id === editingClient.id ? { ...c, ...data } : c);
+      setClients(updatedClients);
       toast({ title: "Cliente Actualizado", description: `El cliente "${data.name}" ha sido actualizado.` });
     } else {
       const newClient: Client = { ...data, id: crypto.randomUUID() };
-      setClients(prev => [...prev, newClient]);
+      const updatedClients = [...clients, newClient];
+      setClients(updatedClients);
+      setActiveTab(newClient.id); // Switch to the new client's tab
       toast({ title: "Cliente Agregado", description: `El cliente "${data.name}" ha sido agregado.` });
     }
     handleCloseDialog();
-  }, [editingClient, toast, handleCloseDialog]);
+  }, [editingClient, toast, handleCloseDialog, clients]);
 
   const handleDeleteClientClick = (client: Client) => {
     setClientToDelete(client);
@@ -445,7 +456,11 @@ export default function SalesClientsPage() {
   
   const confirmDeleteClient = () => {
     if (clientToDelete) {
-      setClients(prev => prev.filter(p => p.id !== clientToDelete.id));
+      const updatedClients = clients.filter(p => p.id !== clientToDelete.id);
+      setClients(updatedClients);
+      if(activeTab === clientToDelete.id) {
+          setActiveTab(updatedClients.length > 0 ? updatedClients[0].id : null);
+      }
       toast({ title: "Cliente Eliminado", description: `El cliente "${clientToDelete.name}" ha sido eliminado.`, variant: "destructive" });
       setClientToDelete(null);
     }
@@ -491,29 +506,6 @@ export default function SalesClientsPage() {
     toast({ title: "Venta Registrada", description: `Se ha registrado una venta para ${client.name}.` });
   }, [clients, toast]);
   
-  const allSortedSales = [...sales].sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime());
-
-  const allSalesForSelectedClient = React.useMemo(() => {
-    if (!selectedClientIdForHistory) return [];
-    return allSortedSales.filter(sale => sale.clientId === selectedClientIdForHistory);
-  }, [selectedClientIdForHistory, allSortedSales]);
-
-  const salesForSelectedClient = React.useMemo(() => {
-    if (showPaidSales) {
-        return allSalesForSelectedClient;
-    }
-    return allSalesForSelectedClient.filter(sale => {
-        const totalPaid = sale.payments.reduce((sum, p) => sum + p.amount, 0);
-        const balance = sale.totalAmount - totalPaid;
-        return balance > 0;
-    });
-  }, [allSalesForSelectedClient, showPaidSales]);
-    
-  const totalDebtForSelectedClient = React.useMemo(() => allSalesForSelectedClient.reduce((total, sale) => {
-    const totalPaid = sale.payments.reduce((sum, p) => sum + p.amount, 0);
-    const balance = sale.totalAmount - totalPaid;
-    return total + (balance > 0 ? balance : 0);
-  }, 0), [allSalesForSelectedClient]);
 
   const handlePaymentSubmit = (data: { amount: number }) => {
     if (!saleForPayment) return;
@@ -533,91 +525,8 @@ export default function SalesClientsPage() {
     setSaleForPayment(null); // Close the dialog
   };
 
-  // Debt Tab Logic
-  const salesForDebtsTab = React.useMemo(() => {
-    if (!selectedClientIdForDebts) return [];
-    return sales
-      .filter(s => s.clientId === selectedClientIdForDebts)
-      .sort((a, b) => parseISO(a.date).getTime() - parseISO(b.date).getTime());
-  }, [sales, selectedClientIdForDebts]);
-
-  const totalClientDebt = React.useMemo(() => {
-    return salesForDebtsTab.reduce((total, sale) => {
-      const totalPaid = sale.payments.reduce((sum, p) => sum + p.amount, 0);
-      const balance = sale.totalAmount - totalPaid;
-      return total + (balance > 0 ? balance : 0);
-    }, 0);
-  }, [salesForDebtsTab]);
-  
-  const handleTotalDebtPayment = (amountPaid: number) => {
-    if (!selectedClientIdForDebts) return;
-  
-    let remainingAmountToPay = amountPaid;
-    const today = format(new Date(), "yyyy-MM-dd");
-  
-    const updatedSales = [...sales];
-    
-    const debtsToPay = salesForDebtsTab
-      .filter(s => {
-        const totalPaid = s.payments.reduce((sum, p) => sum + p.amount, 0);
-        return s.totalAmount > totalPaid;
-      })
-      .sort((a, b) => parseISO(a.date).getTime() - parseISO(b.date).getTime());
-  
-    for (const debt of debtsToPay) {
-      if (remainingAmountToPay <= 0) break;
-  
-      const saleInState = updatedSales.find(s => s.id === debt.id);
-      if (!saleInState) continue;
-  
-      const totalPaid = saleInState.payments.reduce((sum, p) => sum + p.amount, 0);
-      const balance = saleInState.totalAmount - totalPaid;
-      const paymentForThisSale = Math.min(remainingAmountToPay, balance);
-  
-      if (paymentForThisSale > 0) {
-        saleInState.payments.push({ date: today, amount: paymentForThisSale });
-        remainingAmountToPay -= paymentForThisSale;
-      }
-    }
-  
-    setSales(updatedSales);
-    toast({
-      title: "Abono Registrado",
-      description: `Se abonó S/. ${amountPaid.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} a la deuda total.`
-    });
-    setIsDebtPaymentDialogOpen(false);
-  };
-  
-  const handleCancelAccount = (cutoffDate: Date) => {
-    if (!selectedClientIdForDebts) return;
-
-    const updatedSales = sales.map(sale => {
-      // Check if the sale belongs to the selected client and is on or before the cutoff date
-      if (sale.clientId === selectedClientIdForDebts && parseISO(sale.date) <= cutoffDate) {
-        const totalPaid = sale.payments.reduce((sum, p) => sum + p.amount, 0);
-        const balance = sale.totalAmount - totalPaid;
-
-        if (balance > 0) {
-          // Add a new payment to clear the balance
-          const newPayment: Payment = {
-            date: format(cutoffDate, "yyyy-MM-dd"), // Use cutoff date for payment
-            amount: balance,
-          };
-          return {
-            ...sale,
-            payments: [...sale.payments, newPayment],
-          };
-        }
-      }
-      return sale; // Return sale unchanged if conditions are not met
-    });
-
-    setSales(updatedSales);
-    toast({
-      title: "Cuentas Saldadas",
-      description: `Todas las deudas para ${clients.find(c => c.id === selectedClientIdForDebts)?.name} hasta el ${capitalize(format(cutoffDate, "EEEE, dd/MM", { locale: es }))} han sido marcadas como pagadas.`
-    });
-    setIsCancelAccountDialogOpen(false);
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
   };
   
   if (!isClient) {
@@ -661,10 +570,9 @@ export default function SalesClientsPage() {
 
       <main className="flex-grow">
         <Tabs defaultValue="sales" className="w-full">
-            <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3">
+            <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2">
                 <TabsTrigger value="sales">Ventas</TabsTrigger>
                 <TabsTrigger value="clients">Clientes</TabsTrigger>
-                <TabsTrigger value="debts">Deudas</TabsTrigger>
             </TabsList>
             
             {/* Sales Tab */}
@@ -673,126 +581,135 @@ export default function SalesClientsPage() {
                     <div className="md:col-span-1">
                         <SaleForm 
                           onSubmitSale={handleAddSale} 
-                          clients={clients} 
-                          onClientChange={(clientId) => {
-                            setSelectedClientIdForHistory(clientId);
-                            setSelectedClientIdForDebts(clientId);
-                          }} 
+                          clients={clients}
+                          onClientChange={(clientId) => setActiveTab(clientId)}
+                          activeClientId={activeTab}
+                          setActiveClientId={setActiveTab}
                         />
                     </div>
                     <div className="md:col-span-2">
-                        <Card className="shadow-lg rounded-lg">
-                            <CardHeader>
-                                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
-                                  <div>
-                                      <CardTitle>Historial de Ventas</CardTitle>
-                                      {selectedClientIdForHistory ? (
-                                          <CardDescription>
-                                              Mostrando ventas para: {clients.find(c => c.id === selectedClientIdForHistory)?.name || 'Cliente desconocido'}
-                                          </CardDescription>
-                                      ) : (
-                                          <CardDescription>
-                                              Seleccione un cliente para ver su historial.
-                                          </CardDescription>
-                                      )}
-                                  </div>
-                                  {selectedClientIdForHistory && (
-                                      <div className="flex items-center space-x-2 self-end sm:self-center">
-                                          <Checkbox
-                                              id="show-paid"
-                                              checked={showPaidSales}
-                                              onCheckedChange={(checked) => setShowPaidSales(Boolean(checked))}
-                                          />
-                                          <Label htmlFor="show-paid" className="text-sm font-medium leading-none whitespace-nowrap">
-                                              Mostrar Pagadas
-                                          </Label>
-                                      </div>
-                                  )}
-                                </div>
-                            </CardHeader>
-                            <CardContent>
-                                {!selectedClientIdForHistory ? (
-                                    <EmptyState message="Seleccione un cliente en el formulario para ver sus ventas." icon={Users} />
-                                ) : salesForSelectedClient.length === 0 ? (
-                                    <EmptyState message={showPaidSales ? "Este cliente aún no tiene ventas registradas." : "Este cliente no tiene deudas pendientes."} icon={ShoppingCart}/>
-                                ) : (
-                                    <ScrollArea className="h-[440px] rounded-md border">
-                                        <Table>
-                                            <TableHeader>
-                                                <TableRow>
-                                                    <TableHead className="whitespace-nowrap">Fecha</TableHead>
-                                                    <TableHead className="whitespace-nowrap">Cantidad</TableHead>
-                                                    <TableHead className="whitespace-nowrap">Entrega</TableHead>
-                                                    <TableHead className="text-right whitespace-nowrap">Precio Unit.</TableHead>
-                                                    <TableHead className="text-right whitespace-nowrap">Monto Total</TableHead>
-                                                    <TableHead className="text-right whitespace-nowrap">Abono</TableHead>
-                                                    <TableHead className="text-right whitespace-nowrap">Saldo</TableHead>
-                                                    <TableHead className="text-center whitespace-nowrap">Acciones</TableHead>
-                                                </TableRow>
-                                            </TableHeader>
-                                            <TableBody>
-                                                {salesForSelectedClient.map(sale => {
-                                                  const totalPaid = sale.payments.reduce((sum, p) => sum + p.amount, 0);
-                                                  const balance = sale.totalAmount - totalPaid;
-                                                  return (
-                                                    <TableRow key={sale.id}>
-                                                      <TableCell className="whitespace-nowrap">{capitalize(format(parseISO(sale.date), "EEEE, dd/MM", { locale: es }))}</TableCell>
-                                                      <TableCell className="whitespace-nowrap">{`${sale.quantity} ${sale.unit}`}</TableCell>
-                                                      <TableCell className="whitespace-nowrap">
-                                                        <Badge variant={sale.deliveryType === 'personal' ? 'secondary' : 'outline'}>
-                                                          {capitalize(sale.deliveryType)}
-                                                        </Badge>
-                                                      </TableCell>
-                                                      <TableCell className="text-right whitespace-nowrap">S/. {sale.price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
-                                                      <TableCell className="text-right whitespace-nowrap">S/. {sale.totalAmount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
-                                                      <TableCell className="text-right whitespace-nowrap">S/. {totalPaid.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
-                                                      <TableCell className={`text-right font-medium whitespace-nowrap ${balance > 0 ? 'text-destructive' : ''}`}>S/. {balance.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
-                                                      <TableCell className="text-center whitespace-nowrap">
-                                                          <Button
-                                                              variant="ghost"
-                                                              size="icon"
-                                                              onClick={() => setSaleForPayment(sale)}
-                                                              disabled={balance <= 0}
-                                                              aria-label="Añadir pago"
-                                                          >
-                                                              <HandCoins className="h-4 w-4 text-green-500" />
-                                                          </Button>
-                                                          <Button
-                                                              variant="ghost"
-                                                              size="icon"
-                                                              onClick={() => setSaleToDelete(sale)}
-                                                              aria-label="Eliminar Venta"
-                                                          >
-                                                              <Trash2 className="h-4 w-4 text-destructive" />
-                                                          </Button>
-                                                      </TableCell>
-                                                    </TableRow>
-                                                  );
-                                                })}
-                                            </TableBody>
-                                             <TableFooter>
-                                                <TableRow>
-                                                    <TableCell colSpan={7} className="text-right font-bold text-lg whitespace-nowrap">Deuda Total:</TableCell>
-                                                    <TableCell className="text-right font-bold text-lg text-destructive whitespace-nowrap">
-                                                        S/. {totalDebtForSelectedClient.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
-                                                    </TableCell>
-                                                    <TableCell></TableCell>
-                                                </TableRow>
-                                            </TableFooter>
-                                        </Table>
-                                        <ScrollBar orientation="horizontal" />
-                                    </ScrollArea>
-                                )}
-                            </CardContent>
-                             {allSalesForSelectedClient.length > 0 && (
-                                <CardFooter className="flex flex-col items-stretch sm:items-end border-t pt-6 gap-2">
-                                     <Button onClick={() => setIsConsolidatedDialogOpen(true)} variant="outline">
-                                        <Library className="mr-2 h-4 w-4" />
-                                        Consolidado de Deuda
-                                    </Button>
-                                </CardFooter>
-                            )}
-                        </Card>
+                        {clients.length === 0 ? (
+                             <Card className="shadow-lg rounded-lg">
+                                 <CardHeader>
+                                     <CardTitle>Historial de Ventas</CardTitle>
+                                     <CardDescription>Agrega un cliente para empezar a registrar ventas.</CardDescription>
+                                 </CardHeader>
+                                 <CardContent>
+                                     <EmptyState message="No hay clientes registrados." icon={Users}/>
+                                 </CardContent>
+                             </Card>
+                        ) : (
+                        <Tabs value={activeTab ?? ""} onValueChange={handleTabChange} className="w-full">
+                            <ScrollArea>
+                                <TabsList>
+                                    {clients.map(client => (
+                                        <TabsTrigger key={client.id} value={client.id}>{client.name}</TabsTrigger>
+                                    ))}
+                                </TabsList>
+                                <ScrollBar orientation="horizontal"/>
+                            </ScrollArea>
+                            {clients.map(client => {
+                                const allSalesForClient = sales.filter(s => s.clientId === client.id);
+                                const salesToShow = showPaidSales ? allSalesForClient : allSalesForClient.filter(s => s.totalAmount - s.payments.reduce((sum,p) => sum+p.amount, 0) > 0);
+                                const totalDebt = allSalesForClient.reduce((total, sale) => {
+                                    const balance = sale.totalAmount - sale.payments.reduce((sum, p) => sum + p.amount, 0);
+                                    return total + (balance > 0 ? balance : 0);
+                                }, 0);
+                                
+                                return (
+                                <TabsContent key={client.id} value={client.id} className="mt-4">
+                                     <Card className="shadow-lg rounded-lg">
+                                        <CardHeader>
+                                             <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
+                                                <div>
+                                                    <CardTitle>Historial de {client.name}</CardTitle>
+                                                    <CardDescription>Mostrando {salesToShow.length} de {allSalesForClient.length} ventas.</CardDescription>
+                                                </div>
+                                                <div className="flex items-center space-x-2 self-end sm:self-center">
+                                                    <Checkbox
+                                                        id={`show-paid-${client.id}`}
+                                                        checked={showPaidSales}
+                                                        onCheckedChange={(checked) => setShowPaidSales(Boolean(checked))}
+                                                    />
+                                                    <Label htmlFor={`show-paid-${client.id}`} className="text-sm font-medium leading-none whitespace-nowrap">
+                                                        Mostrar Pagadas
+                                                    </Label>
+                                                </div>
+                                             </div>
+                                        </CardHeader>
+                                        <CardContent>
+                                            {allSalesForClient.length === 0 ? (
+                                                <EmptyState message="Este cliente no tiene ventas registradas." icon={ShoppingCart}/>
+                                            ) : (
+                                                <ScrollArea className="h-[440px] rounded-md border">
+                                                    <Table>
+                                                        <TableHeader>
+                                                            <TableRow>
+                                                                <TableHead>Fecha</TableHead>
+                                                                <TableHead>Cantidad</TableHead>
+                                                                <TableHead>Entrega</TableHead>
+                                                                <TableHead className="text-right">Precio U.</TableHead>
+                                                                <TableHead className="text-right">M. Total</TableHead>
+                                                                <TableHead className="text-right">Abono</TableHead>
+                                                                <TableHead className="text-right">Saldo</TableHead>
+                                                                <TableHead className="text-center">Acciones</TableHead>
+                                                            </TableRow>
+                                                        </TableHeader>
+                                                        <TableBody>
+                                                             {salesToShow.map(sale => {
+                                                              const totalPaid = sale.payments.reduce((sum, p) => sum + p.amount, 0);
+                                                              const balance = sale.totalAmount - totalPaid;
+                                                              return (
+                                                                <TableRow key={sale.id}>
+                                                                  <TableCell>{capitalize(format(parseISO(sale.date), "EEEE, dd/MM", { locale: es }))}</TableCell>
+                                                                  <TableCell>{`${sale.quantity} ${sale.unit}`}</TableCell>
+                                                                  <TableCell>
+                                                                    <Badge variant={sale.deliveryType === 'personal' ? 'secondary' : 'outline'}>
+                                                                      {capitalize(sale.deliveryType)}
+                                                                    </Badge>
+                                                                  </TableCell>
+                                                                  <TableCell className="text-right">S/. {sale.price.toLocaleString(undefined, {minimumFractionDigits: 2})}</TableCell>
+                                                                  <TableCell className="text-right">S/. {sale.totalAmount.toLocaleString(undefined, {minimumFractionDigits: 2})}</TableCell>
+                                                                  <TableCell className="text-right">S/. {totalPaid.toLocaleString(undefined, {minimumFractionDigits: 2})}</TableCell>
+                                                                  <TableCell className={`text-right font-medium ${balance > 0 ? 'text-destructive' : ''}`}>S/. {balance.toLocaleString(undefined, {minimumFractionDigits: 2})}</TableCell>
+                                                                  <TableCell className="text-center">
+                                                                      <Button variant="ghost" size="icon" onClick={() => setSaleForPayment(sale)} disabled={balance <= 0} aria-label="Añadir pago"><HandCoins className="h-4 w-4 text-green-500" /></Button>
+                                                                      <Button variant="ghost" size="icon" onClick={() => setSaleToDelete(sale)} aria-label="Eliminar Venta"><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                                                                  </TableCell>
+                                                                </TableRow>
+                                                              );
+                                                            })}
+                                                        </TableBody>
+                                                        <TableFooter>
+                                                            <TableRow>
+                                                                <TableCell colSpan={6} className="text-right font-bold text-lg">Deuda Total:</TableCell>
+                                                                <TableCell className="text-right font-bold text-lg text-destructive">S/. {totalDebt.toLocaleString(undefined, {minimumFractionDigits: 2})}</TableCell>
+                                                                <TableCell></TableCell>
+                                                            </TableRow>
+                                                        </TableFooter>
+                                                    </Table>
+                                                    <ScrollBar orientation="horizontal" />
+                                                    <ScrollBar orientation="vertical" />
+                                                </ScrollArea>
+                                            )}
+                                        </CardContent>
+                                        {allSalesForClient.length > 0 && (
+                                            <CardFooter className="flex flex-col items-stretch sm:items-end border-t pt-6 gap-2">
+                                                 <Button onClick={() => {
+                                                    const clientForDialog = clients.find(c => c.id === activeTab);
+                                                    if(clientForDialog) setIsConsolidatedDialogOpen(true);
+                                                 }} variant="outline">
+                                                    <Library className="mr-2 h-4 w-4" />
+                                                    Consolidado de Deuda
+                                                </Button>
+                                            </CardFooter>
+                                        )}
+                                    </Card>
+                                </TabsContent>
+                                );
+                            })}
+                        </Tabs>
+                        )}
                     </div>
                 </div>
             </TabsContent>
@@ -844,106 +761,6 @@ export default function SalesClientsPage() {
                     </CardContent>
                 </Card>
             </TabsContent>
-
-            {/* Debts Tab */}
-            <TabsContent value="debts" className="mt-6">
-              <Card className="mt-4">
-                <CardHeader>
-                  <CardTitle>Gestión de Deudas de Clientes</CardTitle>
-                  <CardDescription>Seleccione un cliente para ver y gestionar sus deudas pendientes.</CardDescription>
-                  <div className="pt-4">
-                    <Select onValueChange={setSelectedClientIdForDebts} value={selectedClientIdForDebts ?? ''}>
-                      <SelectTrigger className="w-full sm:w-1/2">
-                        <SelectValue placeholder="Seleccione un cliente..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {clients.map(client => (
-                          <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  {!selectedClientIdForDebts ? (
-                    <EmptyState message="Seleccione un cliente para ver su estado de deuda." icon={Users} />
-                  ) : salesForDebtsTab.length === 0 ? (
-                    <EmptyState message="Este cliente no tiene un historial de ventas." icon={ShoppingCart}/>
-                  ) : (
-                    <ScrollArea className="max-h-[500px] rounded-md border">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="whitespace-nowrap">Fecha Venta</TableHead>
-                            <TableHead className="whitespace-nowrap">Descripción</TableHead>
-                            <TableHead className="whitespace-nowrap">Entrega</TableHead>
-                            <TableHead className="text-right whitespace-nowrap">Monto Total</TableHead>
-                            <TableHead className="text-right whitespace-nowrap">Total Pagado</TableHead>
-                            <TableHead className="text-right whitespace-nowrap">Saldo</TableHead>
-                            <TableHead className="text-center whitespace-nowrap">Estado</TableHead>
-                            <TableHead className="text-center whitespace-nowrap">Fecha Pago</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {salesForDebtsTab.map(sale => {
-                            const totalPaid = sale.payments.reduce((sum, p) => sum + p.amount, 0);
-                            const balance = sale.totalAmount - totalPaid;
-                            const isPaid = balance <= 0;
-                            
-                            let paymentDate = '-';
-                            if (isPaid && sale.payments.length > 0) {
-                                const lastPayment = [...sale.payments].sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime())[0];
-                                paymentDate = capitalize(format(parseISO(lastPayment.date), "EEE, dd/MM/yy", { locale: es }));
-                            }
-
-                            return (
-                              <TableRow key={sale.id} className={cn(isPaid && "text-muted-foreground")}>
-                                <TableCell className="whitespace-nowrap">{capitalize(format(parseISO(sale.date), "EEEE, dd/MM", { locale: es }))}</TableCell>
-                                <TableCell className="whitespace-nowrap">{`Venta de ${sale.quantity} ${sale.unit}`}</TableCell>
-                                <TableCell className="whitespace-nowrap">
-                                    <Badge variant={sale.deliveryType === 'personal' ? 'secondary' : 'outline'}>
-                                        {capitalize(sale.deliveryType)}
-                                    </Badge>
-                                </TableCell>
-                                <TableCell className="text-right whitespace-nowrap">S/. {sale.totalAmount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
-                                <TableCell className="text-right whitespace-nowrap">S/. {totalPaid.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
-                                <TableCell className={cn("text-right font-medium whitespace-nowrap", !isPaid && "text-destructive")}>S/. {balance.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
-                                <TableCell className="text-center whitespace-nowrap">
-                                    <Badge variant={isPaid ? "secondary" : "destructive"}>
-                                        {isPaid ? "Pagada" : "Pendiente"}
-                                    </Badge>
-                                </TableCell>
-                                <TableCell className="text-center whitespace-nowrap">{paymentDate}</TableCell>
-                              </TableRow>
-                            );
-                          })}
-                        </TableBody>
-                        <TableFooter>
-                          <TableRow>
-                            <TableCell colSpan={7} className="text-right font-bold text-lg whitespace-nowrap">Deuda Total Pendiente:</TableCell>
-                            <TableCell className="text-right font-bold text-lg text-destructive whitespace-nowrap">
-                              S/. {totalClientDebt.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
-                            </TableCell>
-                          </TableRow>
-                        </TableFooter>
-                      </Table>
-                      <ScrollBar orientation="horizontal" />
-                      <ScrollBar orientation="vertical" />
-                    </ScrollArea>
-                  )}
-                </CardContent>
-                {selectedClientIdForDebts && totalClientDebt > 0 && (
-                  <CardFooter className="flex flex-wrap justify-end border-t pt-6 gap-2">
-                    <Button variant="destructive" onClick={() => setIsCancelAccountDialogOpen(true)}>
-                        <Ban className="mr-2 h-4 w-4"/> Cancelar Cuentas
-                    </Button>
-                    <Button onClick={() => setIsDebtPaymentDialogOpen(true)}>
-                        <Landmark className="mr-2 h-4 w-4"/> Registrar Abono
-                    </Button>
-                  </CardFooter>
-                )}
-              </Card>
-            </TabsContent>
         </Tabs>
       </main>
 
@@ -956,34 +773,13 @@ export default function SalesClientsPage() {
         />
       )}
       
-      {/* Debt Payment Dialog */}
-      {selectedClientIdForDebts && (
-        <DebtPaymentDialog
-          isOpen={isDebtPaymentDialogOpen}
-          onClose={() => setIsDebtPaymentDialogOpen(false)}
-          onSubmit={handleTotalDebtPayment}
-          totalDebt={totalClientDebt}
-          clientName={clients.find(c => c.id === selectedClientIdForDebts)?.name || ''}
-        />
-      )}
-      
-      {/* Cancel Account Dialog */}
-      {selectedClientIdForDebts && (
-        <CancelAccountDialog
-          isOpen={isCancelAccountDialogOpen}
-          onClose={() => setIsCancelAccountDialogOpen(false)}
-          onSubmit={handleCancelAccount}
-          clientName={clients.find(c => c.id === selectedClientIdForDebts)?.name || ''}
-        />
-      )}
-
       {/* Consolidated Debt Dialog */}
-      {selectedClientIdForHistory && (
+      {activeTab && (
         <ConsolidatedDebtDialog
             isOpen={isConsolidatedDialogOpen}
             onClose={() => setIsConsolidatedDialogOpen(false)}
-            client={clients.find(c => c.id === selectedClientIdForHistory)!}
-            sales={allSalesForSelectedClient}
+            client={clients.find(c => c.id === activeTab)!}
+            sales={sales.filter(s => s.clientId === activeTab)}
             toast={toast}
         />
       )}
@@ -1361,7 +1157,7 @@ const ConsolidatedDebtDialog = ({ isOpen, onClose, client, sales, toast }: { isO
 
   }, [sales, dateRange]);
   
-  if (!isOpen) return null;
+  if (!isOpen || !client) return null;
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
