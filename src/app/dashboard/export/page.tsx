@@ -7,13 +7,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, ChevronLeft, ChevronRight, Download, Printer } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, Download, Printer, DollarSign } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import type { Delivery, Provider, Production, Sale, Client, WholeMilkReplenishment } from '@/types';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
-import { format, startOfWeek, endOfWeek, subDays, addDays, isWithinInterval, parseISO, startOfDay, getDay } from 'date-fns';
+import { format, startOfWeek, endOfWeek, subDays, addDays, isWithinInterval, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { capitalize } from '@/lib/utils';
 
@@ -43,6 +44,7 @@ type ReportOptions = {
 export default function ExportPage() {
   const [isClient, setIsClient] = useState(false);
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(startOfWeek(new Date(), { weekStartsOn: 0 }));
+  const [cheesePrice, setCheesePrice] = useState('1.75');
   const [reportOptions, setReportOptions] = useState<ReportOptions>({
     weeklySummary: true,
     providerTotals: true,
@@ -71,6 +73,12 @@ export default function ExportPage() {
     if (Object.values(reportOptions).every(o => !o)) {
       toast({ title: "Sin Selección", description: "Por favor, selecciona al menos una sección para exportar.", variant: "destructive" });
       return;
+    }
+    
+    const numericCheesePrice = parseFloat(cheesePrice);
+    if (isNaN(numericCheesePrice) || numericCheesePrice <= 0) {
+        toast({ title: "Precio Inválido", description: "Por favor, ingrese un precio de venta de queso válido.", variant: "destructive" });
+        return;
     }
 
     const weekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 0 });
@@ -137,7 +145,7 @@ export default function ExportPage() {
     if (reportOptions.profitCalculation) {
         checkYPos(30);
         const totalUnitsProduced = productionForWeek.reduce((sum, p) => sum + p.producedUnits, 0);
-        const totalRevenue = totalUnitsProduced * 1.75;
+        const totalRevenue = totalUnitsProduced * numericCheesePrice;
         const providerTotals = buildProviderTotals(providers, deliveries, currentWeekStart);
         const totalProviderCost = providerTotals.reduce((sum, p) => sum + p.totalToPay, 0);
         const grossProfit = totalRevenue - totalProviderCost;
@@ -145,7 +153,7 @@ export default function ExportPage() {
         doc.autoTable({
             head: [['Descripción', 'Monto']],
             body: [
-                ['(+) Ingresos Totales por Producción (Venta a S/. 1.75)', `S/. ${totalRevenue.toFixed(2)}`],
+                [`(+) Ingresos Totales por Producción (Venta a S/. ${numericCheesePrice.toFixed(2)})`, `S/. ${totalRevenue.toFixed(2)}`],
                 ['(-) Costo Total por Proveedores', `S/. ${totalProviderCost.toFixed(2)}`],
             ],
             startY: yPos,
@@ -268,7 +276,17 @@ export default function ExportPage() {
                     </div>
                 </div>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-6">
+                <div className="space-y-2">
+                    <Label htmlFor="cheese-price" className="flex items-center"><DollarSign className="mr-2 h-4 w-4 text-muted-foreground"/> Precio de Venta de Queso (S/.)</Label>
+                    <Input 
+                        id="cheese-price"
+                        type="number"
+                        value={cheesePrice}
+                        onChange={(e) => setCheesePrice(e.target.value)}
+                        placeholder="Ej: 1.75"
+                    />
+                </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {options.map((option) => (
                         <div key={option.id} className="flex items-center space-x-2">
@@ -368,5 +386,3 @@ const buildClientSummary = (allClients: Client[], salesForWeek: Sale[]) => {
       }))
       .filter(c => c.totalBought > 0);
 }
-
-    

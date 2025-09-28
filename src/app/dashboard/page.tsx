@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import DashboardHeader from '@/components/dashboard-header';
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card } from "@/components/ui/card";
-import { ClipboardPenLine, ShoppingCart, Cpu, DatabaseBackup, Printer } from 'lucide-react';
+import { ClipboardPenLine, ShoppingCart, Cpu, DatabaseBackup, Printer, History } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import type { Production, WholeMilkReplenishment } from '@/types';
 
@@ -67,6 +67,7 @@ export default function DashboardPage() {
     { title: "Operaciones", icon: ClipboardPenLine, action: () => router.push('/dashboard/registry') },
     { title: "Producción", icon: Cpu, action: () => router.push('/dashboard/production') },
     { title: "Ventas y Clientes", icon: ShoppingCart, action: () => router.push('/dashboard/sales-clients') },
+    { title: "Historial", icon: History, action: () => router.push('/dashboard/history') },
     { title: "Exportar / Imprimir", icon: Printer, action: () => router.push('/dashboard/export') },
     { title: "Salvar y Leer", icon: DatabaseBackup, action: () => router.push('/dashboard/backup') },
   ];
