@@ -1,4 +1,3 @@
-
 "use client";
 
 import React from "react";
@@ -16,7 +15,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { User, MapPin, Phone, Save, XCircle } from "lucide-react";
+import { User, MapPin, Phone, Save, XCircle, DollarSign } from "lucide-react";
 import type { Client } from "@/types";
 
 const clientFormSchema = z.object({
@@ -24,6 +23,10 @@ const clientFormSchema = z.object({
   address: z.string().min(1, "La dirección es obligatoria.").max(200, "La dirección debe tener 200 caracteres o menos."),
   phone: z.string().min(1, "El número de teléfono es obligatorio.").max(20, "El teléfono debe tener 20 caracteres o menos.")
     .regex(/^[\d\s()+-]*$/, "El número de teléfono contiene caracteres inválidos."),
+  salePrice: z.coerce
+    .number({ invalid_type_error: "El precio debe ser un número." })
+    .positive({ message: "El precio debe ser un número positivo." })
+    .min(0.01, { message: "El precio debe ser mayor que cero." }),
 });
 
 export type ClientFormData = z.infer<typeof clientFormSchema>;
@@ -42,6 +45,7 @@ const ClientForm: React.FC<ClientFormProps> = ({ onSubmit, onCancel, initialData
       name: "",
       address: "",
       phone: "",
+      salePrice: undefined,
     },
   });
 
@@ -49,7 +53,7 @@ const ClientForm: React.FC<ClientFormProps> = ({ onSubmit, onCancel, initialData
     if (initialData) {
       form.reset(initialData);
     } else {
-      form.reset({ name: "", address: "", phone: "" });
+      form.reset({ name: "", address: "", phone: "", salePrice: undefined });
     }
   }, [initialData, form]);
 
@@ -103,6 +107,28 @@ const ClientForm: React.FC<ClientFormProps> = ({ onSubmit, onCancel, initialData
               </FormLabel>
               <FormControl>
                 <Input placeholder="Ej: (555) 987-6543" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+         <FormField
+          control={form.control}
+          name="salePrice"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="flex items-center font-semibold">
+                <DollarSign className="mr-2 h-4 w-4 text-muted-foreground" />
+                Precio de Venta Predeterminado
+              </FormLabel>
+              <FormControl>
+                 <Input 
+                  type="number" 
+                  placeholder="Ej: 1.75" 
+                  {...field} 
+                  value={field.value === undefined ? '' : field.value}
+                  onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>

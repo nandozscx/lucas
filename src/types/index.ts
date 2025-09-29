@@ -25,6 +25,7 @@ export interface Client {
   name: string;
   address: string;
   phone: string;
+  salePrice: number; // Default sale price for this client
 }
 
 export interface Payment {

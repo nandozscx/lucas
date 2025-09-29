@@ -57,6 +57,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -112,13 +113,13 @@ type SaleFormData = z.infer<typeof saleFormSchema>;
 
 
 // Sales Form Component
-const SaleForm = ({ onSubmitSale, clients, onClientChange, activeClientId, setActiveClientId }: { onSubmitSale: (data: SaleFormData) => void, clients: Client[], onClientChange: (clientId: string) => void, activeClientId: string | null, setActiveClientId: (id: string) => void }) => {
+const SaleForm = ({ onSubmitSale, client }: { onSubmitSale: (data: SaleFormData) => void, client: Client }) => {
     const form = useForm<SaleFormData>({
         resolver: zodResolver(saleFormSchema),
         defaultValues: {
             date: new Date(),
-            clientId: '',
-            price: '' as any,
+            clientId: client.id,
+            price: client.salePrice,
             quantity: '' as any,
             unit: 'baldes',
             downPayment: '' as any,
@@ -126,19 +127,26 @@ const SaleForm = ({ onSubmitSale, clients, onClientChange, activeClientId, setAc
         },
     });
     
+    // Reset form with client's default price when client changes
     useEffect(() => {
-        if(activeClientId) {
-            form.setValue('clientId', activeClientId);
-        }
-    }, [activeClientId, form]);
+        form.reset({
+             date: new Date(),
+            clientId: client.id,
+            price: client.salePrice,
+            quantity: '' as any,
+            unit: 'baldes',
+            downPayment: '' as any,
+            deliveryType: 'personal',
+        });
+    }, [client, form]);
+
 
     const handleSubmit = (data: SaleFormData) => {
         onSubmitSale(data);
-        setActiveClientId(data.clientId); // Ensure the tab for this client is active
         form.reset({
             date: new Date(),
-            clientId: data.clientId,
-            price: '' as any,
+            clientId: client.id,
+            price: client.salePrice,
             quantity: '' as any,
             unit: 'baldes',
             downPayment: '' as any,
@@ -147,187 +155,165 @@ const SaleForm = ({ onSubmitSale, clients, onClientChange, activeClientId, setAc
     };
 
     return (
-        <Card className="shadow-lg rounded-lg">
-            <CardHeader>
-                <CardTitle className="flex items-center text-xl text-primary">
-                    <DollarSign className="mr-2 h-6 w-6" />
-                    Registrar Nueva Venta
-                </CardTitle>
-            </CardHeader>
-            <Form {...form}>
-                <form onSubmit={form.handleSubmit(handleSubmit)}>
-                    <CardContent className="space-y-4">
-                        <FormField
-                            control={form.control}
-                            name="clientId"
-                            render={({ field }) => (
-                                <FormItem>
-                                <FormLabel className="font-semibold">Cliente</FormLabel>
-                                <Select 
-                                  onValueChange={(value) => {
-                                    field.onChange(value);
-                                    if (value) onClientChange(value);
-                                  }} 
-                                  value={field.value ?? ''}
-                                >
-                                    <FormControl>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Seleccione un cliente" />
-                                    </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                    {clients.map(client => (
-                                        <SelectItem key={client.id} value={client.id}>
-                                        {client.name}
-                                        </SelectItem>
-                                    ))}
-                                    </SelectContent>
-                                </Select>
-                                <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        <FormField
-                            control={form.control}
-                            name="date"
-                            render={({ field }) => (
-                                <FormItem className="flex flex-col">
-                                    <FormLabel className="font-semibold">Fecha de Venta</FormLabel>
-                                    <Popover>
-                                        <PopoverTrigger asChild>
+        <Accordion type="single" collapsible className="w-full">
+            <AccordionItem value="new-sale">
+                <AccordionTrigger>
+                    <h3 className="flex items-center text-lg font-semibold text-primary">
+                         <PlusCircle className="mr-2 h-5 w-5" />
+                        Registrar Nueva Venta
+                    </h3>
+                </AccordionTrigger>
+                <AccordionContent>
+                    <Card className="shadow-none border-0">
+                        <Form {...form}>
+                            <form onSubmit={form.handleSubmit(handleSubmit)}>
+                                <CardContent className="space-y-4 pt-4">
+                                     <FormField
+                                        control={form.control}
+                                        name="date"
+                                        render={({ field }) => (
+                                            <FormItem className="flex flex-col">
+                                                <FormLabel className="font-semibold">Fecha de Venta</FormLabel>
+                                                <Popover>
+                                                    <PopoverTrigger asChild>
+                                                        <FormControl>
+                                                            <Button
+                                                                variant={"outline"}
+                                                                className={cn("w-full pl-3 text-left font-normal justify-start", !field.value && "text-muted-foreground")}
+                                                            >
+                                                                {field.value ? capitalize(format(field.value, "EEEE, dd/MM", { locale: es })) : <span>Seleccione una fecha</span>}
+                                                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                                            </Button>
+                                                        </FormControl>
+                                                    </PopoverTrigger>
+                                                    <PopoverContent className="w-auto p-0" align="start">
+                                                        <Calendar
+                                                            mode="single"
+                                                            selected={field.value}
+                                                            onSelect={field.onChange}
+                                                            disabled={(date) => date > new Date() || date < new Date("2000-01-01")}
+                                                            initialFocus
+                                                            locale={es}
+                                                        />
+                                                    </PopoverContent>
+                                                </Popover>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <FormField
+                                            control={form.control}
+                                            name="price"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel className="font-semibold">Precio de Venta (Unitario)</FormLabel>
+                                                    <FormControl>
+                                                        <Input type="number" step="0.01" placeholder="Ej: 1.75" {...field} value={field.value ?? ''} />
+                                                    </FormControl>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                        <FormField
+                                            control={form.control}
+                                            name="quantity"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel className="font-semibold">Cantidad</FormLabel>
+                                                    <FormControl>
+                                                        <Input type="number" placeholder="Ej: 10" {...field} value={field.value ?? ''} />
+                                                    </FormControl>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                    </div>
+                                    <FormField
+                                        control={form.control}
+                                        name="unit"
+                                        render={({ field }) => (
+                                            <FormItem className="space-y-3">
+                                            <FormLabel className="font-semibold">Unidad de Medida</FormLabel>
                                             <FormControl>
-                                                <Button
-                                                    variant={"outline"}
-                                                    className={cn("w-full pl-3 text-left font-normal justify-start", !field.value && "text-muted-foreground")}
+                                                <RadioGroup
+                                                onValueChange={field.onChange}
+                                                defaultValue={field.value}
+                                                className="flex items-center space-x-4"
                                                 >
-                                                    {field.value ? capitalize(format(field.value, "EEEE, dd/MM", { locale: es })) : <span>Seleccione una fecha</span>}
-                                                    <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                                </Button>
+                                                <FormItem className="flex items-center space-x-2 space-y-0">
+                                                    <FormControl>
+                                                        <RadioGroupItem value="baldes" />
+                                                    </FormControl>
+                                                    <FormLabel className="font-normal flex items-center"><Box className="mr-1 h-4 w-4"/> Baldes</FormLabel>
+                                                </FormItem>
+                                                <FormItem className="flex items-center space-x-2 space-y-0">
+                                                    <FormControl>
+                                                        <RadioGroupItem value="unidades" />
+                                                    </FormControl>
+                                                    <FormLabel className="font-normal flex items-center"><Package className="mr-1 h-4 w-4"/> Unidades</FormLabel>
+                                                </FormItem>
+                                                </RadioGroup>
                                             </FormControl>
-                                        </PopoverTrigger>
-                                        <PopoverContent className="w-auto p-0" align="start">
-                                            <Calendar
-                                                mode="single"
-                                                selected={field.value}
-                                                onSelect={field.onChange}
-                                                disabled={(date) => date > new Date() || date < new Date("2000-01-01")}
-                                                initialFocus
-                                                locale={es}
-                                            />
-                                        </PopoverContent>
-                                    </Popover>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        <FormField
-                            control={form.control}
-                            name="price"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel className="font-semibold">Precio de Venta (Unitario)</FormLabel>
-                                    <FormControl>
-                                        <Input type="number" placeholder="Ej: 15.25" {...field} value={field.value ?? ''} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                         <FormField
-                            control={form.control}
-                            name="quantity"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel className="font-semibold">Cantidad</FormLabel>
-                                    <FormControl>
-                                        <Input type="number" placeholder="Ej: 10" {...field} value={field.value ?? ''} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        <FormField
-                            control={form.control}
-                            name="unit"
-                            render={({ field }) => (
-                                <FormItem className="space-y-3">
-                                <FormLabel className="font-semibold">Unidad de Medida</FormLabel>
-                                <FormControl>
-                                    <RadioGroup
-                                    onValueChange={field.onChange}
-                                    defaultValue={field.value}
-                                    className="flex items-center space-x-4"
-                                    >
-                                    <FormItem className="flex items-center space-x-2 space-y-0">
-                                        <FormControl>
-                                            <RadioGroupItem value="baldes" />
-                                        </FormControl>
-                                        <FormLabel className="font-normal flex items-center"><Box className="mr-1 h-4 w-4"/> Baldes</FormLabel>
-                                    </FormItem>
-                                    <FormItem className="flex items-center space-x-2 space-y-0">
-                                        <FormControl>
-                                            <RadioGroupItem value="unidades" />
-                                        </FormControl>
-                                        <FormLabel className="font-normal flex items-center"><Package className="mr-1 h-4 w-4"/> Unidades</FormLabel>
-                                    </FormItem>
-                                    </RadioGroup>
-                                </FormControl>
-                                <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        <FormField
-                            control={form.control}
-                            name="downPayment"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel className="font-semibold">Abono (Acta)</FormLabel>
-                                    <FormControl>
-                                        <Input type="number" placeholder="Opcional. Ej: 500" {...field} value={field.value ?? ''} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        <FormField
-                            control={form.control}
-                            name="deliveryType"
-                            render={({ field }) => (
-                                <FormItem className="space-y-3">
-                                <FormLabel className="font-semibold">Tipo de Entrega</FormLabel>
-                                <FormControl>
-                                    <RadioGroup
-                                    onValueChange={field.onChange}
-                                    defaultValue={field.value}
-                                    className="flex items-center space-x-4"
-                                    >
-                                    <FormItem className="flex items-center space-x-2 space-y-0">
-                                        <FormControl>
-                                            <RadioGroupItem value="personal" />
-                                        </FormControl>
-                                        <FormLabel className="font-normal flex items-center"><PersonStanding className="mr-1 h-4 w-4"/> Personal</FormLabel>
-                                    </FormItem>
-                                    <FormItem className="flex items-center space-x-2 space-y-0">
-                                        <FormControl>
-                                            <RadioGroupItem value="envio" />
-                                        </FormControl>
-                                        <FormLabel className="font-normal flex items-center"><Truck className="mr-1 h-4 w-4"/> Envío</FormLabel>
-                                    </FormItem>
-                                    </RadioGroup>
-                                </FormControl>
-                                <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                    </CardContent>
-                    <CardFooter>
-                        <Button type="submit" className="w-full bg-primary hover:bg-primary/90">
-                            <PlusCircle className="mr-2 h-5 w-5" /> Registrar Venta
-                        </Button>
-                    </CardFooter>
-                </form>
-            </Form>
-        </Card>
+                                            <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <FormField
+                                        control={form.control}
+                                        name="downPayment"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel className="font-semibold">Abono (Acta)</FormLabel>
+                                                <FormControl>
+                                                    <Input type="number" placeholder="Opcional. Ej: 500" {...field} value={field.value ?? ''} />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <FormField
+                                        control={form.control}
+                                        name="deliveryType"
+                                        render={({ field }) => (
+                                            <FormItem className="space-y-3">
+                                            <FormLabel className="font-semibold">Tipo de Entrega</FormLabel>
+                                            <FormControl>
+                                                <RadioGroup
+                                                onValueChange={field.onChange}
+                                                defaultValue={field.value}
+                                                className="flex items-center space-x-4"
+                                                >
+                                                <FormItem className="flex items-center space-x-2 space-y-0">
+                                                    <FormControl>
+                                                        <RadioGroupItem value="personal" />
+                                                    </FormControl>
+                                                    <FormLabel className="font-normal flex items-center"><PersonStanding className="mr-1 h-4 w-4"/> Personal</FormLabel>
+                                                </FormItem>
+                                                <FormItem className="flex items-center space-x-2 space-y-0">
+                                                    <FormControl>
+                                                        <RadioGroupItem value="envio" />
+                                                    </FormControl>
+                                                    <FormLabel className="font-normal flex items-center"><Truck className="mr-1 h-4 w-4"/> Envío</FormLabel>
+                                                </FormItem>
+                                                </RadioGroup>
+                                            </FormControl>
+                                            <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                </CardContent>
+                                <CardFooter>
+                                    <Button type="submit" className="w-full bg-primary hover:bg-primary/90">
+                                        <PlusCircle className="mr-2 h-5 w-5" /> Registrar Venta
+                                    </Button>
+                                </CardFooter>
+                            </form>
+                        </Form>
+                    </Card>
+                </AccordionContent>
+            </AccordionItem>
+        </Accordion>
     );
 };
 
@@ -356,9 +342,10 @@ export default function SalesClientsPage() {
       if (storedClients) {
         try {
           const parsedClients = JSON.parse(storedClients);
-          setClients(parsedClients);
-          if (parsedClients.length > 0 && !activeTab) {
-            setActiveTab(parsedClients[0].id);
+          const clientsWithPrice = parsedClients.map((c: any) => ({ ...c, salePrice: c.salePrice || 1.75 }));
+          setClients(clientsWithPrice);
+          if (clientsWithPrice.length > 0 && !activeTab) {
+            setActiveTab(clientsWithPrice[0].id);
           }
         } catch (error) {
           console.error("Falló al parsear clientes desde localStorage", error);
@@ -402,7 +389,7 @@ export default function SalesClientsPage() {
             }
         }
     }
-  }, []);
+  }, [activeTab]);
 
   // Save clients to localStorage
   useEffect(() => {
@@ -577,141 +564,137 @@ export default function SalesClientsPage() {
             
             {/* Sales Tab */}
             <TabsContent value="sales" className="mt-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
-                    <div className="md:col-span-1">
-                        <SaleForm 
-                          onSubmitSale={handleAddSale} 
-                          clients={clients}
-                          onClientChange={(clientId) => setActiveTab(clientId)}
-                          activeClientId={activeTab}
-                          setActiveClientId={setActiveTab}
-                        />
-                    </div>
-                    <div className="md:col-span-2">
-                        {clients.length === 0 ? (
-                             <Card className="shadow-lg rounded-lg">
+                 {clients.length === 0 ? (
+                      <Card className="shadow-lg rounded-lg">
+                          <CardHeader>
+                              <CardTitle>Historial de Ventas</CardTitle>
+                              <CardDescription>Agrega un cliente para empezar a registrar ventas.</CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                              <EmptyState message="No hay clientes registrados." icon={Users} onAddClick={() => {
+                                  const salesTab = document.querySelector('button[data-radix-collection-item][value="clients"]') as HTMLButtonElement;
+                                  salesTab?.click();
+                                  handleOpenAddDialog();
+                              }} buttonText="Agregar Cliente"/>
+                          </CardContent>
+                      </Card>
+                 ) : (
+                 <Tabs value={activeTab ?? ""} onValueChange={handleTabChange} className="w-full">
+                     <ScrollArea>
+                         <TabsList>
+                             {clients.map(client => (
+                                 <TabsTrigger key={client.id} value={client.id}>{client.name}</TabsTrigger>
+                             ))}
+                         </TabsList>
+                         <ScrollBar orientation="horizontal"/>
+                     </ScrollArea>
+                     {clients.map(client => {
+                         const allSalesForClient = sales.filter(s => s.clientId === client.id);
+                         const salesToShow = showPaidSales ? allSalesForClient : allSalesForClient.filter(s => s.totalAmount - s.payments.reduce((sum,p) => sum+p.amount, 0) > 0.01);
+                         const totalDebt = allSalesForClient.reduce((total, sale) => {
+                             const balance = sale.totalAmount - sale.payments.reduce((sum, p) => sum + p.amount, 0);
+                             return total + (balance > 0 ? balance : 0);
+                         }, 0);
+                         
+                         return (
+                         <TabsContent key={client.id} value={client.id} className="mt-4">
+                              <Card className="shadow-lg rounded-lg">
                                  <CardHeader>
-                                     <CardTitle>Historial de Ventas</CardTitle>
-                                     <CardDescription>Agrega un cliente para empezar a registrar ventas.</CardDescription>
+                                      <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
+                                         <div>
+                                             <CardTitle>Historial de {client.name}</CardTitle>
+                                             <CardDescription>Mostrando {salesToShow.length} de {allSalesForClient.length} ventas.</CardDescription>
+                                         </div>
+                                         <div className="flex items-center space-x-2 self-end sm:self-center">
+                                             <Checkbox
+                                                 id={`show-paid-${client.id}`}
+                                                 checked={showPaidSales}
+                                                 onCheckedChange={(checked) => setShowPaidSales(Boolean(checked))}
+                                             />
+                                             <Label htmlFor={`show-paid-${client.id}`} className="text-sm font-medium leading-none whitespace-nowrap">
+                                                 Mostrar Pagadas
+                                             </Label>
+                                         </div>
+                                      </div>
                                  </CardHeader>
-                                 <CardContent>
-                                     <EmptyState message="No hay clientes registrados." icon={Users}/>
+                                 <CardContent className="space-y-6">
+                                     <SaleForm 
+                                       onSubmitSale={handleAddSale} 
+                                       client={client}
+                                     />
+
+                                     {allSalesForClient.length === 0 ? (
+                                         <EmptyState message="Este cliente no tiene ventas registradas." icon={ShoppingCart}/>
+                                     ) : (
+                                         <ScrollArea className="h-[440px] rounded-md border">
+                                             <Table>
+                                                 <TableHeader>
+                                                     <TableRow>
+                                                         <TableHead>Fecha</TableHead>
+                                                         <TableHead>Cantidad</TableHead>
+                                                         <TableHead>Entrega</TableHead>
+                                                         <TableHead className="text-right">Precio U.</TableHead>
+                                                         <TableHead className="text-right">M. Total</TableHead>
+                                                         <TableHead className="text-right">Abono</TableHead>
+                                                         <TableHead className="text-right">Saldo</TableHead>
+                                                         <TableHead className="text-center">Acciones</TableHead>
+                                                     </TableRow>
+                                                 </TableHeader>
+                                                 <TableBody>
+                                                      {salesToShow.map(sale => {
+                                                       const totalPaid = sale.payments.reduce((sum, p) => sum + p.amount, 0);
+                                                       const balance = sale.totalAmount - totalPaid;
+                                                       return (
+                                                         <TableRow key={sale.id}>
+                                                           <TableCell>{capitalize(format(parseISO(sale.date), "EEEE, dd/MM", { locale: es }))}</TableCell>
+                                                           <TableCell>{`${sale.quantity} ${sale.unit}`}</TableCell>
+                                                           <TableCell>
+                                                             <Badge variant={sale.deliveryType === 'personal' ? 'secondary' : 'outline'}>
+                                                               {capitalize(sale.deliveryType)}
+                                                             </Badge>
+                                                           </TableCell>
+                                                           <TableCell className="text-right">S/. {sale.price.toLocaleString(undefined, {minimumFractionDigits: 2})}</TableCell>
+                                                           <TableCell className="text-right">S/. {sale.totalAmount.toLocaleString(undefined, {minimumFractionDigits: 2})}</TableCell>
+                                                           <TableCell className="text-right">S/. {totalPaid.toLocaleString(undefined, {minimumFractionDigits: 2})}</TableCell>
+                                                           <TableCell className={`text-right font-medium ${balance > 0.01 ? 'text-destructive' : 'text-green-500'}`}>S/. {balance.toLocaleString(undefined, {minimumFractionDigits: 2})}</TableCell>
+                                                           <TableCell className="text-center">
+                                                               <Button variant="ghost" size="icon" onClick={() => setSaleForPayment(sale)} disabled={balance <= 0.01} aria-label="Añadir pago"><HandCoins className="h-4 w-4 text-green-500" /></Button>
+                                                               <Button variant="ghost" size="icon" onClick={() => setSaleToDelete(sale)} aria-label="Eliminar Venta"><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                                                           </TableCell>
+                                                         </TableRow>
+                                                       );
+                                                     })}
+                                                 </TableBody>
+                                                 <TableFooter>
+                                                     <TableRow>
+                                                         <TableCell colSpan={6} className="text-right font-bold text-lg">Deuda Total:</TableCell>
+                                                         <TableCell className="text-right font-bold text-lg text-destructive">S/. {totalDebt.toLocaleString(undefined, {minimumFractionDigits: 2})}</TableCell>
+                                                         <TableCell></TableCell>
+                                                     </TableRow>
+                                                 </TableFooter>
+                                             </Table>
+                                             <ScrollBar orientation="horizontal" />
+                                             <ScrollBar orientation="vertical" />
+                                         </ScrollArea>
+                                     )}
                                  </CardContent>
+                                 {allSalesForClient.length > 0 && (
+                                     <CardFooter className="flex flex-col items-stretch sm:items-end border-t pt-6 gap-2">
+                                          <Button onClick={() => {
+                                             const clientForDialog = clients.find(c => c.id === activeTab);
+                                             if(clientForDialog) setIsConsolidatedDialogOpen(true);
+                                          }} variant="outline">
+                                             <Library className="mr-2 h-4 w-4" />
+                                             Consolidado de Deuda
+                                         </Button>
+                                     </CardFooter>
+                                 )}
                              </Card>
-                        ) : (
-                        <Tabs value={activeTab ?? ""} onValueChange={handleTabChange} className="w-full">
-                            <ScrollArea>
-                                <TabsList>
-                                    {clients.map(client => (
-                                        <TabsTrigger key={client.id} value={client.id}>{client.name}</TabsTrigger>
-                                    ))}
-                                </TabsList>
-                                <ScrollBar orientation="horizontal"/>
-                            </ScrollArea>
-                            {clients.map(client => {
-                                const allSalesForClient = sales.filter(s => s.clientId === client.id);
-                                const salesToShow = showPaidSales ? allSalesForClient : allSalesForClient.filter(s => s.totalAmount - s.payments.reduce((sum,p) => sum+p.amount, 0) > 0);
-                                const totalDebt = allSalesForClient.reduce((total, sale) => {
-                                    const balance = sale.totalAmount - sale.payments.reduce((sum, p) => sum + p.amount, 0);
-                                    return total + (balance > 0 ? balance : 0);
-                                }, 0);
-                                
-                                return (
-                                <TabsContent key={client.id} value={client.id} className="mt-4">
-                                     <Card className="shadow-lg rounded-lg">
-                                        <CardHeader>
-                                             <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
-                                                <div>
-                                                    <CardTitle>Historial de {client.name}</CardTitle>
-                                                    <CardDescription>Mostrando {salesToShow.length} de {allSalesForClient.length} ventas.</CardDescription>
-                                                </div>
-                                                <div className="flex items-center space-x-2 self-end sm:self-center">
-                                                    <Checkbox
-                                                        id={`show-paid-${client.id}`}
-                                                        checked={showPaidSales}
-                                                        onCheckedChange={(checked) => setShowPaidSales(Boolean(checked))}
-                                                    />
-                                                    <Label htmlFor={`show-paid-${client.id}`} className="text-sm font-medium leading-none whitespace-nowrap">
-                                                        Mostrar Pagadas
-                                                    </Label>
-                                                </div>
-                                             </div>
-                                        </CardHeader>
-                                        <CardContent>
-                                            {allSalesForClient.length === 0 ? (
-                                                <EmptyState message="Este cliente no tiene ventas registradas." icon={ShoppingCart}/>
-                                            ) : (
-                                                <ScrollArea className="h-[440px] rounded-md border">
-                                                    <Table>
-                                                        <TableHeader>
-                                                            <TableRow>
-                                                                <TableHead>Fecha</TableHead>
-                                                                <TableHead>Cantidad</TableHead>
-                                                                <TableHead>Entrega</TableHead>
-                                                                <TableHead className="text-right">Precio U.</TableHead>
-                                                                <TableHead className="text-right">M. Total</TableHead>
-                                                                <TableHead className="text-right">Abono</TableHead>
-                                                                <TableHead className="text-right">Saldo</TableHead>
-                                                                <TableHead className="text-center">Acciones</TableHead>
-                                                            </TableRow>
-                                                        </TableHeader>
-                                                        <TableBody>
-                                                             {salesToShow.map(sale => {
-                                                              const totalPaid = sale.payments.reduce((sum, p) => sum + p.amount, 0);
-                                                              const balance = sale.totalAmount - totalPaid;
-                                                              return (
-                                                                <TableRow key={sale.id}>
-                                                                  <TableCell>{capitalize(format(parseISO(sale.date), "EEEE, dd/MM", { locale: es }))}</TableCell>
-                                                                  <TableCell>{`${sale.quantity} ${sale.unit}`}</TableCell>
-                                                                  <TableCell>
-                                                                    <Badge variant={sale.deliveryType === 'personal' ? 'secondary' : 'outline'}>
-                                                                      {capitalize(sale.deliveryType)}
-                                                                    </Badge>
-                                                                  </TableCell>
-                                                                  <TableCell className="text-right">S/. {sale.price.toLocaleString(undefined, {minimumFractionDigits: 2})}</TableCell>
-                                                                  <TableCell className="text-right">S/. {sale.totalAmount.toLocaleString(undefined, {minimumFractionDigits: 2})}</TableCell>
-                                                                  <TableCell className="text-right">S/. {totalPaid.toLocaleString(undefined, {minimumFractionDigits: 2})}</TableCell>
-                                                                  <TableCell className={`text-right font-medium ${balance > 0 ? 'text-destructive' : ''}`}>S/. {balance.toLocaleString(undefined, {minimumFractionDigits: 2})}</TableCell>
-                                                                  <TableCell className="text-center">
-                                                                      <Button variant="ghost" size="icon" onClick={() => setSaleForPayment(sale)} disabled={balance <= 0} aria-label="Añadir pago"><HandCoins className="h-4 w-4 text-green-500" /></Button>
-                                                                      <Button variant="ghost" size="icon" onClick={() => setSaleToDelete(sale)} aria-label="Eliminar Venta"><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                                                                  </TableCell>
-                                                                </TableRow>
-                                                              );
-                                                            })}
-                                                        </TableBody>
-                                                        <TableFooter>
-                                                            <TableRow>
-                                                                <TableCell colSpan={6} className="text-right font-bold text-lg">Deuda Total:</TableCell>
-                                                                <TableCell className="text-right font-bold text-lg text-destructive">S/. {totalDebt.toLocaleString(undefined, {minimumFractionDigits: 2})}</TableCell>
-                                                                <TableCell></TableCell>
-                                                            </TableRow>
-                                                        </TableFooter>
-                                                    </Table>
-                                                    <ScrollBar orientation="horizontal" />
-                                                    <ScrollBar orientation="vertical" />
-                                                </ScrollArea>
-                                            )}
-                                        </CardContent>
-                                        {allSalesForClient.length > 0 && (
-                                            <CardFooter className="flex flex-col items-stretch sm:items-end border-t pt-6 gap-2">
-                                                 <Button onClick={() => {
-                                                    const clientForDialog = clients.find(c => c.id === activeTab);
-                                                    if(clientForDialog) setIsConsolidatedDialogOpen(true);
-                                                 }} variant="outline">
-                                                    <Library className="mr-2 h-4 w-4" />
-                                                    Consolidado de Deuda
-                                                </Button>
-                                            </CardFooter>
-                                        )}
-                                    </Card>
-                                </TabsContent>
-                                );
-                            })}
-                        </Tabs>
-                        )}
-                    </div>
-                </div>
+                         </TabsContent>
+                         );
+                     })}
+                 </Tabs>
+                 )}
             </TabsContent>
 
             {/* Clients Tab */}
@@ -734,6 +717,7 @@ export default function SalesClientsPage() {
                                   <TableHead className="font-semibold">Nombre</TableHead>
                                   <TableHead className="font-semibold">Dirección</TableHead>
                                   <TableHead className="font-semibold">Teléfono</TableHead>
+                                  <TableHead className="font-semibold text-right">Precio Venta</TableHead>
                                   <TableHead className="text-right font-semibold">Acciones</TableHead>
                                 </TableRow>
                               </TableHeader>
@@ -743,6 +727,7 @@ export default function SalesClientsPage() {
                                     <TableCell className="font-medium">{client.name}</TableCell>
                                     <TableCell className="whitespace-nowrap">{client.address}</TableCell>
                                     <TableCell>{client.phone}</TableCell>
+                                    <TableCell className="text-right">S/. {client.salePrice.toLocaleString(undefined, {minimumFractionDigits: 2})}</TableCell>
                                     <TableCell className="text-right">
                                       <Button variant="ghost" size="icon" onClick={() => handleOpenEditDialog(client)} aria-label={`Editar ${client.name}`}>
                                         <Edit2 className="h-4 w-4 text-blue-600 hover:text-blue-500" />
@@ -756,6 +741,7 @@ export default function SalesClientsPage() {
                               </TableBody>
                             </Table>
                             <ScrollBar orientation="horizontal" />
+                             <ScrollBar orientation="vertical" />
                           </ScrollArea>
                         )}
                     </CardContent>
@@ -799,7 +785,7 @@ export default function SalesClientsPage() {
           <ClientForm
             onSubmit={handleClientFormSubmit}
             onCancel={handleCloseDialog}
-            initialData={editingClient ? { name: editingClient.name, address: editingClient.address, phone: editingClient.phone } : undefined}
+            initialData={editingClient ? { name: editingClient.name, address: editingClient.address, phone: editingClient.phone, salePrice: editingClient.salePrice } : undefined}
             isEditing={!!editingClient}
           />
         </DialogContent>
@@ -1039,7 +1025,7 @@ const CancelAccountDialog = ({ isOpen, onClose, onSubmit, clientName }: { isOpen
                             <FormControl>
                                 <Button
                                     variant={"outline"}
-                                    className={cn("w-full pl-3 text-left font-normal justify-start", !field.value && "text-muted-foreground")}
+                                    className={cn("w-full pl-3 text-left font-normal justify-start", !field.value && "text-muted_foreground")}
                                 >
                                     {field.value ? capitalize(format(field.value, "EEEE, dd/MM", { locale: es })) : <span>Seleccione una fecha</span>}
                                     <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
@@ -1220,6 +1206,3 @@ const ConsolidatedDebtDialog = ({ isOpen, onClose, client, sales, toast }: { isO
     </Dialog>
   );
 };
-
-
-    
