@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -75,7 +74,7 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen flex flex-col p-4 sm:p-6 space-y-6 bg-background">
       <DashboardHeader />
-      <main className="flex-grow grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 p-4 items-center">
+      <main className="flex-grow grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 p-4">
         {cardItems.map((item, index) => {
           const IconComponent = item.icon;
           return (

@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -618,8 +617,8 @@ export default function ProductionPage() {
             </TabsContent>
             
             <TabsContent value="wholeMilk" className="mt-6">
-                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                    <div className="space-y-8 md:col-span-1 lg:col-span-1">
+                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div className="space-y-8 lg:col-span-1">
                         <Card>
                             <CardHeader>
                                 <CardTitle>Reabastecer Stock</CardTitle>
@@ -712,7 +711,7 @@ export default function ProductionPage() {
                             </CardContent>
                         </Card>
                     </div>
-                     <Card className="md:col-span-1 lg:col-span-2">
+                     <Card className="lg:col-span-2">
                         <CardHeader>
                             <CardTitle>Historial de Reabastecimiento</CardTitle>
                             <CardDescription>Registro de todas las compras de leche entera.</CardDescription>

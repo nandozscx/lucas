@@ -1,4 +1,3 @@
-
 "use client";
 import Link from "next/link";
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -344,7 +343,7 @@ export default function BackupPage() {
                       </div>
                     ) : (
                       <div className="space-y-4">
-                        <div className="flex justify-between items-center">
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                            <p className="text-sm text-muted-foreground">Carpeta conectada: <Badge variant="secondary">{dirHandle.name}</Badge></p>
                            <Button variant="outline" size="sm" onClick={handleDisconnect}><Trash2 className="mr-2 h-4 w-4"/> Desconectar</Button>
                         </div>
@@ -459,5 +458,3 @@ export default function BackupPage() {
     </>
   );
 }
-
-    

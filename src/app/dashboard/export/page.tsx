@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -264,7 +263,7 @@ export default function ExportPage() {
             <CardHeader>
                 <CardTitle>Generador de Reportes</CardTitle>
                 <CardDescription>Selecciona las secciones que deseas incluir en tu reporte PDF para la semana:</CardDescription>
-                <div className="flex justify-between items-center pt-4">
+                <div className="flex flex-col sm:flex-row justify-between items-center pt-4 gap-2">
                     <CardDescription>{weekTitle}</CardDescription>
                      <div className="flex items-center gap-2">
                         <Button variant="outline" size="sm" onClick={handlePreviousWeek}>

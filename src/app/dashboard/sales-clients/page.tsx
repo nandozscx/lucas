@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -599,7 +598,7 @@ export default function SalesClientsPage() {
                                      {allSalesForClient.length === 0 ? (
                                          <EmptyState message="Este cliente no tiene ventas registradas." icon={ShoppingCart}/>
                                      ) : (
-                                         <ScrollArea className="h-[440px] rounded-md border">
+                                         <ScrollArea className="h-auto max-h-[500px] rounded-md border">
                                              <Table>
                                                  <TableHeader>
                                                      <TableRow>
@@ -673,9 +672,9 @@ export default function SalesClientsPage() {
             {/* Clients Tab */}
             <TabsContent value="clients" className="mt-6">
                 <Card>
-                    <CardHeader className="flex flex-row items-center justify-between">
+                    <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                        <CardTitle>Gestionar Clientes</CardTitle>
-                       <Button onClick={handleOpenAddDialog} className="bg-primary hover:bg-primary/90">
+                       <Button onClick={handleOpenAddDialog} className="bg-primary hover:bg-primary/90 w-full sm:w-auto">
                             <PlusCircle className="mr-2 h-5 w-5" /> Agregar Cliente
                         </Button>
                     </CardHeader>

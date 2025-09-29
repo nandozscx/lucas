@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -225,11 +224,9 @@ export default function OperationsPage() {
           <ArrowLeft className="mr-1 h-4 w-4" />
           Volver al Panel
         </Link>
-        <div className="text-center order-first sm:order-none mx-auto sm:mx-0">
-          <h1 className="text-2xl md:text-3xl font-bold text-primary flex items-center justify-center">
-            <ClipboardList className="mr-3 h-8 w-8" /> Operaciones
-          </h1>
-        </div>
+        <h1 className="text-2xl md:text-3xl font-bold text-primary flex items-center order-first sm:order-none mx-auto sm:mx-0">
+          <ClipboardList className="mr-3 h-8 w-8" /> Operaciones
+        </h1>
         <div className="w-0 sm:w-auto"></div> 
       </header>
 
@@ -241,8 +238,8 @@ export default function OperationsPage() {
             </TabsList>
             
             <TabsContent value="deliveries" className="mt-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
-                    <div className="md:col-span-1 space-y-6">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
+                    <div className="lg:col-span-1 space-y-6">
                     {providers.length === 0 ? (
                         <Alert variant="destructive" className="shadow-md">
                             <UsersIcon className="h-4 w-4" />
@@ -255,7 +252,7 @@ export default function OperationsPage() {
                         <SupplyEntryForm onSubmitDeliveries={handleAddDeliveries} providers={providers} />
                     )}
                     </div>
-                    <div className="md:col-span-2 space-y-6">
+                    <div className="lg:col-span-2 space-y-6">
                     <SupplyDataView
                         deliveries={deliveries}
                         dailyTotals={dailyTotals}
@@ -267,9 +264,9 @@ export default function OperationsPage() {
 
             <TabsContent value="providers" className="mt-6">
                 <Card>
-                    <CardHeader className="flex flex-row items-center justify-between">
+                    <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                         <CardTitle>Gestionar Proveedores</CardTitle>
-                        <Button onClick={handleOpenAddDialog} className="bg-primary hover:bg-primary/90">
+                        <Button onClick={handleOpenAddDialog} className="bg-primary hover:bg-primary/90 w-full sm:w-auto">
                             <PlusCircle className="mr-2 h-5 w-5" /> Agregar Proveedor
                         </Button>
                     </CardHeader>

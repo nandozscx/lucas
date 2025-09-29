@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -218,7 +217,7 @@ export default function HistoryPage() {
             </CardHeader>
             <CardContent>
                 <Tabs defaultValue="providerTotals" className="w-full">
-                    <TabsList className="grid w-full grid-cols-3">
+                    <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3">
                         <TabsTrigger value="weeklySummary"><CalendarRange className="mr-2 h-4 w-4"/> Resumen Semanal</TabsTrigger>
                         <TabsTrigger value="dailyTotals"><CalendarDays className="mr-2 h-4 w-4"/> Totales Diarios</TabsTrigger>
                         <TabsTrigger value="providerTotals"><Users className="mr-2 h-4 w-4"/> Totales por Proveedor</TabsTrigger>
@@ -229,7 +228,7 @@ export default function HistoryPage() {
                             <Button variant="outline" onClick={() => exportToPDF('weekly')}><Download className="mr-2 h-4 w-4" /> Exportar PDF</Button>
                         </div>
                         {weeklyTableData.length > 0 && deliveriesForWeek.length > 0 ? (
-                             <ScrollArea className="max-h-[500px] rounded-md border whitespace-nowrap">
+                             <ScrollArea className="h-auto max-h-[500px] rounded-md border whitespace-nowrap">
                                 <Table>
                                     <TableCaption>Resumen de entregas por proveedor para la semana seleccionada.</TableCaption>
                                     <TableHeader>
@@ -248,6 +247,7 @@ export default function HistoryPage() {
                                     </TableBody>
                                 </Table>
                                 <ScrollBar orientation="horizontal"/>
+                                <ScrollBar orientation="vertical"/>
                             </ScrollArea>
                         ) : <EmptyState message="No se registraron entregas en esta semana." />}
                     </TabsContent>
