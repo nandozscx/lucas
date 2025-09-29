@@ -40,7 +40,7 @@ export interface Sale {
   clientName: string; // Denormalized for easier display
   price: number;
   quantity: number;
-  unit: 'baldes' | 'unidades';
+  unit: 'baldes';
   deliveryType: 'personal' | 'envio';
   totalAmount: number;
   payments: Payment[];

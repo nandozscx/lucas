@@ -91,7 +91,7 @@ const saleFormSchema = z.object({
   quantity: z.coerce
     .number({ invalid_type_error: "La cantidad debe ser un número." })
     .positive({ message: "La cantidad debe ser un número positivo." }),
-  unit: z.enum(['baldes', 'unidades'], { required_error: "Debe seleccionar una unidad." }),
+  unit: z.enum(['baldes'], { required_error: "Debe seleccionar una unidad." }),
   downPayment: z.coerce
     .number({ invalid_type_error: "El abono debe ser un número." })
     .min(0, "El abono no puede ser negativo.")
@@ -122,7 +122,7 @@ const SaleForm = ({ onSubmitSale, client }: { onSubmitSale: (data: SaleFormData)
             price: client.salePrice,
             quantity: '' as any,
             unit: 'baldes',
-            downPayment: '' as any,
+            downPayment: 0,
             deliveryType: 'personal',
         },
     });
@@ -135,7 +135,7 @@ const SaleForm = ({ onSubmitSale, client }: { onSubmitSale: (data: SaleFormData)
             price: client.salePrice,
             quantity: '' as any,
             unit: 'baldes',
-            downPayment: '' as any,
+            downPayment: 0,
             deliveryType: 'personal',
         });
     }, [client, form]);
@@ -149,7 +149,7 @@ const SaleForm = ({ onSubmitSale, client }: { onSubmitSale: (data: SaleFormData)
             price: client.salePrice,
             quantity: '' as any,
             unit: 'baldes',
-            downPayment: '' as any,
+            downPayment: 0,
             deliveryType: 'personal',
         });
     };
@@ -220,7 +220,7 @@ const SaleForm = ({ onSubmitSale, client }: { onSubmitSale: (data: SaleFormData)
                                             name="quantity"
                                             render={({ field }) => (
                                                 <FormItem>
-                                                    <FormLabel className="font-semibold">Cantidad</FormLabel>
+                                                    <FormLabel className="font-semibold">Cantidad (Baldes)</FormLabel>
                                                     <FormControl>
                                                         <Input type="number" placeholder="Ej: 10" {...field} value={field.value ?? ''} />
                                                     </FormControl>
@@ -229,36 +229,6 @@ const SaleForm = ({ onSubmitSale, client }: { onSubmitSale: (data: SaleFormData)
                                             )}
                                         />
                                     </div>
-                                    <FormField
-                                        control={form.control}
-                                        name="unit"
-                                        render={({ field }) => (
-                                            <FormItem className="space-y-3">
-                                            <FormLabel className="font-semibold">Unidad de Medida</FormLabel>
-                                            <FormControl>
-                                                <RadioGroup
-                                                onValueChange={field.onChange}
-                                                defaultValue={field.value}
-                                                className="flex items-center space-x-4"
-                                                >
-                                                <FormItem className="flex items-center space-x-2 space-y-0">
-                                                    <FormControl>
-                                                        <RadioGroupItem value="baldes" />
-                                                    </FormControl>
-                                                    <FormLabel className="font-normal flex items-center"><Box className="mr-1 h-4 w-4"/> Baldes</FormLabel>
-                                                </FormItem>
-                                                <FormItem className="flex items-center space-x-2 space-y-0">
-                                                    <FormControl>
-                                                        <RadioGroupItem value="unidades" />
-                                                    </FormControl>
-                                                    <FormLabel className="font-normal flex items-center"><Package className="mr-1 h-4 w-4"/> Unidades</FormLabel>
-                                                </FormItem>
-                                                </RadioGroup>
-                                            </FormControl>
-                                            <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
                                     <FormField
                                         control={form.control}
                                         name="downPayment"
@@ -380,6 +350,9 @@ export default function SalesClientsPage() {
                         migratedSale.deliveryType = 'personal';
                     }
                     
+                    // Force unit to 'baldes'
+                    migratedSale.unit = 'baldes';
+
                     return migratedSale;
                 });
                 setSales(migratedSales as Sale[]);
@@ -473,7 +446,7 @@ export default function SalesClientsPage() {
       return;
     }
 
-    const totalAmount = data.price * data.quantity * (data.unit === 'baldes' ? 100 : 1);
+    const totalAmount = data.price * data.quantity * 100;
     const finalDownPayment = data.downPayment ?? 0;
     
     const newSale: Sale = {
@@ -483,7 +456,7 @@ export default function SalesClientsPage() {
       clientName: client.name,
       price: data.price,
       quantity: data.quantity,
-      unit: data.unit,
+      unit: 'baldes',
       deliveryType: data.deliveryType,
       totalAmount: totalAmount,
       payments: finalDownPayment > 0 ? [{ date: format(data.date, "yyyy-MM-dd"), amount: finalDownPayment }] : [],
